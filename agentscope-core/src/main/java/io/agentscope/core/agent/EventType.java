@@ -24,6 +24,7 @@ package io.agentscope.core.agent;
 public enum EventType {
     /**
      * Reasoning event - Agent thinking and planning.
+     * 推理事件，智能体思考与计划
      *
      * <p>Characteristics:
      * <ul>

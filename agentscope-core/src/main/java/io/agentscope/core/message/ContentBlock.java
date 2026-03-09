@@ -51,6 +51,7 @@ import io.agentscope.core.state.State;
     @JsonSubTypes.Type(value = ToolUseBlock.class, name = "tool_use"),
     @JsonSubTypes.Type(value = ToolResultBlock.class, name = "tool_result")
 })
+// 只有指定的子类才能继承，编译时穷尽检查
 public sealed class ContentBlock implements State
         permits TextBlock,
                 ImageBlock,
