@@ -21,21 +21,27 @@ import reactor.core.publisher.Flux;
 
 /**
  * Interface for agents that support streaming events during execution.
+ * 支持在执行过程中流式事件的智能体接口
  *
  * <p>This interface enables real-time streaming of execution events as the agent
  * processes input. Events can include reasoning steps, tool results, and final output.
+ * 该接口使得在智能体处理输入时能够实时流式传输执行事件。事件可以包括推理步骤、工具结果和最终输出。
  *
  * <p>Streaming is useful for:
  * <ul>
  *   <li>Displaying incremental progress to users</li>
+ *   向用户显示增量进度
  *   <li>Monitoring agent reasoning in real-time</li>
+ *   监控智能体的实时推理
  *   <li>Building interactive chat interfaces</li>
+ *   构建交互式聊天界面
  * </ul>
  */
 public interface StreamableAgent {
 
     /**
      * Stream execution events based on current state without adding new input.
+     * 基于当前状态流式执行事件而不添加新的输入
      *
      * @param options Stream configuration options
      * @return Flux of events emitted during execution
@@ -46,6 +52,7 @@ public interface StreamableAgent {
 
     /**
      * Stream execution events with structured output support based on current state.
+     * 基于当前状态流式执行事件并支持结构化输出
      *
      * @param structuredModel Class defining the structure of the output
      * @return Flux of events emitted during execution
@@ -56,6 +63,7 @@ public interface StreamableAgent {
 
     /**
      * Stream execution events with structured output support based on current state.
+     * 基于当前状态流式执行事件并支持结构化输出
      *
      * @param options Stream configuration options
      * @param structuredModel Class defining the structure of the output
@@ -67,6 +75,7 @@ public interface StreamableAgent {
 
     /**
      * Stream execution events for a single message with default options.
+     * 使用默认选项为单个消息流式执行事件
      *
      * @param msg Input message
      * @return Flux of events emitted during execution
@@ -77,6 +86,7 @@ public interface StreamableAgent {
 
     /**
      * Stream execution events for a single message.
+     * 为单个消息流式执行事件
      *
      * @param msg Input message
      * @param options Stream configuration options
@@ -88,6 +98,7 @@ public interface StreamableAgent {
 
     /**
      * Stream execution events for a single message with structured output support.
+     * 为单个消息流式执行事件并支持结构化输出
      *
      * @param msg Input message
      * @param options Stream configuration options
@@ -100,6 +111,7 @@ public interface StreamableAgent {
 
     /**
      * Stream execution events for multiple messages with default options.
+     * 为多个消息使用默认选项流式执行事件
      *
      * @param msgs Input messages
      * @return Flux of events emitted during execution
@@ -110,6 +122,7 @@ public interface StreamableAgent {
 
     /**
      * Stream execution events in real-time as the agent processes the input.
+     * 在智能体处理输入时实时流式执行事件
      *
      * @param msgs Input messages
      * @param options Stream configuration options
@@ -119,6 +132,7 @@ public interface StreamableAgent {
 
     /**
      * Stream execution events with structured output support.
+     * 支持结构化输出的流式执行事件
      *
      * @param msgs Input messages
      * @param options Stream configuration options
