@@ -17,6 +17,7 @@ package io.agentscope.core.agent;
 
 /**
  * Types of events emitted during agent execution.
+ * agent执行期间发出的事件类型
  *
  * <p>Each event type represents a specific stage in the agent's reasoning-acting loop.
  * Events provide a clear separation of concerns for monitoring agent behavior.
@@ -37,6 +38,7 @@ public enum EventType {
 
     /**
      * Tool execution result event.
+     * 工具执行结果事件
      *
      * <p>Characteristics:
      * <ul>
@@ -49,6 +51,7 @@ public enum EventType {
 
     /**
      * Hint event - Information from RAG, memory, or planning systems.
+     * 提示事件 - 来自RAG、记忆或计划系统的信息
      *
      * <p>Characteristics:
      * <ul>
@@ -61,6 +64,7 @@ public enum EventType {
 
     /**
      * Final result event - The agent's complete response.
+     * 完整结果事件 - 智能体的完整响应
      *
      * <p>This is the message returned by {@link Agent#call(io.agentscope.core.message.Msg)}.
      * By default, this event is NOT included in the stream to avoid duplication since it's the return value.
@@ -76,6 +80,7 @@ public enum EventType {
 
     /**
      * Summary event - Generated when max iterations reached.
+     * 总结事件 - 当最大迭代次数达到时生成
      *
      * <p>Characteristics:
      * <ul>
@@ -88,6 +93,7 @@ public enum EventType {
 
     /**
      * Special value to stream all event types (except {@link #AGENT_RESULT}).
+     * 所有事件类型（除了{@link #AGENT_RESULT}）
      *
      * <p>Use this in {@link StreamOptions} to receive all events without filtering.
      */
