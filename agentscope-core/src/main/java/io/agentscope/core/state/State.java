@@ -17,6 +17,7 @@ package io.agentscope.core.state;
 
 /**
  * Marker interface for persistable state objects.
+ * 用于持久化状态对象的标记接口
  *
  * <p>Classes implementing this interface can be serialized and stored by {@link
  * io.agentscope.core.session.Session} implementations. The recommended approach is to use Java

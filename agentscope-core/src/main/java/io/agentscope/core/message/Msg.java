@@ -24,6 +24,7 @@ import io.agentscope.core.model.ChatUsage;
 import io.agentscope.core.state.State;
 import io.agentscope.core.util.JsonUtils;
 import io.agentscope.core.util.TypeUtils;
+
 import java.beans.Transient;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -41,43 +42,89 @@ import java.util.stream.Collectors;
  * <p>Messages are the primary communication unit between agents, users, and tools.
  * Each message has a role (user, assistant, system, or tool), content blocks,
  * and optional metadata.
+ * 消息是智能体s、用户s和工具s的主要通信方式。每一个消息都有一个角色（user, assistant, system, or tool），内容块,
+ * 元数据（可选）
  *
  * <p>Content blocks can include text, images, audio, video, thinking content,
  * tool use blocks, and tool result blocks. The content is stored as an immutable
  * list for thread safety.
+ * content blocks可以包含文本、图片、音频、视频、思考内容、工具使用介绍、
+ * 工具执行结果。为了线程安全。内容以不可变列表的形式存储。
  *
  * <p>Messages are serialized to JSON using Jackson and include a unique ID
  * for tracking purposes.
+ * 消息使用Jackson进行序列化，并包含一个唯一的ID用于追踪。
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Msg implements State {
 
-    /** Metadata key for storing the generate reason. */
+    /**
+     * Metadata key for storing the generate reason.
+     */
     public static final String METADATA_GENERATE_REASON = "agentscope_generate_reason";
 
     private static final DateTimeFormatter TIMESTAMP_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.systemDefault());
 
+    /*
+     {
+        "id": "message_id",
+          "name": "message_name",
+          "role": "user",
+          "content": [
+          {
+                "type": "text",
+                "text": "Hello, world!"
+            },
+            {
+              "type": "thinking",
+               ""
+               },
+               {
+    "type": "tool_use",
+    "id": "call_123",
+    "name": "get_weather",
+    "input": {
+        "city": "Beijing",
+        "unit": "celsius"
+    }
+},
+
+          ],
+          "metadata": {
+             "key": "value",
+              ..........
+          },
+          "timestamp": "2023-07-05 12:34:56.789"
+     }
+     // 测试过程中一定要输出消息体json
+     */
+    // Message ID
     private final String id;
 
+    // Message name
     private final String name;
 
+    // Message role
     private final MsgRole role;
 
+    // Message content
     private final List<ContentBlock> content;
 
+    // Message metadata
     private final Map<String, Object> metadata;
 
+    // 执行时间戳
     private final String timestamp;
 
     /**
      * Creates a new message with the specified fields.
      *
-     * @param id Unique identifier for the message
-     * @param name Optional name for the message (can be null)
-     * @param role The role of the message sender (user, assistant, system, or tool)
-     * @param content List of content blocks that make up the message content
-     * @param metadata Optional metadata map for additional information
+     * @param id        Unique identifier for the message
+     * @param name      Optional name for the message (can be null)
+     * @param role      The role of the message sender (user, assistant, system, or tool)
+     * @param content   List of content blocks that make up the message content
+     * @param metadata  Optional metadata map for additional information
      * @param timestamp Optional timestamp string (if null, will be generated automatically)
      */
     @JsonCreator
@@ -176,7 +223,7 @@ public class Msg implements State {
      * Check if this message has content blocks of the specified type (type-safe).
      *
      * @param blockClass Block class to check for
-     * @param <T> Content block type
+     * @param <T>        Content block type
      * @return true if at least one block of the type exists
      */
     @Transient
@@ -189,7 +236,7 @@ public class Msg implements State {
      * Get all content blocks of the specified type (type-safe).
      *
      * @param blockClass Block class to filter for
-     * @param <T> Content block type
+     * @param <T>        Content block type
      * @return List of matching blocks
      */
     @Transient
@@ -216,7 +263,7 @@ public class Msg implements State {
      * Get the first content block of the specified type (type-safe).
      *
      * @param blockClass Block class to search for
-     * @param <T> Content block type
+     * @param <T>        Content block type
      * @return First matching block or null
      */
     @Transient
@@ -259,9 +306,9 @@ public class Msg implements State {
      * }</pre>
      *
      * @param targetClass The class to convert metadata into
-     * @param <T> Type of the structured data
+     * @param <T>         Type of the structured data
      * @return The structured data object
-     * @throws IllegalStateException if no metadata exists
+     * @throws IllegalStateException    if no metadata exists
      * @throws IllegalArgumentException if conversion fails
      */
     @Transient
@@ -304,23 +351,23 @@ public class Msg implements State {
      *                 						 "properties": {
      *                 						   "productName": {
      *                 							 "type": "string"
-     *                 						                                              },
+     *                                                                                      },
      *                 						   "features": {
      *                 							 "type": "array",
      *                 							 "items": {
      *                 							   "type": "string"                                             *                                           }
-     *                 						   },
+     *                                           },
      *                 						   "pricing": {
      *                 							 "type": "object",
      *                 							 "properties": {
      *                 							   "amount": {
      *                                                  e": "number"
-     *                 							   },
+     *                                               },
      *                 							   "currency": {
      *                                                  e": "string"
      *                                             }
      *                                           }
-     *                 						   },
+     *                                           },
      *                 						   "ratings": {
      *                 							 "type": "object",
      *                 							 "additionalProperties": {
@@ -328,7 +375,7 @@ public class Msg implements State {
      *                                           }
      *                                         }
      *                                       }
-     *                 					   }
+     *                                       }
      *         """;
      *  JsonNode sampleJsonNode = new ObjectMapper().readTree(json);
      *   Msg msg = agent.call(input, sampleJsonNode).block(TEST_TIMEOUT);
@@ -363,7 +410,8 @@ public class Msg implements State {
         }
         try {
             return JsonUtils.getJsonCodec()
-                    .convertValue(result, new TypeReference<Map<String, Object>>() {});
+                    .convertValue(result, new TypeReference<Map<String, Object>>() {
+                    });
         } catch (Exception e) {
             throw new IllegalArgumentException("Failed to convert structured output to Map.", e);
         }
@@ -531,6 +579,7 @@ public class Msg implements State {
 
         /**
          * Set content from a list of content blocks.
+         *
          * @param content List of content blocks
          * @return This builder
          */
@@ -542,6 +591,7 @@ public class Msg implements State {
         /**
          * Set content from a single content block (convenience method).
          * The block will be wrapped in a list automatically.
+         *
          * @param block Single content block
          * @return This builder
          */
@@ -552,6 +602,7 @@ public class Msg implements State {
 
         /**
          * Set content from varargs content blocks (convenience method).
+         *
          * @param blocks Content blocks
          * @return This builder
          */
@@ -562,6 +613,7 @@ public class Msg implements State {
 
         /**
          * Set text content from a string.
+         *
          * @param text Text content
          * @return This builder
          */
@@ -572,6 +624,7 @@ public class Msg implements State {
 
         /**
          * Set metadata for structured output.
+         *
          * @param metadata Metadata map
          * @return This builder
          */

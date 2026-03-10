@@ -22,9 +22,12 @@ import io.agentscope.core.message.Msg;
 
 /**
  * An event emitted during streaming agent execution.
+ * 流式代理执行期间触发的事件
  *
  * <p>Events provide a structured way to observe agent execution, with clear
  * type identification and completion status for each message.
+ * 事件提供了一种结构化的方式来观察代理的执行情况，并清晰的表示每条消息的类型和完成状态。
+ *
  *
  * <p><b>Example usage:</b>
  * <pre>{@code
