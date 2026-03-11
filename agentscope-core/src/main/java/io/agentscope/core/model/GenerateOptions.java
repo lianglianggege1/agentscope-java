@@ -23,9 +23,11 @@ import java.util.Map;
 /**
  * Immutable generation options for LLM models.
  * Use the builder pattern to construct instances.
+ * 翻译：LLM 模型的不可变配置。使用构建器模式来构造实例。
  *
  * <p>This class holds both per-request generation parameters (temperature, maxTokens, etc.)
  * and connection-level configuration (apiKey, baseUrl, modelName, stream).
+ * 这个类同时包含每个请求的生成参数（temperature、maxTokens 等）和连接级别的配置（apiKey、baseUrl、modelName、stream）。
  */
 public class GenerateOptions {
     // Connection-level configuration
@@ -119,6 +121,7 @@ public class GenerateOptions {
      *
      * <p>This allows customization for OpenAI-compatible APIs that use different
      * endpoint paths than the standard OpenAI API.
+     * 允许针对使用与标准 OpenAI API 不同端点路径的 OpenAI 兼容 API 进行自定义。
      *
      * @return the endpoint path, or null if not set
      */
@@ -140,10 +143,14 @@ public class GenerateOptions {
 
     /**
      * Gets whether streaming mode is enabled.
+     * 启用流式模式。
      *
      * <p>When true, responses will be streamed as they are generated.
      * When false, the full response will be returned when complete.
      * When null, the model's default streaming mode will be used (if configured).
+     * 当 true 时，响应将随着生成而流式传输。
+     * 当 false 时，完整的响应将在完成时返回。
+     * 当 null 时，将使用模型的默认流式模式（如果配置）。
      *
      * @return true for streaming, false for non-streaming, null if not set
      */
@@ -153,10 +160,11 @@ public class GenerateOptions {
 
     /**
      * Gets the temperature for text generation.
+     * 采样温度。
      *
      * <p>Higher values (e.g., 0.8) make output more random, while lower values
      * (e.g., 0.2) make it more focused and deterministic.
-     *
+     * 采样温度 (0-2)，越高越随机  越低越集中和确定。
      * @return the temperature value between 0 and 2, or null if not set
      */
     public Double getTemperature() {
@@ -165,9 +173,10 @@ public class GenerateOptions {
 
     /**
      * Gets the top-p (nucleus sampling) parameter.
-     *
+     * nucleus 采样参数。
      * <p>Controls diversity via nucleus sampling: considers the smallest set of tokens
      * whose cumulative probability exceeds the top_p value.
+     * 通过 nucleus 采样控制多样性：考虑累积概率超过 top_p 值的最小 token 集合。
      *
      * @return the top-p value between 0 and 1, or null if not set
      */
@@ -177,6 +186,7 @@ public class GenerateOptions {
 
     /**
      * Gets the maximum number of tokens to generate.
+     * 最大生成 token 数。
      *
      * @return the maximum tokens limit, or null if not set
      */
@@ -186,9 +196,11 @@ public class GenerateOptions {
 
     /**
      * Gets the frequency penalty.
+     * 频率惩罚。
      *
      * <p>Reduces repetition by penalizing tokens based on their frequency in the text so far.
      * Higher values decrease repetition more strongly.
+     * 通过根据 token 在文本中出现的频率进行惩罚来减少重复。较高的值更强烈地减少重复。
      *
      * @return the frequency penalty between -2 and 2, or null if not set
      */
@@ -198,9 +210,11 @@ public class GenerateOptions {
 
     /**
      * Gets the presence penalty.
+     * 存在惩罚。
      *
      * <p>Reduces repetition by penalizing tokens that have already appeared in the text.
      * Higher values decrease repetition more strongly.
+     * 通过惩罚已经出现在文本中的 token 来减少重复。较高的值更强烈地减少重复。
      *
      * @return the presence penalty between -2 and 2, or null if not set
      */
@@ -210,10 +224,17 @@ public class GenerateOptions {
 
     /**
      * Gets the maximum number of tokens for reasoning/thinking content.
+     * 推理/思考内容的最大 token 数。
      *
-     * <p>This parameter is specific to models that support thinking mode (e.g., DashScope).
-     * When set, it enables the model to show its reasoning process before generating the final
+     * <p>
+     * This parameter is specific to models that support thinking mode (e.g.,
+     * DashScope).
+     * When set, it enables the model to show its reasoning process before
+     * generating the final
      * answer.
+     * 此参数特定于支持思维模式的模型（例如DashScope）。
+     * 设置后，它使模型能够在生成最终结果之前显示其推理过程
+     * 回答。
      *
      * @return the thinking budget in tokens, or null if not set
      */
@@ -223,9 +244,12 @@ public class GenerateOptions {
 
     /**
      * Gets the reasoning effort level for o1 models.
+     * o1 模型推理效率级别。
      *
      * <p>This parameter controls how much effort the model spends on reasoning.
      * Valid values are "low", "medium", and "high".
+     * 此参数控制模型 spends on reasoning。
+     * 有效值为 "low"、"medium" 和 "high"。
      *
      * @return the reasoning effort level, or null if not set
      */
@@ -235,9 +259,10 @@ public class GenerateOptions {
 
     /**
      * Gets the execution configuration for timeout and retry behavior.
-     *
+     * 得到执行配置以控制超时和重试行为。
      * <p>When set, the model will apply timeout and retry logic according to the
      * configured execution config (timeout duration, max attempts, backoff, error filtering).
+     * 当配置时，模型将应用超时和重试逻辑，根据配置的执行配置（超时持续时间、最大尝试次数、退避、错误过滤）。
      *
      * @return the execution configuration, or null if not configured
      */
@@ -247,9 +272,11 @@ public class GenerateOptions {
 
     /**
      * Gets the tool choice configuration for controlling how the model uses tools.
+     * 获取工具选择配置以控制模型如何使用工具。
      *
      * <p>When set, this controls whether the model can call tools, must call tools,
      * or must call a specific tool. When null, the default behavior (auto) is used.
+     * 当设置时，它控制模型是否可以调用工具、必须调用工具或必须调用特定的工具。或者使用默认行为（自动）。
      *
      * @return the tool choice configuration, or null if not set (defaults to auto)
      * @see ToolChoice
@@ -260,9 +287,11 @@ public class GenerateOptions {
 
     /**
      * Gets the top-k sampling parameter.
+     * top-k 采样参数。
      *
      * <p>Limits the model to only consider the top K most probable tokens at each step.
      * Lower values make output more focused, higher values allow more diversity.
+     * 通过限制模型考虑的概率最高的 K 个 token 来减少输出的聚焦度，
      *
      * @return the top-k value, or null if not set
      */
@@ -272,9 +301,11 @@ public class GenerateOptions {
 
     /**
      * Gets the random seed for deterministic generation.
+     * 获取随机种子以获得可重复结果。
      *
      * <p>When set, the model will attempt to generate the same output for the same
      * input and seed value, enabling reproducible results.
+     * 当设置时，模型将尝试为相同的输入和种子值生成相同的输出，从而获得可重复结果。
      *
      * @return the seed value, or null if not set
      */
@@ -284,9 +315,11 @@ public class GenerateOptions {
 
     /**
      * Gets the additional HTTP headers to include in API requests.
+     * 在API 请求中包含的附加 HTTP 头。
      *
      * <p>These headers will be merged with the default headers when making API calls.
      * Useful for passing custom authentication, tracing, or provider-specific headers.
+     * 这些头将被合并到 API 调用中， 使用有效的认证、跟踪或特定于供应商的头
      *
      * @return an unmodifiable map of additional headers, empty if none set
      */
@@ -296,9 +329,11 @@ public class GenerateOptions {
 
     /**
      * Gets the additional parameters to include in the request body.
+     * 获取要包含在请求正文中的附加参数。
      *
      * <p>These parameters will be merged into the API request body, allowing
      * provider-specific options not covered by the standard fields.
+     * These parameters允许提供特定的选项，这些选项不在标准字段中覆盖。
      *
      * @return an unmodifiable map of additional body parameters, empty if none set
      */
@@ -308,8 +343,10 @@ public class GenerateOptions {
 
     /**
      * Gets the additional query parameters to include in API requests.
+     * 获取要包含在 API 请求中的附加查询参数。
      *
      * <p>These parameters will be appended to the API request URL as query string.
+     * These parameters将作为查询字符串附加到 API 请求 URL。
      *
      * @return an unmodifiable map of additional query parameters, empty if none set
      */
@@ -319,6 +356,7 @@ public class GenerateOptions {
 
     /**
      * Creates a new builder for GenerateOptions.
+     * 创建生成选项的新构建器。
      *
      * @return a new Builder instance
      */
@@ -328,14 +366,18 @@ public class GenerateOptions {
 
     /**
      * Merges two GenerateOptions instances, with primary options taking precedence.
+     * 合并两个生成选项实例，将主要选项优先级。
      *
      * <p>This method performs parameter-by-parameter merging: for each parameter, if the primary
      * value is non-null, it is used; otherwise, the fallback value is used. This allows proper
      * layering of options from different sources (e.g., per-request options over default options).
+     * 逐个参数合并：对于每个参数，如果主要值不为 null，则使用主要值；否则，使用回退值。
      *
      * <p><b>Merge Behavior:</b>
+     * 合并行为：
      * <ul>
      *   <li>Primitive fields (temperature, topP, etc.): primary != null ? primary : fallback</li>
+     *   高级字段（温度、topP 等）：primary != null ? primary : fallback
      *   <li>Map fields (additionalHeaders, etc.): merges both maps, with primary values overriding fallback</li>
      *   <li>If primary is null, returns fallback directly</li>
      *   <li>If fallback is null, returns primary directly</li>

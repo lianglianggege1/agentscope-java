@@ -17,12 +17,16 @@ package io.agentscope.core.model.exception;
 
 /**
  * Exception thrown when the request is malformed (HTTP 400).
+ * 请求格式错误时抛出异常（HTTP 400）。
  *
  * <p>Common causes:
  * <ul>
  *   <li>Invalid JSON format</li>
+ *    JSON格式无效
  *   <li>Missing required parameters</li>
+ *    缺少必需的参数
  *   <li>Invalid parameter values</li>
+ *   参数值无效
  * </ul>
  */
 public class BadRequestException extends OpenAIException {

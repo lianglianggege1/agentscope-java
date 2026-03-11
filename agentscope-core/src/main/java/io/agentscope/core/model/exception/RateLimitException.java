@@ -17,15 +17,20 @@ package io.agentscope.core.model.exception;
 
 /**
  * Exception thrown when rate limits are exceeded (HTTP 429).
+ * 当超过速率限制时抛出异常（HTTP 429）。
  *
  * <p>This exception is thrown when you've exceeded your assigned rate limits.
  * Consider implementing exponential backoff retry logic.
+ * 当您超过分配的速率限制时会抛出此异常。考虑实现指数退避重试逻辑。
  *
  * <p>Common causes:
  * <ul>
  *   <li>Too many requests per minute</li>
+ *   每分钟请求过多
  *   <li>Token quota exceeded</li>
+ *    令牌配额超出
  *   <li>Concurrent request limit reached</li>
+ *    达到并发请求限制
  * </ul>
  */
 public class RateLimitException extends OpenAIException {

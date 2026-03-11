@@ -17,12 +17,16 @@ package io.agentscope.core.model.exception;
 
 /**
  * Exception thrown when permission is denied (HTTP 403).
+ * 权限被拒绝时抛出异常（HTTP 403）。
  *
  * <p>Common causes:
  * <ul>
  *   <li>API key lacks required permissions</li>
+ *    API 密钥缺乏所需权限
  *   <li>Resource access denied</li>
+ *    资源访问被拒绝
  *   <li>Organization restrictions</li>
+ *   组织限制
  * </ul>
  */
 public class PermissionDeniedException extends OpenAIException {

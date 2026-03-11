@@ -17,9 +17,11 @@ package io.agentscope.core.model.exception;
 
 /**
  * Base exception for all OpenAI API errors.
+ * 所有 OpenAI API 错误的基础异常。
  *
  * <p>This is the root exception class for OpenAI-related errors.
  * Specific error conditions are represented by subclasses.
+ * 这个是与 OpenAI 相关的错误的根异常类。具体的错误条件由子类表示。
  */
 public class OpenAIException extends RuntimeException {
     private final Integer statusCode;

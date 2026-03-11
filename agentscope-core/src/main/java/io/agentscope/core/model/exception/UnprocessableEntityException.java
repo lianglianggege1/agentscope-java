@@ -17,12 +17,15 @@ package io.agentscope.core.model.exception;
 
 /**
  * Exception thrown when the request is well-formed but semantically incorrect (HTTP 422).
- *
+ * 当请求格式正确但语义错误时抛出异常（HTTP 422）。
  * <p>Common causes:
  * <ul>
  *   <li>Parameter values out of range</li>
+ *   参数值超出范围
  *   <li>Conflicting parameters</li>
+ *   参数冲突
  *   <li>Validation errors</li>
+ *    验证错误
  * </ul>
  */
 public class UnprocessableEntityException extends OpenAIException {

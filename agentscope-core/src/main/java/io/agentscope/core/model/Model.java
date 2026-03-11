@@ -24,10 +24,11 @@ public interface Model {
     /**
      * Stream chat completion responses.
      * The model internally handles message formatting using its configured formatter.
+     * 对话完成响应流。模型内部使用其配置的格式化程序处理消息格式。
      *
      * @param messages AgentScope messages to send to the model
      * @param tools Optional list of tool schemas (null or empty if no tools)
-     * @param options Optional generation options (null to use defaults)
+     * @param options Optional generation options (null to use defaults) 配置类，包含生成参数和连接配置
      * @return Flux stream of chat responses
      */
     Flux<ChatResponse> stream(List<Msg> messages, List<ToolSchema> tools, GenerateOptions options);

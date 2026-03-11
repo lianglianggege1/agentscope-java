@@ -21,8 +21,11 @@ package io.agentscope.core.model.exception;
  * <p>Common causes:
  * <ul>
  *   <li>Invalid or missing API key</li>
+ *   翻译：无效或缺失的 API 密钥
  *   <li>Expired API key</li>
+ *   翻译：过期的 API 密钥
  *   <li>Incorrect authentication header</li>
+ *   翻译：错误的认证头
  * </ul>
  */
 public class AuthenticationException extends OpenAIException {

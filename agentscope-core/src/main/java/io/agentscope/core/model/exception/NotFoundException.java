@@ -17,12 +17,16 @@ package io.agentscope.core.model.exception;
 
 /**
  * Exception thrown when the requested resource is not found (HTTP 404).
+ * 当请求的资源未找到时抛出异常（HTTP 404）。
  *
  * <p>Common causes:
  * <ul>
  *   <li>Invalid endpoint URL</li>
+ *   无效的端点 URL
  *   <li>Non-existent model</li>
+ *      不存在的模型
  *   <li>Deleted or unavailable resource</li>
+ *   已删除或不可用的资源
  * </ul>
  */
 public class NotFoundException extends OpenAIException {
