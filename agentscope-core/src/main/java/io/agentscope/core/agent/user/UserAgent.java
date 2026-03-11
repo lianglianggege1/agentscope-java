@@ -31,20 +31,30 @@ import reactor.core.publisher.Mono;
 
 /**
  * UserAgent class for handling user interaction within the agent framework.
+ * 用户智能体类，用于处理智能体框架内的用户交互
  *
  * <p>Acts as a bridge between various user input sources (streams, web UI, etc.) and the message
  * system. Supports pluggable input methods through the UserInputBase interface, allowing
  * customization of how user input is collected and converted into framework messages.
+ * 作为各种用户输入源（流、Web UI等）和消息系统之间的桥梁。
+ * 通过UserInputBase接口支持可插拔输入方法，
+ * 允许自定义如何收集用户输入并将其转换为框架消息
  *
  * <p>Design Philosophy:
+ * 设计理念
  * <ul>
  *   <li>UserAgent does NOT manage memory - it only captures user input</li>
+ *   用户智能体不管理内存-它只捕获用户输入
  *   <li>Input is obtained via pluggable UserInputBase implementations</li>
+ *   输入是通过可插拔的UserInputBase实现获得的
  *   <li>Supports both simple text input and structured input with validation</li>
+ *   支持简单文本输入和带验证的结构化输入
  *   <li>Can participate in MsgHub for multi-agent conversations</li>
+ *   支持MsgHub中的多智能体对话
  * </ul>
  *
  * <p>Usage Examples:
+ * 使用示例：
  * <pre>{@code
  * // Simple console input (default)
  * UserAgent user = UserAgent.builder()
@@ -318,6 +328,7 @@ public class UserAgent extends AgentBase {
 
         /**
          * Set the input method for user interaction.
+         * 设置用户交互的输入方法
          *
          * @param inputMethod The input method implementation (defaults to StreamUserInput with
          *     System.in/out)
@@ -330,6 +341,7 @@ public class UserAgent extends AgentBase {
 
         /**
          * Set the hooks for monitoring agent execution.
+         * 设置监控智能体执行的hook
          *
          * @param hooks List of hooks
          * @return This builder
@@ -341,6 +353,7 @@ public class UserAgent extends AgentBase {
 
         /**
          * Build the UserAgent instance.
+         * 构建UserAgent实例
          *
          * @return A new UserAgent instance
          * @throws IllegalArgumentException if name is null or empty

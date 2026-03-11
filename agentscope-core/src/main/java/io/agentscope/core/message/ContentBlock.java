@@ -21,6 +21,7 @@ import io.agentscope.core.state.State;
 
 /**
  * Base sealed class for all content blocks in messages.
+ * 消息中所有内容块的基本密封类
  *
  * <p>Content blocks represent different types of content that can be included in a message,
  * such as text, images, audio, video, or thinking content. This sealed hierarchy ensures

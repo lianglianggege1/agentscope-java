@@ -34,9 +34,11 @@ import reactor.core.scheduler.Schedulers;
 /**
  * Stream-based user input implementation that reads from any InputStream and writes to any
  * OutputStream. By default, uses System.in and System.out for console interaction.
+ * 基于流的用户输入实现，可以从任何InputStream读取并写入任何OutputStream。
  *
  * <p>Supports both simple text input and structured data input via key=value pairs. Blocking I/O
  * operations are executed on the bounded elastic scheduler to maintain reactive compatibility.
+ * 通过key=value对支持简单文本输入和结构化数据输入。阻塞I/O操作在有界弹性调度器上执行，以保持反应式兼容性。
  *
  * <p>Usage examples:
  *
@@ -83,6 +85,11 @@ public class StreamUserInput implements UserInputBase {
      * prompting the user with the configured input hint, reads a line of text, and optionally
      * collects structured data if a model class is provided. Returns a UserInputData containing
      * both the text content blocks and any structured input.
+     * 从配置的输入流处理用户输入。
+     * 在提示用户之前打印任何上下文消息，
+     * 使用配置的输入提示读取一行文本，
+     * 并在提供模型类时可选地收集结构化数据。
+     * 返回一个包含文本内容块和任何结构化输入的UserInputData。
      *
      * @param agentId The agent identifier (unused in this implementation)
      * @param agentName The agent name (unused in this implementation)
@@ -91,6 +98,7 @@ public class StreamUserInput implements UserInputBase {
      * @param structuredModel Optional class for structured input format
      * @return Mono containing the user input data
      */
+    // todo 明日分析
     @Override
     public Mono<UserInputData> handleInput(
             String agentId, String agentName, List<Msg> contextMessages, Class<?> structuredModel) {
@@ -206,6 +214,7 @@ public class StreamUserInput implements UserInputBase {
 
         /**
          * Set the input hint prompt.
+         * 设置输入提示
          *
          * @param inputHint The prompt text to display before user input
          * @return This builder
@@ -219,6 +228,7 @@ public class StreamUserInput implements UserInputBase {
 
         /**
          * Set the input stream to read from.
+         * 设置要读取的输入流
          *
          * @param inputStream The input stream (defaults to System.in)
          * @return This builder
@@ -232,6 +242,7 @@ public class StreamUserInput implements UserInputBase {
 
         /**
          * Set the output stream to write to.
+         * 设置要写入的输出流
          *
          * @param outputStream The output stream (defaults to System.out)
          * @return This builder
