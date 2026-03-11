@@ -20,6 +20,7 @@ package io.agentscope.core;
  *
  * <p>Provides a unified User-Agent string for all model requests to identify AgentScope Java
  * clients and collect usage statistics.
+ * 提供一个统一的User-Agent字符串，用于所有模型请求，以识别AgentScope Java客户端并收集使用统计信息。
  */
 public final class Version {
 

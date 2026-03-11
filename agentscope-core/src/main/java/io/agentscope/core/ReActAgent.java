@@ -81,17 +81,26 @@ import reactor.core.publisher.Mono;
 
 /**
  * ReAct (Reasoning and Acting) Agent implementation.
+ * ReAct (推理与行动) 智能体实现。
  *
  * <p>ReAct is an agent design pattern that combines reasoning (thinking and planning) with acting
  * (tool execution) in an iterative loop. The agent alternates between these two phases until it
  * either completes the task or reaches the maximum iteration limit.
+ * ReAct 是一种智能体设计模式，
+ * 将推理（思考和规划）与行动（工具执行）结合在一个迭代循环中。
+ * 智能体在这两个阶段之间交替，直到完成任务或达到最大迭代限制。
  *
  * <p><b>Key Features:</b>
+ * 主要特性：
  * <ul>
  *   <li><b>Reactive Streaming:</b> Uses Project Reactor for non-blocking execution
+ *   响应式流：使用 Project Reactor 实现非阻塞执行
  *   <li><b>Hook System:</b> Extensible hooks for monitoring and intercepting agent execution
+ *   钩子系统：可扩展的钩子，用于监控和拦截智能体执行
  *   <li><b>HITL Support:</b> Human-in-the-loop via stopAgent() in PostReasoningEvent/PostActingEvent
+ *   人机协作支持：通过 PostReasoningEvent/PostActingEvent 中的 stopAgent() 实现人机协作
  *   <li><b>Structured Output:</b> StructuredOutputCapableAgent provides type-safe output generation
+ *   结构化输出：StructuredOutputCapableAgent 提供类型安全的输出生成
  * </ul>
  *
  * <p><b>Usage Example:</b>
@@ -1111,6 +1120,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Enables or disables the meta-tool functionality.
+         * 启用或禁用元工具功能。
          *
          * <p>When enabled, the toolkit will automatically register a meta-tool that provides
          * information about available tools to the agent. This can help the agent understand
@@ -1126,10 +1136,12 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Sets the execution configuration for model API calls.
+         * 设置模型 API 调用的执行配置。
          *
          * <p>This configuration controls timeout, retry behavior, and backoff strategy for
          * model requests during the reasoning phase. If not set, the agent will use the
          * model's default execution configuration.
+         * 这个配置控制了推理阶段模型请求的超时、重试行为和退避策略。如果未设置，智能体将使用模型的默认执行配置。
          *
          * @param modelExecutionConfig The execution configuration for model calls, can be null
          * @return This builder instance for method chaining
@@ -1142,10 +1154,12 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Sets the execution configuration for tool executions.
+         * 设置工具执行的执行配置。
          *
          * <p>This configuration controls timeout, retry behavior, and backoff strategy for
          * tool calls during the acting phase. If not set, the toolkit will use its default
          * execution configuration.
+         * 这个配置控制了行动阶段工具调用的超时、重试行为和退避策略。如果未设置，工具包将使用其默认执行配置。
          *
          * @param toolExecutionConfig The execution configuration for tool calls, can be null
          * @return This builder instance for method chaining
@@ -1158,6 +1172,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Sets the structured output enforcement mode.
+         * 设置结构化输出强制模式。
          *
          * @param reminder The structured output reminder mode, must not be null
          * @return This builder instance for method chaining
@@ -1169,11 +1184,15 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Sets the PlanNotebook for plan-based task execution.
+         * 设置计划笔记本以支持基于计划的任务执行。
          *
          * <p>When provided, the PlanNotebook will be integrated into the agent:
+         * 当提供时，计划笔记本将被集成到智能体中：
          * <ul>
          *   <li>Plan management tools will be automatically registered to the toolkit
+         *   计划管理工具将被自动注册到工具包中
          *   <li>A hook will be added to inject plan hints before each reasoning step
+         *    在每次推理步骤之前将添加一个钩子来注入计划提示
          * </ul>
          *
          * @param planNotebook The configured PlanNotebook instance, can be null
@@ -1186,11 +1205,15 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Sets the skill box for this agent.
+         * 设置此智能体的技能箱。
          *
          * <p>The skill box is used to manage the skills for this agent. It will be used to register the skills to the toolkit.
+         * 技能箱用于管理此智能体的技能。它将被用来将技能注册到工具包中。
          * <ul>
          *   <li>Skill loader tools will be automatically registered to the toolkit</li>
+         *   技能加载器工具将被自动注册到工具包中
          *   <li>A skill hook will be added to inject skill prompts and manage skill activation</li>
+         *   技能钩子将被添加以注入技能提示并管理技能激活
          * </ul>
          * @param skillBox The skill box to use for this agent
          * @return This builder instance for method chaining
@@ -1202,10 +1225,14 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Sets the long-term memory for this agent.
+         * 设置此智能体的长期记忆。
          *
          * <p>Long-term memory enables the agent to remember information across sessions.
          * It can be used in combination with {@link #longTermMemoryMode(LongTermMemoryMode)}
          * to control whether memory management is automatic, agent-controlled, or both.
+         * 长期记忆使智能体能够跨会话记住信息。
+         * 它可以与 {@link #longTermMemoryMode(LongTermMemoryMode)} 结合使用，
+         * 以控制记忆管理是自动的、由智能体控制的还是两者兼有。
          *
          * @param longTermMemory The long-term memory implementation
          * @return This builder instance for method chaining
@@ -1218,12 +1245,17 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Sets the long-term memory mode.
+         * 设置长期记忆模式。
          *
          * <p>This determines how long-term memory is integrated with the agent:
+         * 翻译：这决定了长期记忆如何与智能体集成：
          * <ul>
          *   <li><b>AGENT_CONTROL:</b> Memory tools are registered for agent to call</li>
+         *   <li><b>AGENT_CONTROL:</b> 注册内存工具供智能体调用</li>
          *   <li><b>STATIC_CONTROL:</b> Framework automatically retrieves/records memory</li>
+         *   <li><b>STATIC_CONTROL:</b> 框架自动检索/记录记忆</li>
          *   <li><b>BOTH:</b> Combines both approaches (default)</li>
+         *   <li><b>BOTH:</b> 结合两种方法（默认）</li>
          * </ul>
          *
          * @param mode The long-term memory mode
@@ -1237,9 +1269,12 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Sets the state persistence configuration.
+         * 设置状态持久化配置。
          *
          * <p>Use this to control which components' state is managed by the agent during
          * saveTo/loadFrom operations. By default, all components are managed.
+         * 使用此选项来控制在 saveTo/loadFrom 操作期间由智能体管理哪些组件的状态。
+         * 默认情况下，所有组件都由智能体管理。
          *
          * <p>Example usage:
          *
@@ -1264,6 +1299,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Enables plan functionality with default configuration.
+         * 启用具有默认配置的计划功能。
          *
          * <p>This is a convenience method equivalent to:
          * <pre>{@code
@@ -1279,6 +1315,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Adds a knowledge base for RAG (Retrieval-Augmented Generation).
+         * 为 RAG（检索增强生成）添加知识库。
          *
          * @param knowledge The knowledge base to add
          * @return This builder instance for method chaining
@@ -1292,6 +1329,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Adds multiple knowledge bases for RAG.
+         * 为 RAG 添加多个知识库。
          *
          * @param knowledges The list of knowledge bases to add
          * @return This builder instance for method chaining
@@ -1305,6 +1343,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Sets the RAG mode.
+         * 设置 RAG 模式。
          *
          * @param mode The RAG mode (GENERIC, AGENTIC, or NONE)
          * @return This builder instance for method chaining
@@ -1318,6 +1357,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Sets the retrieve configuration for RAG.
+         * 设置 RAG 的检索配置。
          *
          * @param config The retrieve configuration
          * @return This builder instance for method chaining
@@ -1331,11 +1371,16 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Sets the tool execution context for this agent.
+         * 设置此智能体的工具执行上下文。
          *
          * <p>This context will be passed to all tools invoked by this agent and can include
          * user identity, session information, permissions, and other metadata. The context
          * from this agent level will override toolkit-level context but can be overridden by
          * call-level context.
+         * 这个上下文将被传递给此智能体调用的所有工具，
+         * 并且可以包含用户身份、会话信息、权限和其他元数据。
+         * 这个智能体级别的上下文将覆盖工具包级别的上下文，
+         * 但可以被调用级别的上下文覆盖。
          *
          * @param toolExecutionContext The tool execution context
          * @return This builder instance for method chaining
@@ -1347,6 +1392,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Builds and returns a new ReActAgent instance with the configured settings.
+         * 构建并返回一个具有配置设置的新 ReActAgent 实例。
          *
          * @return A new ReActAgent instance
          * @throws IllegalArgumentException if required parameters are missing or invalid
@@ -1384,12 +1430,17 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Configures long-term memory based on the selected mode.
+         * 根据选择的模式配置长期记忆。
          *
          * <p>This method sets up long-term memory integration:
+         * 这个方法设置长期记忆集成：
          * <ul>
          *   <li>AGENT_CONTROL: Registers memory tools for agent to call</li>
+         *  <li>AGENT_CONTROL: 注册内存工具供智能体调用</li>
          *   <li>STATIC_CONTROL: Registers StaticLongTermMemoryHook for automatic retrieval/recording</li>
-         *   <li>BOTH: Combines both approaches (registers tools + hook)</li>
+         *   <li>STATIC_CONTROL: 注册 StaticLongTermMemoryHook 以实现自动检索/记录</li>
+         * <li>BOTH: Combines both approaches (registers tools + hook)</li>
+         *  <li>BOTH: 结合两种方法（注册工具 + 钩子）</li>
          * </ul>
          */
         private void configureLongTermMemory(Toolkit agentToolkit) {

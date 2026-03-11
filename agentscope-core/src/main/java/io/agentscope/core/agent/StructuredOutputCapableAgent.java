@@ -43,23 +43,52 @@ import reactor.core.publisher.Mono;
 
 /**
  * Abstract base class for agents that support structured output generation.
+ * 支持结构化输出生成的代理抽象基类。
  *
- * <p>This class provides the infrastructure for generating structured output using the
- * {@code generate_response} tool pattern combined with StructuredOutputHook for flow control.
+ * <p>
+ * This class provides the infrastructure for generating structured output using
+ * the
+ * {@code generate_response} tool pattern combined with StructuredOutputHook for
+ * flow control.
+ * 这个类提供了使用{@code generate_response}工具模式结合StructuredOutputHook进行流程控制的结构化输出生成基础设施。
  *
- * <p><b>Key Features:</b>
+ * <p>
+ * <b>Key Features:</b>
+ * Key的特征：
  * <ul>
- *   <li>Automatic tool registration for structured output</li>
- *   <li>Schema validation before tool execution</li>
- *   <li>Memory compression after structured output completion</li>
- *   <li>Configurable reminder mode (TOOL_CHOICE or PROMPT)</li>
+ * <li>Automatic tool registration for structured output</li>
+ * 自动注册结构化输出工具
+ * <li>Schema validation before tool execution</li>
+ * 在工具执行前进行模式验证
+ * <li>Memory compression after structured output completion</li>
+ * 在结构化输出完成后进行记忆压缩
+ * <li>Configurable reminder mode (TOOL_CHOICE or PROMPT)</li>
+ * 可配置的提醒模式（TOOL_CHOICE或PROMPT）
  * </ul>
  *
- * <p><b>Subclass Requirements:</b>
+ * <p>
+ * <b>Subclass Requirements:</b>
  * <ul>
- *   <li>Provide Toolkit via constructor</li>
- *   <li>Implement {@link #getMemory()} for memory access</li>
- *   <li>Implement {@link #buildGenerateOptions()} for model options</li>
+ * <li>Provide Toolkit via constructor</li>
+ * <li>Implement {@link #getMemory()} for memory access</li>
+ * <li>Implement {@link #buildGenerateOptions()} for model options</li>
+ * </ul>
+ * 
+* <p>
+ * <b>主要特性：</b>
+ * <ul>
+ * <li>自动注册结构化输出工具</li>
+ * <li>工具执行前的 Schema 验证</li>
+ * <li>结构化输出完成后的记忆压缩</li>
+ * <li>可配置的模式提示模式 (TOOL_CHOICE 或 PROMPT)</li>
+ * </ul>
+ *
+ * <p>
+ * <b>子类要求：</b>
+ * <ul>
+ * <li>通过构造函数提供 Toolkit</li>
+ * <li>实现 {@link #getMemory()} 用于记忆访问</li>
+ * <li>实现 {@link #buildGenerateOptions()} 用于模型选项配置</li>
  * </ul>
  */
 public abstract class StructuredOutputCapableAgent extends AgentBase {
@@ -104,6 +133,7 @@ public abstract class StructuredOutputCapableAgent extends AgentBase {
 
     /**
      * Get the toolkit for tool operations.
+     * 得到工具包用于工具操作。
      */
     public Toolkit getToolkit() {
         return toolkit;
@@ -112,12 +142,14 @@ public abstract class StructuredOutputCapableAgent extends AgentBase {
     /**
      * Get the memory for structured output hook.
      * Subclasses must implement this.
+     * 获取用于结构化输出钩子的记忆。子类必须实现这个方法。
      */
     public abstract Memory getMemory();
 
     /**
      * Build generate options for model calls.
      * Subclasses must implement this.
+     * 为模型调用构建生成选项。子类必须实现这个方法。
      */
     protected abstract GenerateOptions buildGenerateOptions();
 
@@ -135,6 +167,7 @@ public abstract class StructuredOutputCapableAgent extends AgentBase {
 
     /**
      * Execute with structured output using StructuredOutputHook.
+     * 使用StructuredOutputHook执行结构化输出。
      */
     private Mono<Msg> executeWithStructuredOutput(
             List<Msg> msgs, Class<?> targetClass, JsonNode schemaDesc) {
@@ -198,6 +231,7 @@ public abstract class StructuredOutputCapableAgent extends AgentBase {
 
     /**
      * Create the structured output tool with validation.
+     * 创建具有验证功能的结构化输出工具。
      */
     private AgentTool createStructuredOutputTool(
             Map<String, Object> schema, Class<?> targetClass, JsonNode schemaDesc) {
@@ -270,6 +304,7 @@ public abstract class StructuredOutputCapableAgent extends AgentBase {
 
     /**
      * Extract structured result from tool result message.
+     * 从工具结果消息中提取结构化结果。
      */
     private Msg extractStructuredResult(Msg hookResultMsg) {
         if (hookResultMsg == null) {
@@ -312,6 +347,7 @@ public abstract class StructuredOutputCapableAgent extends AgentBase {
 
     /**
      * Merge collected metadata (ChatUsage and ThinkingBlock) into the message.
+     * 
      */
     private Msg mergeCollectedMetadata(Msg msg, ChatUsage chatUsage, ThinkingBlock thinking) {
         // Merge ChatUsage into metadata

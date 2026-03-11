@@ -19,6 +19,7 @@ import io.agentscope.core.session.Session;
 
 /**
  * Interface for all stateful components in AgentScope.
+ * 在AgentScope中所有有状态组件的接口。
  *
  * <p>This interface provides state serialization and deserialization capabilities for components
  * that need to persist and restore their internal state. Components that implement this interface
