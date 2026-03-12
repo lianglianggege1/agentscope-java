@@ -35,19 +35,23 @@ import reactor.core.scheduler.Schedulers;
 
 /**
  * Anthropic Chat Model implementation using the official Anthropic Java SDK.
- *
+ * 使用官方 Anthropic Java SDK 实现 Anthropic 聊天模型。
  * <p>
  * This implementation provides complete integration with Anthropic's Messages
  * API, including
  * tool calling, streaming support, and extended thinking features.
+ * 这个实现提供了完整的 Anthropic Messages API 的完整集成，包括工具调用、流式支持和扩展思考功能。
  *
  * <p>
  * Important notes:
- *
+ * 重要提示：
  * <ul>
  * <li>System messages are handled via the system parameter, not as messages
+ *     系统消息通过系统参数处理，而不是作为消息本身处理。
  * <li>Tool results must be in separate user messages
+ *     工具结果必须以单独的用户消息形式发送
  * <li>Supports Claude models (claude-3-*, claude-sonnet-*, etc.)
+ *     支持 Claude 模型（claude-3-*、claude-sonnet-* 等）
  * </ul>
  */
 public class AnthropicChatModel extends ChatModelBase {
@@ -106,15 +110,18 @@ public class AnthropicChatModel extends ChatModelBase {
 
     /**
      * Stream chat completion responses from Anthropic's API.
-     *
+     * 从 Anthropic 的 API 获取聊天完成响应。
      * <p>
      * This method internally handles message formatting using the configured
      * formatter. It
      * supports both streaming and non-streaming modes based on the streamEnabled
      * setting.
+     * 此方法内部使用已配置的格式化程序处理消息格式化。
+     * 它支持流式和非流式模式，具体取决于 streamEnabled 设置。
      *
      * <p>
      * Supports timeout and retry configuration through GenerateOptions.
+     * 支持通过GenerateOptions 配置超时和重试。
      *
      * @param messages AgentScope messages to send to the model
      * @param tools    Optional list of tool schemas (null or empty if no tools)
@@ -206,6 +213,7 @@ public class AnthropicChatModel extends ChatModelBase {
                         });
 
         // Apply timeout and retry if configured
+        // 如果已配置，则应用超时并重试。
         return ModelUtils.applyTimeoutAndRetry(
                 responseFlux, options, defaultOptions, modelName, "anthropic");
     }

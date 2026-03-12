@@ -17,9 +17,11 @@ package io.agentscope.core.message;
 
 /**
  * Constants for well-known message metadata keys.
+ * 常用消息元数据键的常量。
  *
  * <p>This class defines standard metadata keys used across the framework
  * to ensure consistency and avoid magic strings.
+ * 此类定义了框架中使用的标准元数据键，以确保一致性并避免出现魔法字符串。
  */
 public final class MessageMetadataKeys {
 
@@ -29,6 +31,7 @@ public final class MessageMetadataKeys {
 
     /**
      * Metadata key to bypass history merging in multiagent formatters.
+     * 元数据键用于绕过多代理格式化程序中的历史记录合并。
      *
      * <p>Messages with this flag set to {@code true} will be kept as separate messages
      * rather than being merged into conversation history when using multiagent formatters.
@@ -49,6 +52,7 @@ public final class MessageMetadataKeys {
 
     /**
      * Metadata key to mark structured output reminder messages.
+     * 用于标记结构化输出提醒消息的元数据键。
      *
      * <p>This flag is used internally by ReActAgent to identify temporary reminder messages
      * that guide the model to use the generate_response tool for structured output.
@@ -60,6 +64,7 @@ public final class MessageMetadataKeys {
 
     /**
      * Metadata key for the type of structured output reminder.
+     * 结构化输出提醒类型的元数据键。
      *
      * <p>Stores the {@link io.agentscope.core.model.StructuredOutputReminder} mode
      * (e.g., TOOL_CHOICE, PROMPT) used when creating reminder messages. This allows
@@ -72,6 +77,7 @@ public final class MessageMetadataKeys {
 
     /**
      * Metadata key for chat usage statistics.
+     * 聊天使用统计信息的元数据键。
      *
      * <p>Contains token usage information (input tokens, output tokens, and time)
      * accumulated during model generation. This allows users to track token consumption

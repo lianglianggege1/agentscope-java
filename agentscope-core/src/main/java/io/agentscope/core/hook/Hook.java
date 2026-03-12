@@ -19,6 +19,7 @@ import reactor.core.publisher.Mono;
 
 /**
  * Hook interface for monitoring and intercepting agent execution.
+ * 用于监控和拦截代理执行的钩子接口。
  *
  * <p>All agent execution events are delivered through a single {@link #onEvent(HookEvent)} method.
  * This unified event model provides a clean, type-safe way to intercept and modify agent behavior.

@@ -40,12 +40,14 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Converts AgentScope Msg objects to Anthropic SDK MessageParam types.
+ * 将 AgentScope Msg 对象转换为 Anthropic SDK MessageParam 类型。
  *
  * <p>This class handles all message role conversions including system, user, assistant, and tool
  * messages. It supports multimodal content (text, images) and tool calling functionality.
  *
  * <p>Important: In Anthropic API, only the first message can be a system message. Non-first system
  * messages are converted to user messages.
+ * 在 Anthropic API 中，只有第一条消息才能是系统消息。除第一条消息外，其他系统消息都会被转换为用户消息。
  */
 public class AnthropicMessageConverter {
 
@@ -56,8 +58,10 @@ public class AnthropicMessageConverter {
 
     /**
      * Create an AnthropicMessageConverter with required dependency functions.
+     * 创建一个包含所需依赖函数的 AnthropicMessageConverter。
      *
      * @param toolResultConverter Function to convert tool result blocks to strings
+     * 将工具结果块转换为字符串的函数
      */
     public AnthropicMessageConverter(Function<List<ContentBlock>, String> toolResultConverter) {
         this.mediaConverter = new AnthropicMediaConverter();
@@ -67,6 +71,7 @@ public class AnthropicMessageConverter {
     /**
      * Convert list of Msg to list of Anthropic MessageParam. Handles the special case where tool
      * results need to be in separate user messages.
+     * 将 Msg 列表转换为 Anthropic MessageParam 列表。处理工具结果需要以单独用户消息形式呈现的特殊情况。
      *
      * @param messages The messages to convert
      * @return List of MessageParam for Anthropic API
@@ -79,6 +84,7 @@ public class AnthropicMessageConverter {
             boolean isFirstMessage = (i == 0);
 
             // Special handling for tool results - they create separate user messages
+            // 工具结果需特殊处理——它们会创建单独的用户消息。
             if (msg.hasContentBlocks(ToolResultBlock.class)) {
                 // Add non-tool-result content first (if any)
                 List<ContentBlock> nonToolBlocks = new ArrayList<>();
@@ -117,6 +123,7 @@ public class AnthropicMessageConverter {
 
     /**
      * Convert message content to MessageParam.
+     * 将消息内容转换为 MessageParam。
      */
     private MessageParam convertMessageContent(
             Msg msg, List<ContentBlock> blocks, boolean isFirstMessage) {
@@ -252,6 +259,7 @@ public class AnthropicMessageConverter {
 
     /**
      * Extract system message content if present in the first message.
+     * 如果第一条消息中包含系统消息内容，则提取该消息内容。
      */
     public String extractSystemMessage(List<Msg> messages) {
         if (messages.isEmpty()) {

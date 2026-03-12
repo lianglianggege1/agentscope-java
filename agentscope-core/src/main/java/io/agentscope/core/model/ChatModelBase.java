@@ -23,16 +23,20 @@ import reactor.core.publisher.Flux;
 
 /**
  * Abstract base class for all models in the AgentScope framework.
+ * 基本抽象模型
  *
  * <p>This class provides common functionality for model including basic model invocation and tracing.
+ * 这个类提供了模型通用功能，包括基本的模型调用和跟踪。
  */
 public abstract class ChatModelBase implements Model {
 
     /**
      * Stream chat completion responses.
+     * 流式对话响应的标准实现
      * The model internally handles message formatting using its configured formatter.
+     * 模型内部使用其配置的格式化程序处理消息。
      *
-     * <p>Tracing data will be captured once telemetry is enabled.
+     * <p>Tracing data will be captured once telemetry is enabled.跟踪数据将在启用跟踪时捕获。
      *
      * @param messages AgentScope messages to send to the model
      * @param tools Optional list of tool schemas (null or empty if no tools)
@@ -49,8 +53,9 @@ public abstract class ChatModelBase implements Model {
 
     /**
      * Internal implementation for streaming chat completion responses.
+     * 内部流式对话响应的实现
      * Subclasses must implement their specific logic here.
-     *
+     * 子类必须实现自己的逻辑。
      * @param messages AgentScope messages to send to the model
      * @param tools Optional list of tool schemas (null or empty if no tools)
      * @param options Optional generation options (null to use defaults)

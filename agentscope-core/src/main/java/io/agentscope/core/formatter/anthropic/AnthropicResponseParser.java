@@ -38,6 +38,7 @@ import reactor.core.publisher.Flux;
 /**
  * Parses Anthropic API responses (both streaming and non-streaming) into AgentScope ChatResponse
  * objects.
+ * 将 Anthropic API 响应（包括流式和非流式响应）解析为 AgentScope ChatResponse 对象。
  */
 public class AnthropicResponseParser {
 
@@ -45,6 +46,7 @@ public class AnthropicResponseParser {
 
     /**
      * Parse non-streaming Anthropic Message to ChatResponse.
+     * 将非流式 Anthropic 消息解析为 ChatResponse。
      */
     public static ChatResponse parseMessage(Message message, Instant startTime) {
         List<ContentBlock> contentBlocks = new ArrayList<>();
@@ -99,6 +101,7 @@ public class AnthropicResponseParser {
 
     /**
      * Parse streaming Anthropic events to ChatResponse Flux.
+     * 将 Anthropic 事件流解析为 ChatResponse Flux。
      */
     public static Flux<ChatResponse> parseStreamEvents(
             Flux<RawMessageStreamEvent> eventFlux, Instant startTime) {

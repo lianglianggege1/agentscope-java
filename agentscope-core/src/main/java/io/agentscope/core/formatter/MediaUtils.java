@@ -35,7 +35,9 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Utility class for handling media files in multimodal content.
+ * 用于处理多模态内容中媒体文件的实用类。
  * Provides methods for processing images, audio, and other media types.
+ * 提供处理图像、音频和其他媒体类型的方法。
  */
 public class MediaUtils {
 

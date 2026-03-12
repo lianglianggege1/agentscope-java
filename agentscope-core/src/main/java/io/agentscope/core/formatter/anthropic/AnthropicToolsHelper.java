@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Helper class for tool registration and option application for Anthropic API.
+ * 用于 Anthropic API 的工具注册和选项应用的辅助类。
  */
 public class AnthropicToolsHelper {
 

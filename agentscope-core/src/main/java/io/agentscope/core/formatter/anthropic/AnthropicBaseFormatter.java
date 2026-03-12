@@ -40,6 +40,7 @@ public abstract class AnthropicBaseFormatter
     protected final AnthropicMessageConverter messageConverter;
 
     /** Thread-local storage for generation options (passed from applyOptions to applyTools). */
+    // 用于生成选项的线程本地存储（从 applyOptions 传递给 applyTools）。
     private final ThreadLocal<GenerateOptions> currentOptions = new ThreadLocal<>();
 
     protected AnthropicBaseFormatter() {
@@ -48,6 +49,7 @@ public abstract class AnthropicBaseFormatter
 
     /**
      * Apply generation options to Anthropic request parameters.
+     * 将生成选项应用于 Anthropic 请求参数。
      *
      * @param paramsBuilder Anthropic request parameters builder
      * @param options Generation options to apply
@@ -68,6 +70,7 @@ public abstract class AnthropicBaseFormatter
     /**
      * Apply tool schemas to Anthropic request parameters. This method uses the options saved from
      * applyOptions to apply tool choice configuration.
+     * 将工具模式应用于 Anthropic 请求参数。此方法使用从 `applyOptions` 保存的选项来应用工具选择配置。
      *
      * @param paramsBuilder Anthropic request parameters builder
      * @param tools List of tool schemas to apply (may be null or empty)
@@ -90,9 +93,11 @@ public abstract class AnthropicBaseFormatter
     /**
      * Extract and apply system message if present. Anthropic API requires system message to be set
      * via the system parameter, not as a message.
-     *
+     * 提取并应用系统消息（如有）。Anthropic API 要求系统消息通过系统参数设置，而不是作为消息本身
+     * 
      * <p>This method is called by Model to extract the first system message from the messages list
      * and apply it to the system parameter.
+     * 此方法由模型调用，用于从消息列表中提取第一条系统消息并将其应用于系统参数。
      *
      * @param paramsBuilder Anthropic request parameters builder
      * @param messages All messages including potential system message

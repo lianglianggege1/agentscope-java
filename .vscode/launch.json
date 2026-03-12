@@ -1,0 +1,378 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Current File",
+            "request": "launch",
+            "mainClass": "${file}"
+        },
+        {
+            "type": "java",
+            "name": "A2aExampleApplication",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.a2a.A2aExampleApplication",
+            "projectName": "a2a"
+        },
+        {
+            "type": "java",
+            "name": "NacosA2aAgentExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.a2a.NacosA2aAgentExample",
+            "projectName": "a2a"
+        },
+        {
+            "type": "java",
+            "name": "SimpleA2aAgentExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.a2a.SimpleA2aAgentExample",
+            "projectName": "a2a"
+        },
+        {
+            "type": "java",
+            "name": "AutoMemoryExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.advanced.AutoMemoryExample",
+            "projectName": "advanced"
+        },
+        {
+            "type": "java",
+            "name": "BailianRAGExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.advanced.BailianRAGExample",
+            "projectName": "advanced"
+        },
+        {
+            "type": "java",
+            "name": "ElasticsearchRAGExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.advanced.ElasticsearchRAGExample",
+            "projectName": "advanced"
+        },
+        {
+            "type": "java",
+            "name": "LangfuseExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.advanced.LangfuseExample",
+            "projectName": "advanced"
+        },
+        {
+            "type": "java",
+            "name": "Mem0Example",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.advanced.Mem0Example",
+            "projectName": "advanced"
+        },
+        {
+            "type": "java",
+            "name": "RAGExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.advanced.RAGExample",
+            "projectName": "advanced"
+        },
+        {
+            "type": "java",
+            "name": "ReMeExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.advanced.ReMeExample",
+            "projectName": "advanced"
+        },
+        {
+            "type": "java",
+            "name": "RoutingByToolCallsExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.advanced.RoutingByToolCallsExample",
+            "projectName": "advanced"
+        },
+        {
+            "type": "java",
+            "name": "StudioExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.advanced.StudioExample",
+            "projectName": "advanced"
+        },
+        {
+            "type": "java",
+            "name": "HitlInteractionExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.advanced.hitl.HitlInteractionExample",
+            "projectName": "advanced"
+        },
+        {
+            "type": "java",
+            "name": "MethodToolExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.core.tool.method.MethodToolExample",
+            "projectName": "agentscope-core"
+        },
+        {
+            "type": "java",
+            "name": "DashScopeTTSE2ETest",
+            "request": "launch",
+            "mainClass": "io.agentscope.core.tool.multimodal.DashScopeTTSE2ETest",
+            "projectName": "agentscope-core"
+        },
+        {
+            "type": "java",
+            "name": "AguiExampleApplication",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.agui.AguiExampleApplication",
+            "projectName": "agui"
+        },
+        {
+            "type": "java",
+            "name": "BusinessServerApplication",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.bobatea.business.BusinessServerApplication",
+            "projectName": "business-mcp-server"
+        },
+        {
+            "type": "java",
+            "name": "BusinessSubAgentApplication",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.bobatea.business.BusinessSubAgentApplication",
+            "projectName": "business-sub-agent"
+        },
+        {
+            "type": "java",
+            "name": "ChatCompletionsWebApplication",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.chatcompletions.ChatCompletionsWebApplication",
+            "projectName": "chat-completions-web"
+        },
+        {
+            "type": "java",
+            "name": "ChatTTSSpringBootApplication",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.chattts.ChatTTSSpringBootApplication",
+            "projectName": "chat-tts"
+        },
+        {
+            "type": "java",
+            "name": "ReActAgentWithTTSDemo",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.chattts.ReActAgentWithTTSDemo",
+            "projectName": "chat-tts"
+        },
+        {
+            "type": "java",
+            "name": "ConsultSubAgentApplication",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.bobatea.consult.ConsultSubAgentApplication",
+            "projectName": "consult-sub-agent"
+        },
+        {
+            "type": "java",
+            "name": "HitlChatApplication",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.hitlchat.HitlChatApplication",
+            "projectName": "hitl-chat"
+        },
+        {
+            "type": "java",
+            "name": "Application",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.micronaut.Application",
+            "projectName": "micronaut"
+        },
+        {
+            "type": "java",
+            "name": "CompressionDemo",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.compression.CompressionDemo",
+            "projectName": "model-request-compression"
+        },
+        {
+            "type": "java",
+            "name": "PlanNotebookWebApplication",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.plannotebook.PlanNotebookWebApplication",
+            "projectName": "plan-notebook"
+        },
+        {
+            "type": "java",
+            "name": "AgentSkillExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.AgentSkillExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "BasicChatExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.BasicChatExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "DifyRAGExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.DifyRAGExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "FanoutPipelineExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.FanoutPipelineExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "HayStackRAGExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.HayStackRAGExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "HigressToolExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.HigressToolExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "HookExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.HookExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "HookStopAgentExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.HookStopAgentExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "InterruptionExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.InterruptionExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "McpToolExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.McpToolExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "MsgHubExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.MsgHubExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "PgVectorRAGExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.PgVectorRAGExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "PlanNotebookExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.PlanNotebookExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "RAGFlowRAGExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.RAGFlowRAGExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "SequentialPipelineExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.SequentialPipelineExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "SessionExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.SessionExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "StreamingWebExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.StreamingWebExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "StructuredOutputExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.StructuredOutputExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "TTSExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.TTSExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "ToolCallingExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.ToolCallingExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "ToolCallingWithConverterExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.ToolCallingWithConverterExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "ToolGroupExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.ToolGroupExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "VisionExample",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.quickstart.VisionExample",
+            "projectName": "quickstart"
+        },
+        {
+            "type": "java",
+            "name": "SupervisorAgentApplication",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.bobatea.supervisor.SupervisorAgentApplication",
+            "projectName": "supervisor-agent"
+        },
+        {
+            "type": "java",
+            "name": "WerewolfWebApplication",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.werewolf.WerewolfWebApplication",
+            "projectName": "werewolf-hitl"
+        },
+        {
+            "type": "java",
+            "name": "WerewolfWebApplication(1)",
+            "request": "launch",
+            "mainClass": "io.agentscope.examples.werewolf.WerewolfWebApplication",
+            "projectName": "werewolf"
+        }
+    ]
+}

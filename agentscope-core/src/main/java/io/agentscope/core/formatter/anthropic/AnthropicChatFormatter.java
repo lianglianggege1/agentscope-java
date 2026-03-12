@@ -30,8 +30,11 @@ import java.util.List;
  *
  * <ul>
  *   <li>Only the first message can be a system message (handled via system parameter)
+ *       系统消息必须是第一个消息（由系统参数处理）
  *   <li>Tool results must be in separate user messages
+ *        工具结果必须以单独的用户消息形式发送。
  *   <li>Supports thinking blocks natively (extended thinking feature)
+ *       原生支持思维导图（扩展思维功能）
  * </ul>
  */
 public class AnthropicChatFormatter extends AnthropicBaseFormatter {

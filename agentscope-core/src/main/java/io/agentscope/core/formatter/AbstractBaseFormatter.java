@@ -44,13 +44,18 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Abstract base formatter providing common functionality for all formatter implementations.
- *
+ * 抽象基础格式化程序，为所有格式化程序实现提供通用功能。
  * <p>This class contains shared logic across all formatters including:
+ * <p>此类包含所有格式化程序共享的逻辑，包括：
  * <ul>
  *   <li>Text content extraction (with ThinkingBlock filtering)
+ *   <li>文本内容提取（使用 ThinkingBlock 过滤）
  *   <li>Media content detection
+ *   <li>媒体内容检测
  *   <li>Role label formatting
+ *   <li>角色标签格式
  *   <li>Shared ObjectMapper instance
+ *   <li>共享对象映射器实例
  * </ul>
  *
  * @param <TReq>    Provider-specific request message type
@@ -153,6 +158,7 @@ public abstract class AbstractBaseFormatter<TReq, TResp, TParams>
 
     /**
      * Check if a message should bypass history merging in multiagent formatters.
+     * 检查消息是否应在多代理格式化程序中绕过历史记录合并。
      * Messages with the {@link MessageMetadataKeys#BYPASS_MULTIAGENT_HISTORY_MERGE} flag set to {@code true}
      * should be kept as separate messages rather than merged into the conversation history.
      *
@@ -170,6 +176,7 @@ public abstract class AbstractBaseFormatter<TReq, TResp, TParams>
 
     /**
      * Get an option value from options or fall back to defaultOptions.
+     * 从选项中获取选项值，或者回退到默认选项。
      *
      * @param <T>            The type of the option value
      * @param options        The primary options object
@@ -189,7 +196,8 @@ public abstract class AbstractBaseFormatter<TReq, TResp, TParams>
 
     /**
      * Convert tool result output to string representation.
-     * Handles multimodal content by converting images/audio/video to textual references.
+     * Handles multimodal content by converting images/audio/video to textual references.、
+     * 通过将图像/音频/视频转换为文本引用来处理多模态内容。
      *
      * @param output The tool result output blocks (can be null or empty)
      * @return String representation (single items directly, multiple with "- " prefix)

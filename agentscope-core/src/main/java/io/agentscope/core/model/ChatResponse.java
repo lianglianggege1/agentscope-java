@@ -22,9 +22,11 @@ import java.util.UUID;
 
 /**
  * Represents a chat completion response from a language model.
- *
+ * 表示语音模型对聊天内容的完成响应
  * <p>This immutable data class contains the response content, usage information,
  * and optional metadata returned by the model after processing a chat request.
+ * 该不可变数据类包含模型在处理聊天请求后返回的响应内容、使用信息和可选元数据。
+ * 
  */
 public class ChatResponse {
 
@@ -37,11 +39,11 @@ public class ChatResponse {
     /**
      * Creates a new ChatResponse instance.
      *
-     * @param id the unique identifier for this response
-     * @param content the list of content blocks containing the response content
-     * @param usage the token usage information for this response
-     * @param metadata additional metadata from the model provider
-     * @param finishReason the reason for
+     * @param id the unique identifier for this response 响应的唯一标识符
+     * @param content the list of content blocks containing the response content 响应内容s
+     * @param usage the token usage information for this response 使用token的信息
+     * @param metadata additional metadata from the model provider 额外元数据
+     * @param finishReason the reason for 结束原因（如 stop、length、tool_calls）
      */
     public ChatResponse(
             String id,

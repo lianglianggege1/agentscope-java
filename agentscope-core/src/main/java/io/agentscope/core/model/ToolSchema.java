@@ -23,6 +23,7 @@ import java.util.Objects;
 
 /**
  * Immutable tool schema definition.
+ * 定义工具的接口，使用JSON Schema进行参数描述
  * Describes a tool's interface using JSON Schema for parameters.
  */
 public class ToolSchema {
@@ -75,6 +76,7 @@ public class ToolSchema {
 
     /**
      * Gets the strict mode flag for schema validation.
+     * 严格模式，参数必须与定义的JSON模式匹配
      *
      * @return true if strict mode is enabled, false otherwise, or null if not specified
      */
