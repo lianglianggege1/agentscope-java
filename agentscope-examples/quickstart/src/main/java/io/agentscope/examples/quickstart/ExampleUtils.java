@@ -25,8 +25,13 @@ import io.agentscope.core.message.TextBlock;
 import io.agentscope.core.message.ThinkingBlock;
 import io.agentscope.examples.quickstart.util.MsgUtils;
 import java.io.BufferedReader;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -59,6 +64,10 @@ public class ExampleUtils {
                 "DASHSCOPE_API_KEY", "DashScope", "https://dashscope.console.aliyun.com/apiKey");
     }
 
+    public static String getMiniMaxApiKey() throws IOException {
+        return getApiKey("MINIMAX_API_KEY", "MiniMax", "https://minimax.cloud/api-key");
+    }
+
     /**
      * Get OpenAI API key from environment variable or interactive input.
      *
@@ -87,6 +96,15 @@ public class ExampleUtils {
         if (apiKey != null && !apiKey.isEmpty()) {
             System.out.println("✓ Using API key from environment variable " + envVarName + "\n");
             return apiKey;
+        }
+        
+        // 在agentscope-java的项目目录下有.env.properties文件，里面存放API key
+        // 格式如下： DASHSCOPE_API_KEY: YOUR_API_KEY
+        // 实现读取里面具体的API key
+        String apiKeyFromFile = loadApiKeyFromEnvFile(envVarName);
+        if (apiKeyFromFile != null && !apiKeyFromFile.isEmpty()) {
+            System.out.println("✓ Using API key from .env.properties file\n");
+            return apiKeyFromFile;
         }
 
         // 2. Interactive input
@@ -329,5 +347,43 @@ public class ExampleUtils {
             System.out.print(toPrint);
             System.out.flush();
         }
+    }
+
+    /**
+     * Load API key from .env.properties file in the project root directory.
+     *
+     * @param envVarName the environment variable name to look for in the file
+     * @return the API key value, or null if not found
+     */
+    private static String loadApiKeyFromEnvFile(String envVarName) {
+        // Look for .env.properties in the project root (parent of agentscope-examples)
+        Path projectRoot = Paths.get("..", ".env.properties");
+        if (!Files.exists(projectRoot)) {
+            return null;
+        }
+
+        try (FileInputStream fis = new FileInputStream(projectRoot.toFile())) {
+            Properties props = new Properties();
+            props.load(fis);
+
+            // Try to get the value - support both formats:
+            // DASHSCOPE_API_KEY=YOUR_API_KEY
+            // DASHSCOPE_API_KEY: YOUR_API_KEY
+            String value = props.getProperty(envVarName);
+            if (value != null) {
+                value = value.trim();
+                // Handle colon separator
+                if (value.contains(":")) {
+                    String[] parts = value.split(":", 2);
+                    if (parts.length == 2) {
+                        value = parts[1].trim();
+                    }
+                }
+                return value;
+            }
+        } catch (Exception e) {
+            // Silently ignore - will fall back to interactive input
+        }
+        return null;
     }
 }

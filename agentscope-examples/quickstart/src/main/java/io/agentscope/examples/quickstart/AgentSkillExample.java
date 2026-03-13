@@ -16,8 +16,10 @@
 package io.agentscope.examples.quickstart;
 
 import io.agentscope.core.ReActAgent;
+import io.agentscope.core.formatter.anthropic.AnthropicChatFormatter;
 import io.agentscope.core.formatter.dashscope.DashScopeChatFormatter;
 import io.agentscope.core.memory.InMemoryMemory;
+import io.agentscope.core.model.AnthropicChatModel;
 import io.agentscope.core.model.DashScopeChatModel;
 import io.agentscope.core.skill.AgentSkill;
 import io.agentscope.core.skill.SkillBox;
@@ -56,7 +58,7 @@ public class AgentSkillExample {
                         + "  - Use file tools to create a new skill\n"
                         + "  - Write SKILL.md and references under a target folder");
 
-        String apiKey = ExampleUtils.getDashScopeApiKey();
+        String apiKey = ExampleUtils.getMiniMaxApiKey();
 
         Toolkit toolkit = new Toolkit();
         SkillBox skillBox = new SkillBox(toolkit);
@@ -89,13 +91,14 @@ public class AgentSkillExample {
                         .name("SkillCreator")
                         .sysPrompt(buildSystemPrompt(outputDir))
                         .model(
-                                DashScopeChatModel.builder()
-                                        .apiKey(apiKey)
-                                        .modelName("qwen-max")
-                                        .stream(true)
-                                        .enableThinking(true)
-                                        .formatter(new DashScopeChatFormatter())
-                                        .build())
+                                AnthropicChatModel.builder()
+                                .apiKey(apiKey)
+                                .modelName("MiniMax-M2.5")
+                                .stream(true)
+                                .formatter(new AnthropicChatFormatter())
+                                .baseUrl("https://api.minimaxi.com/anthropic")
+                                .defaultOptions(null) //暂时看不懂，先不填了
+                                .build())
                         .toolkit(toolkit)
                         .skillBox(skillBox)
                         .memory(new InMemoryMemory())
