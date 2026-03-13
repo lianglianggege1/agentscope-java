@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * ClasspathSkillRepository - Loads skills from classpath resources and JAR files.
+ * 
  *
  * <p>This repository bridges the gap between JAR resources and file system based skill loading by:
  * <ol>

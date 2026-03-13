@@ -17,9 +17,11 @@ package io.agentscope.core.skill;
 
 /**
  * Generates skill system prompts for agents to understand available skills.
+ * 生成技能系统prompts
  *
  * <p>This provider creates system prompts containing information about available skills
  * that the LLM can dynamically load and use.
+ * 这个提供者创建系统prompt，包含有关可用技能的信息，以便LLM动态加载和使用。
  *
  * <p><b>Usage example:</b>
  * <pre>{@code
@@ -38,6 +40,7 @@ public class AgentSkillPromptProvider {
 
             <usage>
             Skills provide specialized capabilities and domain knowledge. Use them when they match your current task.
+            
 
             How to use skills:
             - Load skill: load_skill_through_path(skillId="<skill-id>", path="SKILL.md")

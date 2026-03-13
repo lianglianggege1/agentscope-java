@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Utility class for file system operations related to skills.
+ * 与技能相关的文件系统操作的实用程序类。
  *
  * <p>This class provides reusable operations for loading, listing, saving, and
  * deleting skills on the file system. It is designed to be shared by multiple
@@ -51,6 +52,7 @@ public final class SkillFileSystemHelper {
 
     /**
      * Loads a skill by name from the given base directory.
+     * 
      *
      * @param baseDir The base directory containing skill folders
      * @param skillName The skill name to load

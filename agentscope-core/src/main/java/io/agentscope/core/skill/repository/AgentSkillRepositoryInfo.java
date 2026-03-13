@@ -17,9 +17,12 @@ package io.agentscope.core.skill.repository;
 
 /**
  * Metadata about a skill repository.
+ * skill库的元数据
  *
  * <p>Contains essential information about a skill repository including its type,
  * location, and write capability.
+ * 包含有关技能库的基本信息，包括其类型、位置和写入能力。
+ * 
  *
  * <p><b>Repository types:</b>
  * <ul>

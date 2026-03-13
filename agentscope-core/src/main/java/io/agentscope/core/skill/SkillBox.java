@@ -832,9 +832,11 @@ public class SkillBox implements StateModule {
 
     /**
      * Fluent builder for configuring code execution with custom options.
+     * 流构建器，用于使用自定义选项配置代码执行。
      *
      * <p>This builder provides a flexible way to enable code execution capabilities
      * with selective tool enabling and custom ShellCommandTool configuration.
+     * 此构建器提供了一种灵活的方法，通过选择性工具启用和自定义ShellCommandTool配置来启用代码执行功能。
      *
      * <p>Key features:
      * <ul>
@@ -918,6 +920,7 @@ public class SkillBox implements StateModule {
 
         /**
          * Set the file extensions to include for uploads.
+         * 设置上传所包含的文件扩展名。
          *
          * @param extensions File extensions to include
          * @return This builder for chaining

@@ -23,6 +23,7 @@ import java.util.regex.Pattern;
 
 /**
  * Utility for parsing and generating Markdown files with YAML frontmatter.
+ * 使用YAML frontmatter解析和生成Markdown文件的实用程序。
  *
  * <p>This utility can:
  * <ul>

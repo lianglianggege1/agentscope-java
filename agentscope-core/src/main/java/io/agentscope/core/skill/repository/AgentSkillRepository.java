@@ -20,10 +20,13 @@ import java.util.List;
 
 /**
  * Repository interface for AgentSkill persistence operations.
+ * AgentSKill持久化操作的存储库接口。
  *
  * <p>This interface follows the Repository Pattern and Dependency Inversion Principle,
  * allowing different storage backends (filesystem, database, remote APIs, etc.) to be
  * used interchangeably.
+ * 此接口遵循存储库模式和依赖反转原则，
+ * 允许不同的存储后端（文件系统、数据库、远程API等）互换使用。
  *
  * <p>Example usage:
  * <pre>{@code
