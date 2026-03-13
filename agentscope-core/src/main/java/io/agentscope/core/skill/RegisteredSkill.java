@@ -17,9 +17,12 @@ package io.agentscope.core.skill;
 
 /**
  * Metadata wrapper for registered skills.
+ *  已注册技能的元数据包装器。
  *
  * <p>Records skill registration information including skill ID and activation state.
  * The activation state determines whether the skill's associated tools are available to the LLM.
+ * 记录技能注册信息，包括技能ID和激活状态。
+ * 激活状态决定了大型语言模型（LLM）是否能使用与该技能相关的工具。
  */
 class RegisteredSkill {
     private final String skillId;

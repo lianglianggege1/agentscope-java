@@ -20,14 +20,18 @@ import java.util.concurrent.ExecutorService;
 
 /**
  * Configuration for Toolkit execution behavior.
+ * 工具包执行行为的配置。
  *
  * <p>This class defines how tools are executed:
- * - Parallel vs Sequential execution
- * - Custom ExecutorService (optional)
- * - Execution configuration for timeout and retry
+ *    此类定义了工具的执行方式：
+ * - Parallel vs Sequential execution 并行执行与顺序执行
+ * - Custom ExecutorService (optional) 自定义执行器服务（可选）
+ * - Execution configuration for timeout and retry 超时和重试的执行配置
  *
  * <p>By default, all tool execution is asynchronous using Reactor's Schedulers.
+ *    默认情况下，所有工具的执行都是异步的，使用 Reactor 的调度器。
  * The default execution config provides 5-minute timeout with no retry (1 attempt).
+ *    默认执行配置提供 5 分钟超时，不重试（1 次尝试）。
  */
 public class ToolkitConfig {
 
@@ -47,6 +51,7 @@ public class ToolkitConfig {
 
     /**
      * Whether tools should be executed in parallel.
+     * 工具是否应该并行执行。
      *
      * @return true if parallel execution is enabled
      */
@@ -56,6 +61,7 @@ public class ToolkitConfig {
 
     /**
      * Get the custom executor service if provided.
+     * 如果提供，请获取自定义执行人服务。
      *
      * @return ExecutorService or null if using default Reactor schedulers
      */
@@ -65,6 +71,7 @@ public class ToolkitConfig {
 
     /**
      * Check if a custom executor service was provided.
+     * 检查是否提供了自定义执行服务。
      *
      * @return true if custom executor is configured
      */
@@ -74,6 +81,7 @@ public class ToolkitConfig {
 
     /**
      * Get the execution configuration for timeout and retry.
+     * 获取超时和重试的执行配置。
      *
      * @return ExecutionConfig or null if not configured (defaults will be applied)
      */
@@ -83,7 +91,8 @@ public class ToolkitConfig {
 
     /**
      * Check if tool deletion is allowed.
-     *
+     * 检查是否允许删除工具。
+     * 
      * @return true if tool deletion is allowed (default), false otherwise
      */
     public boolean isAllowToolDeletion() {
@@ -92,6 +101,7 @@ public class ToolkitConfig {
 
     /**
      * Get the default tool execution context.
+     * 获取默认工具执行上下文。
      *
      * <p>This context is used as the base for all tool calls and can be overridden by
      * agent-level or call-level contexts.
@@ -104,6 +114,7 @@ public class ToolkitConfig {
 
     /**
      * Create a new builder for ToolkitConfig.
+     * 为 ToolkitConfig 创建一个新的构建器。
      *
      * @return Builder instance
      */
@@ -113,6 +124,7 @@ public class ToolkitConfig {
 
     /**
      * Get the default configuration (sequential execution using Reactor).
+     * 获取默认配置（使用 Reactor 进行顺序执行）。
      *
      * @return Default ToolkitConfig
      */

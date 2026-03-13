@@ -22,19 +22,24 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Registry for managing skill registration and activation state.
+ * 用于管理技能注册和激活状态的注册表。
  *
  * <p>This class provides basic storage and retrieval operations for skills.
+ *    本课程提供技能的基本存储和检索操作。
  *
  * <p><b>Responsibilities:</b>
  * <ul>
  *   <li>Store and retrieve skills
+ *       存储和检索技能
  *   <li>Track skill metadata and activation state
+ *       跟踪技能元数据和激活状态
  * </ul>
  *
  * <p><b>Design principle:</b>
  * This is a pure storage layer. All parameters are assumed to be non-null
  * unless explicitly documented. Parameter validation should be performed
  * at the Toolkit layer.
+ * 设计原则：这是一个纯存储层。除非另有明确说明，所有参数均假定为非空值。参数验证应在工具包层执行。
  */
 class SkillRegistry {
     private final Map<String, AgentSkill> skills = new ConcurrentHashMap<>();

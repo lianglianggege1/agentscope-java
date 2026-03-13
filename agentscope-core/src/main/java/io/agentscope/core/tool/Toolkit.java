@@ -36,31 +36,33 @@ import reactor.core.publisher.Mono;
 
 /**
  * Toolkit manages the registration, retrieval, and execution of agent tools.
+ * Toolkit 管理代理工具的注册、检索和执行。
  * This class acts as a facade, delegating specific responsibilities to specialized managers:
+ * 该类起到装饰作用，将具体职责委派给专门的经理：
  *
  * <p><b>Managers:</b>
  * <ul>
- *   <li>ToolRegistry: Tool registration and lookup</li>
- *   <li>ToolGroupManager: Tool group CRUD operations and active group management</li>
- *   <li>ToolSchemaProvider: Tool schema generation with group filtering</li>
- *   <li>McpClientManager: MCP client lifecycle and tool registration</li>
- *   <li>MetaToolFactory: Creates meta tools for dynamic group control</li>
+ *   <li>ToolRegistry: Tool registration and lookup 工具注册表：工具注册和查找</li>
+ *   <li>ToolGroupManager: Tool group CRUD operations and active group management 工具组管理器：工具组的 CRUD 操作和活动组管理</li>
+ *   <li>ToolSchemaProvider: Tool schema generation with group filtering 带分组筛选功能的工具架构生成</li>
+ *   <li>McpClientManager: MCP client lifecycle and tool registration MCP客户端生命周期和工具注册</li>
+ *   <li>MetaToolFactory: Creates meta tools for dynamic group control 创建用于动态组控制的元工具</li>
  * </ul>
  *
  * <p><b>Core Components:</b>
  * <ul>
- *   <li>ToolSchemaGenerator: Generates JSON schemas for tool parameters</li>
- *   <li>ToolMethodInvoker: Handles method invocation and parameter conversion</li>
- *   <li>ToolResultConverter: Converts method results to ToolResultBlock</li>
- *   <li>ToolExecutor: Handles parallel/sequential tool execution with validation</li>
+ *   <li>ToolSchemaGenerator: Generates JSON schemas for tool parameters 为工具参数生成 JSON 模式</li>
+ *   <li>ToolMethodInvoker: Handles method invocation and parameter conversion 处理方法调用和参数转换</li>
+ *   <li>ToolResultConverter: Converts method results to ToolResultBlock 将方法结果转换为 ToolResultBlock</li>
+ *   <li>ToolExecutor: Handles parallel/sequential tool execution with validation 处理并行/顺序工具执行并进行验证</li>
  * </ul>
  *
  * <p><b>Features:</b>
  * <ul>
- *   <li>Tool group management for dynamic tool activation</li>
- *   <li>State management via StateModule interface (activeGroups persistence)</li>
- *   <li>Meta tool for runtime tool group control (reset_equipped_tools)</li>
- *   <li>MCP (Model Context Protocol) client support for external tool providers</li>
+ *   <li>Tool group management for dynamic tool activation 用于动态工具激活的工具组管理</li>
+ *   <li>State management via StateModule interface (activeGroups persistence) 通过 StateModule 接口进行状态管理（activeGroups 持久化）</li>
+ *   <li>Meta tool for runtime tool group control (reset_equipped_tools) 用于运行时工具组控制的元工具（reset_equipped_tools）</li>
+ *   <li>MCP (Model Context Protocol) client support for external tool providers MCP（模型上下文协议）客户端对外部工具提供商的支持</li>
  * </ul>
  */
 public class Toolkit {

@@ -32,9 +32,12 @@ import java.util.zip.ZipInputStream;
 
 /**
  * Utility class for creating AgentSkill instances.
+ * 用于创建 AgentSkill 实例的实用类。
  *
  * <p>This class provides factory methods to create AgentSkill objects from various sources,
  * particularly from markdown content with YAML frontmatter.
+ * 此类提供工厂方法，可以从各种来源创建 AgentSkill 对象，
+ * 特别是从带有 YAML frontmatter 的 Markdown 内容创建。
  *
  * <p><b>Usage example:</b>
  * <pre>{@code

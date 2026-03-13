@@ -33,13 +33,18 @@ import java.util.Set;
 
 /**
  * AgentSkillExample - Demonstrates creating skills using the skill-creator skill.
+ * 演示如何使用技能创建器技能来创建技能
  *
  * <p>This example shows a complete skill creation workflow with:
+ * 此示例展示了一个完整的技能创建工作流程，包括：
  *
  * <ul>
  *   <li>Loading a skill from resources via FileSystemSkillRepository
+ *   通过 FileSystemSkillRepository 从资源中加载技能
  *   <li>Enabling code execution tools for writing new skills
+ *   启用代码执行工具以编写新技能
  *   <li>Running a demo prompt that creates a new skill on disk
+ *   运行演示提示，在磁盘上创建一个新技能
  * </ul>
  */
 public class AgentSkillExample {

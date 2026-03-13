@@ -56,6 +56,7 @@ public class SkillBox implements StateModule {
 
     /**
      * Creates a SkillBox without a toolkit.
+     * 创建一个没有工具包的技能箱。
      *
      * <p>This constructor will be removed in the next release. A SkillBox must hold a
      * {@link Toolkit} to operate correctly. Relying on automatic toolkit assignment makes
@@ -82,10 +83,11 @@ public class SkillBox implements StateModule {
 
     /**
      * Creates a SkillBox with a toolkit and custom skill prompt instruction and template.
+     * 创建一个包含工具包、自定义技能提示说明和模板的技能盒。
      *
      * @param toolkit The toolkit to bind
-     * @param instruction Custom instruction header (null or blank uses default)
-     * @param template Custom skill template (null or blank uses default)
+     * @param instruction Custom instruction header (null or blank uses default) 自定义指令头（空或空白使用默认值）
+     * @param template Custom skill template (null or blank uses default) 自定义技能模板（空或留空使用默认值）
      */
     public SkillBox(Toolkit toolkit, String instruction, String template) {
         this.skillPromptProvider =
@@ -588,6 +590,7 @@ public class SkillBox implements StateModule {
 
     /**
      * Create a fluent builder for configuring code execution with custom options.
+     *  创建一个流畅的构建器，用于配置带有自定义选项的代码执行。
      *
      * <p>This is the recommended way to enable code execution capabilities for skills.
      * The builder allows selective enabling of tools and customization of ShellCommandTool.
