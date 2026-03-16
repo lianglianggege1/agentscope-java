@@ -37,20 +37,24 @@ import reactor.util.retry.Retry;
 
 /**
  * Unified executor for tool execution with infrastructure concerns.
+ * 针对基础设施问题的工具执行的统一执行器。
  *
  * <p>This class consolidates all tool execution logic including:
+ *    此类整合了所有工具执行逻辑，包括：
  * <ul>
- *   <li>Single and batch tool execution</li>
- *   <li>Parallel/sequential execution control</li>
- *   <li>Timeout and retry handling</li>
- *   <li>Thread scheduling</li>
- *   <li>Schema validation before execution</li>
+ *   <li>Single and batch tool execution 单次和批量工具执行</li>
+ *   <li>Parallel/sequential execution control 并行/顺序执行控制</li>
+ *   <li>Timeout and retry handling 超时和重试处理</li>
+ *   <li>Thread scheduling 线程调度</li>
+ *   <li>Schema validation before execution 执行前的架构验证</li>
  * </ul>
  *
  * <p>Execution modes:
  * <ul>
  *   <li>Default: Uses Reactor's Schedulers.boundedElastic() for async I/O operations</li>
+ *                使用Reactor的Scheduler.boundedElastic（）进行异步I/O操作
  *   <li>Custom: Uses user-provided ExecutorService</li>
+ *               使用用户提供的ExecutorService
  * </ul>
  */
 class ToolExecutor {
@@ -112,15 +116,17 @@ class ToolExecutor {
 
     /**
      * Core tool execution logic.
+     * 核心工具执行逻辑。
      *
      * <p>This method handles:
+     *    此方法处理：
      * <ul>
-     *   <li>Tool lookup and validation</li>
-     *   <li>Group activation check</li>
-     *   <li>Parameter merging (preset + input)</li>
-     *   <li>Context merging</li>
-     *   <li>Schema validation</li>
-     *   <li>Actual tool invocation</li>
+     *   <li>Tool lookup and validation 工具查找和验证</li>
+     *   <li>Group activation check 组激活检查</li>
+     *   <li>Parameter merging (preset + input) 参数合并（预设+输入）</li>
+     *   <li>Context merging 上下文合并</li>
+     *   <li>Schema validation 模式验证</li>
+     *   <li>Actual tool invocation 实际工具调用</li>
      * </ul>
      */
     private Mono<ToolResultBlock> executeCore(ToolCallParam param) {
@@ -209,6 +215,7 @@ class ToolExecutor {
 
     /**
      * Execute multiple tool calls with concurrency control, timeout, and retry.
+     * 执行多个具有并发控制、超时和重试的工具调用。
      *
      * @param toolCalls List of tool calls to execute
      * @param parallel Whether to execute in parallel
@@ -247,6 +254,7 @@ class ToolExecutor {
 
     /**
      * Execute a single tool call with infrastructure (scheduling, timeout, retry).
+     * 使用基础架构执行单个工具调用（调度、超时、重试）。
      */
     private Mono<ToolResultBlock> executeWithInfrastructure(
             ToolUseBlock toolCall,

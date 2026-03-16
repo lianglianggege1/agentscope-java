@@ -17,10 +17,12 @@ package io.agentscope.core.tool;
 
 /**
  * Provider interface for resolving ToolExecutionContext from external sources.
+ * 用于从外部源解析ToolExecutionContext的提供程序接口。
  *
  * <p>This interface enables integration with dependency injection frameworks like Spring, allowing
  * tool execution contexts to be resolved from IoC containers, request scopes, thread-local storage,
  * or any other context management mechanism.
+ * 此接口支持与Spring等依赖注入框架的集成，允许从IoC容器、请求范围、线程本地存储或任何其他上下文管理机制解析工具执行上下文。
  *
  * <p><b>Spring Integration Example:</b>
  *
@@ -116,11 +118,14 @@ public interface ToolExecutionContextProvider {
 
     /**
      * Resolves a context instance of the specified type.
+     * 解析指定类型的上下文实例。
      *
      * <p>This method is called by the framework when a tool method parameter requires context
      * injection but no explicit context was provided at the call site. The implementation should
      * attempt to resolve the context from its managed source (Spring container, ThreadLocal, etc.)
      * and return an instance of the requested type.
+     * 当工具方法参数需要上下文注入但调用站点没有提供显式上下文时，框架会调用此方法。
+     * 实现应尝试从其托管源（Spring容器、ThreadLocal等）解析上下文，并返回所请求类型的实例。
      *
      * @param targetType The target type to resolve (ToolExecutionContext or custom POJO)
      * @param <T> The target type

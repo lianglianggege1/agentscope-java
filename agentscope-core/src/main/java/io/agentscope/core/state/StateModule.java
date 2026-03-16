@@ -25,6 +25,8 @@ import io.agentscope.core.session.Session;
  * that need to persist and restore their internal state. Components that implement this interface
  * can have their state saved to and restored from external storage through the session management
  * system.
+ * 此接口为需要持久化和恢复其内部状态的组件提供状态序列化和反序列化功能。
+ * 实现此接口的组件可以通过会话管理系统将其状态保存到外部存储和从外部存储还原。
  *
  * <p>Use {@link #saveTo(Session, String)} and {@link #loadFrom(Session, String)} for direct session
  * interaction with simple string session IDs.

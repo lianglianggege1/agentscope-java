@@ -49,7 +49,9 @@ import reactor.core.scheduler.Schedulers;
  *
  * <ul>
  *   <li>Multi-module session support
+ *    多个模块会话支持
  *   <li>Atomic file operations
+ *      原子文件操作
  *   <li>UTF-8 encoding
  *   <li>Graceful handling of missing sessions
  *   <li>Configurable storage directory

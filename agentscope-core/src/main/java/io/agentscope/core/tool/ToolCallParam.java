@@ -26,9 +26,11 @@ import java.util.Map;
  *
  * <p>This class encapsulates all the information needed to call a tool, including the tool use
  * block (containing metadata like call ID and tool name), input parameters, and the calling agent.
+ * 这个类封装所有调用工具所需的信息，包括工具调用块（包含调用ID和工具名称），输入参数，和调用的代理。
  *
  * <p>Using a parameter object instead of multiple method parameters provides better extensibility
  * - new parameters can be added without breaking existing code.
+ * 使用参数对象而不是多个方法参数提供了更好的扩展性 - 新参数可以不破坏现有代码
  *
  * <p><b>Example usage:</b>
  * <pre>{@code

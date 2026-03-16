@@ -23,10 +23,12 @@ import java.util.Set;
 
 /**
  * Session storage interface for AgentScope.
+ * AgentScope的会话存储接口。
  *
  * <p>Sessions provide persistent storage for state objects, allowing agents, memories, toolkits,
  * and other stateful components to be saved and restored across application runs or user
  * interactions.
+ * 会话为状态对象提供持久存储，允许在应用程序运行或用户交互过程中保存和恢复代理、内存、工具包和其他有状态组件。
  *
  * <ul>
  *   <li>{@link #save(SessionKey, String, State)} - Save a single state object

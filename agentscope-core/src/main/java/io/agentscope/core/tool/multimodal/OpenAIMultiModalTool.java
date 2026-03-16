@@ -39,6 +39,7 @@ import reactor.core.publisher.Mono;
 
 /**
  * OpenAI multimodal tool.
+ * OpenAI多模式工具。
  *
  * <p>Supports:
  * <ul>

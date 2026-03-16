@@ -32,6 +32,10 @@ import java.util.function.Predicate;
  * executions.
  *
  * <p>Use the builder pattern to construct instances. All fields are optional and nullable.
+ * 
+ * 超时和重试行为的统一执行配置。
+ * 该类取代了以前的TimeoutConfig和RetryConfig类，提供了一个统一的配置来控制模型API调用和工具执行的执行行为。
+ * 使用构建器模式构建实例。所有字段都是可选的，可以为空。
  *
  * <h2>Standard Defaults</h2>
  *

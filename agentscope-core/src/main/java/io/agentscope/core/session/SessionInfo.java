@@ -18,9 +18,11 @@ package io.agentscope.core.session;
 
 /**
  * Information about a session.
+ * 一个会话信息
  * <p>
  * Contains metadata about stored sessions including size, modification time,
  * and the number of state components saved in the session.
+ * 包含有关存储会话的元数据，包括会话中保存的状态组件的大小、修改时间和数量。
  */
 public class SessionInfo {
     private final String sessionId;

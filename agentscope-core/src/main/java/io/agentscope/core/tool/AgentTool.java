@@ -21,16 +21,18 @@ import reactor.core.publisher.Mono;
 
 /**
  * Interface for agent tools that can be called by models.
+ * 模型可以调用的智能体工具的接口。
  *
  * <p>Agent tools are functions that AI agents can invoke to perform actions or retrieve
  * information. They bridge the gap between the agent's reasoning and the external world.
+ * 智能体工具是AI agent可以调用以执行操作或检索信息的功能。它们弥合了智能体的推理和外部世界之间的差距。
  *
  * <p><b>Implementation Guidelines:</b>
  * <ul>
- *   <li>Tools should have clear, descriptive names</li>
- *   <li>Descriptions should explain what the tool does and when to use it</li>
- *   <li>Parameter schemas must follow JSON Schema format</li>
- *   <li>All operations should be implemented asynchronously using Reactor Mono</li>
+ *   <li>Tools should have clear, descriptive names 工具应具有清晰、描述性的名称</li>
+ *   <li>Descriptions should explain what the tool does and when to use it 说明应解释工具的功能以及何时使用</li>
+ *   <li>Parameter schemas must follow JSON Schema format 参数模式必须遵循JSON模式格式</li>
+ *   <li>All operations should be implemented asynchronously using Reactor Mono 所有操作都应使用Reactor Mono异步执行</li>
  * </ul>
  *
  * @see Tool

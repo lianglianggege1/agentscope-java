@@ -16,8 +16,10 @@
 package io.agentscope.examples.quickstart;
 
 import io.agentscope.core.ReActAgent;
+import io.agentscope.core.formatter.anthropic.AnthropicChatFormatter;
 import io.agentscope.core.formatter.dashscope.DashScopeChatFormatter;
 import io.agentscope.core.memory.InMemoryMemory;
+import io.agentscope.core.model.AnthropicChatModel;
 import io.agentscope.core.model.DashScopeChatModel;
 import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.tool.Toolkit;
@@ -32,10 +34,10 @@ public class BasicChatExample {
         ExampleUtils.printWelcome(
                 "Basic Chat Example",
                 "This example demonstrates the simplest Agent setup.\n"
-                        + "You'll chat with an AI assistant powered by DashScope.");
+                        + "You'll chat with an AI assistant powered by MiniMax.");
 
         // Get API key (from environment or interactive input)
-        String apiKey = ExampleUtils.getDashScopeApiKey();
+        String apiKey = ExampleUtils.getMiniMaxApiKey();
 
         // Create Agent with minimal configuration
         ReActAgent agent =
@@ -43,17 +45,29 @@ public class BasicChatExample {
                         .name("Assistant")
                         .sysPrompt("You are a helpful AI assistant. Be friendly and concise.")
                         .model(
-                                DashScopeChatModel.builder()
-                                        .apiKey(apiKey)
-                                        .modelName("qwen-plus")
-                                        .stream(true)
-                                        .enableThinking(true)
-                                        .formatter(new DashScopeChatFormatter())
-                                        .defaultOptions(
+                                AnthropicChatModel.builder()
+                                .apiKey(apiKey)
+                                .modelName("MiniMax-M2.5")
+                                .stream(true)
+                                .formatter(new AnthropicChatFormatter())
+                                .baseUrl("https://api.minimaxi.com/anthropic")
+                               .defaultOptions(
                                                 GenerateOptions.builder()
                                                         .thinkingBudget(1024)
                                                         .build())
-                                        .build())
+                                .build()
+                                // DashScopeChatModel.builder()
+                                //         .apiKey(apiKey)
+                                //         .modelName("qwen-plus")
+                                //         .stream(true)
+                                //         .enableThinking(true)
+                                //         .formatter(new DashScopeChatFormatter())
+                                //         .defaultOptions(
+                                //                 GenerateOptions.builder()
+                                //                         .thinkingBudget(1024)
+                                //                         .build())
+                                //         .build()
+                                )
                         .memory(new InMemoryMemory())
                         .toolkit(new Toolkit())
                         .build();

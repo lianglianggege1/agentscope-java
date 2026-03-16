@@ -22,10 +22,13 @@ import java.util.Objects;
 
 /**
  * Facade for passing custom POJOs to tool methods via priority-based resolution.
+ * 通过基于优先级的解析将自定义POJO传递给工具方法的外观。
  *
  * <p>Two-layer architecture: External interface + Storage layer ({@link ContextStore}).
+ * 两层架构：外部接口+存储层（{@link ContextStore}）。
  *
  * <p>Priority chain: Call → Agent → Toolkit → Spring (highest to lowest)
+ * 优先级链：呼叫→ 智能体→ 工具包→ Spring（最高至最低）
  *
  * <p>Example:
  *
@@ -58,6 +61,7 @@ public class ToolExecutionContext {
 
     /**
      * Retrieves an object by key and type (for multi-instance scenarios).
+     * 按键和类型检索对象（用于多实例场景）。
      *
      * @param key The key identifying the instance
      * @param type The class type to retrieve
@@ -135,6 +139,7 @@ public class ToolExecutionContext {
 
     /**
      * Merges multiple contexts into priority-based resolution chain.
+     * 将多个上下文合并到基于优先级的解析链中。
      *
      * <p>Earlier contexts have higher priority.
      *

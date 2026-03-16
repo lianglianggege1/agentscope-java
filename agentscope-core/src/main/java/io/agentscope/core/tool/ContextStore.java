@@ -17,17 +17,20 @@ package io.agentscope.core.tool;
 
 /**
  * Storage layer abstraction for tool execution context.
+ * 为工具执行上下文进行存储层的接口
  *
  * <p>This interface defines the storage contract for context objects. It supports two retrieval
  * modes:
  * <ol>
  *   <li><b>By type only</b>: {@code get(Class<T>)} - suitable for singleton scenarios</li>
+ *   适用于单例场景
  *   <li><b>By key + type</b>: {@code get(String, Class<T>)} - suitable for multi-instance
- *       scenarios</li>
+ *       scenarios 适用于多实例场景</li>
  * </ol>
  *
  * <p>This design allows handling both simple cases (one UserContext) and complex cases
  * (multiple UserContext instances for different users).
+ * 这种设计允许处理简单情况（一个UserContext）和复杂情况（不同用户的多个UserContext实例）。
  *
  * <p>Implementations can be:
  * <ul>
@@ -52,9 +55,11 @@ public interface ContextStore {
 
     /**
      * Retrieves an object by key and type.
+     * 按键和类型检索对象。
      *
      * <p>This method allows storing multiple instances of the same type with different keys.
      * Keys can be user IDs, session IDs, or any other identifier that distinguishes instances.
+     * 此方法允许存储具有不同键的同一类型的多个实例。密钥可以是用户ID、会话ID或区分实例的任何其他标识符。
      *
      * <p>Example:
      * <pre>{@code

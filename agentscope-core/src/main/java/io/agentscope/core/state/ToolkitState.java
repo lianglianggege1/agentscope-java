@@ -19,10 +19,13 @@ import java.util.List;
 
 /**
  * State record for toolkit active groups.
+ * 工具箱活动组的状态记录。
  *
  * <p>This record captures the active tool groups configuration for persistence. The toolkit itself
  * is stateless, but its activeGroups configuration needs to be persisted. This state is managed by
  * {@link io.agentscope.core.ReActAgent}.
+ * 此记录捕获了用于持久化的活动工具组配置。
+ * 该工具包本身是无状态的，但其activeGroups配置需要持久化。
  *
  * <p>Example usage:
  *

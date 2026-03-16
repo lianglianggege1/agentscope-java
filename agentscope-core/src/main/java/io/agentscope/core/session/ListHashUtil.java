@@ -20,11 +20,14 @@ import java.util.List;
 
 /**
  * Utility class for computing hash values of state lists.
+ * 用于计算状态列表哈希值的实用类。
  *
  * <p>This class provides hash computation for change detection in Session implementations. The hash
  * is used to detect if a list has been modified (not just appended) since the last save operation.
+ * 此类为会话实现中的更改检测提供哈希计算。哈希用于检测自上次保存操作以来列表是否已被修改（而不仅仅是附加）。
  *
  * <p>The hash computation uses a sampling strategy to avoid iterating over large lists:
+ * 哈希计算使用采样策略来避免迭代大列表：
  *
  * <ul>
  *   <li>For small lists (≤5 elements): all elements are included

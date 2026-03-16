@@ -17,9 +17,12 @@ package io.agentscope.core.state;
 
 /**
  * State record for agent metadata.
+ * 智能体元数据状态
  *
  * <p>This record captures the essential metadata of an agent for persistence. It is used by {@link
  * io.agentscope.core.ReActAgent} to save and restore agent configuration across sessions.
+ * 此记录捕获代理的基本元数据以实现持久性。它由{@link使用
+ * io.agentscope.core。ReActAgent｝用于跨会话保存和还原代理配置。
  *
  * <p>Example usage:
  *
@@ -32,7 +35,7 @@ package io.agentscope.core.state;
  * }</pre>
  *
  * @param id the unique identifier of the agent
- * @param name the display name of the agent
+ * @param name the display name of the agent 
  * @param description a brief description of the agent's purpose
  * @param systemPrompt the system prompt used to configure agent behavior
  * @see State

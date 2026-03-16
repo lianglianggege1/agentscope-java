@@ -63,6 +63,9 @@ class SkillToolFactory {
      * <p>This tool allows agents to load and activate skills by their ID and resource path.
      * It supports loading SKILL.md for skill documentation or other resources like scripts,
      * configs, and templates.
+     * 创建load_skill_through_path智能体工具。
+     * 此工具允许智能体通过其ID和资源路径加载和激活技能。
+     * 它支持加载技能文档或脚本、配置和模板等其他资源的SKILL.md。
      *
      * @return AgentTool for loading skill resources (including SKILL.md)
      */

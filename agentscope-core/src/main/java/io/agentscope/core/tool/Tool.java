@@ -23,10 +23,13 @@ import java.lang.annotation.Target;
 
 /**
  * Annotation to mark a method as a tool that can be invoked by AI agents.
+ * 注释，将方法标记为可由AI代理调用的工具。
  *
  * <p>Methods annotated with {@code @Tool} are automatically registered with the toolkit and made
  * available to agents for execution. The toolkit uses reflection to discover tool methods and
  * generate appropriate JSON schemas for LLM consumption.
+ * 用@Tool注释的方法会自动注册到工具包中，并可供智能体执行。
+ * 该工具包使用反射来发现工具方法，并为LLM消费生成适当的JSON模式。
  *
  * <p><b>Usage Example:</b>
  *
@@ -45,9 +48,13 @@ import java.lang.annotation.Target;
  * <p><b>Requirements:</b>
  * <ul>
  *   <li>All parameters must be annotated with {@link ToolParam} (except {@link ToolEmitter})</li>
+ *   所有参数都必须使用{@link ToolParam}进行注释（{@link ToolsEmitter}除外）
  *   <li>Return type must be String, Mono&lt;String&gt;, or other reactive types</li>
+ *   返回类型必须是字符串、单声道&lt；字符串&gt；，或其他反应型
  *   <li>Tool names should follow snake_case convention for LLM compatibility</li>
+ *   为了LLM兼容性，工具名称应遵循snake_case约定
  *   <li>Descriptions should clearly explain what the tool does and when to use it</li>
+ *   描述应清楚地解释工具的功能以及何时使用
  * </ul>
  *
  * @see ToolParam
@@ -71,16 +78,22 @@ public @interface Tool {
 
     /**
      * The description of the tool that explains its purpose and usage.
+     * 对工具的描述，解释其用途和用法。
      *
      * <p>This description is sent to the LLM to help it decide when to invoke the tool. It should
      * clearly explain:
+     * 此描述将发送给LLM，以帮助其决定何时调用该工具。它应该清楚地解释：
      * <ul>
      *   <li>What the tool does</li>
+     *   干什么
      *   <li>When it should be used</li>
+     *   何时干
      *   <li>What kind of results it returns</li>
+     *   返回什么结果
      * </ul>
      *
      * <p>If not provided, a generic description based on the method name will be generated.
+     * 如果没有提供，将生成基于方法名称的通用描述。
      *
      * @return The tool description, or empty string to auto-generate
      */
