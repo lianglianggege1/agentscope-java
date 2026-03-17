@@ -24,6 +24,7 @@ import reactor.core.publisher.Mono;
 
 /**
  * An external tool implementation that only contains schema definition without execution logic.
+ * 一个仅包含模式定义而不包含执行逻辑的外部工具实现。
  *
  * <p>This class is used for registering external tools that will be executed outside the framework.
  * When a model returns a call to a SchemaOnlyTool, the framework will catch the

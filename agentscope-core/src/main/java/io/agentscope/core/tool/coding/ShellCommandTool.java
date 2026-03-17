@@ -51,9 +51,11 @@ import reactor.core.scheduler.Schedulers;
 
 /**
  * Tool for executing shell commands with security validation.
+ * 用于执行 shell 命令并进行安全验证的工具。
  *
  * <p>Features: command whitelist, user approval callback, multiple command detection,
  * timeout support (default 300s), platform-specific validation.
+ * 功能：命令白名单、用户批准回调、多命令检测、超时支持（默认 300 秒）、平台特定验证。
  *
  * <p><b>Security Warning:</b> {@code new ShellCommandTool()} allows arbitrary command execution.
  * For production, ALWAYS use whitelist: {@code new ShellCommandTool(allowedCommands)}
@@ -106,8 +108,8 @@ public class ShellCommandTool implements AgentTool {
     /**
      * Constructor with command whitelist and approval callback.
      *
-     * @param allowedCommands Set of allowed command executables
-     * @param approvalCallback Callback function to request user approval
+     * @param allowedCommands Set of allowed command executables 允许执行的命令集
+     * @param approvalCallback Callback function to request user approval 回调函数，用于请求用户批准
      */
     public ShellCommandTool(
             Set<String> allowedCommands, Function<String, Boolean> approvalCallback) {
@@ -116,10 +118,11 @@ public class ShellCommandTool implements AgentTool {
 
     /**
      * Constructor with base directory, command whitelist, and approval callback.
+     * 构造函数包含基本目录、命令白名单和批准回调。
      *
-     * @param baseDir Base directory for command execution (null to use current directory)
-     * @param allowedCommands Set of allowed command executables
-     * @param approvalCallback Callback function to request user approval
+     * @param baseDir Base directory for command execution (null to use current directory) 命令执行的基本目录（如果为 null 则使用当前目录）
+     * @param allowedCommands Set of allowed command executables 允许执行的命令集
+     * @param approvalCallback Callback function to request user approval 回调函数，用于请求用户批准
      */
     public ShellCommandTool(
             String baseDir,
@@ -130,10 +133,11 @@ public class ShellCommandTool implements AgentTool {
 
     /**
      * Constructor with command whitelist, approval callback, and custom validator.
+     * 构造函数包含命令白名单、审批回调和自定义验证器。
      *
-     * @param allowedCommands Set of allowed command executables (null to allow all commands)
-     * @param approvalCallback Callback function to request user approval
-     * @param commandValidator Custom command validator
+     * @param allowedCommands Set of allowed command executables (null to allow all commands) 允许执行的命令集合（为 null 表示允许所有命令）
+     * @param approvalCallback Callback function to request user approval 回调函数，用于请求用户批准
+     * @param commandValidator Custom command validator 自定义命令验证器
      */
     public ShellCommandTool(
             Set<String> allowedCommands,
@@ -144,6 +148,7 @@ public class ShellCommandTool implements AgentTool {
 
     /**
      * Constructor with base directory, command whitelist, approval callback, and custom validator.
+     * 构造函数包含基本目录、命令白名单、批准回调和自定义验证器。
      *
      * @param baseDir Base directory for command execution (null to use current directory)
      * @param allowedCommands Set of allowed command executables (null to allow all commands)
@@ -175,6 +180,7 @@ public class ShellCommandTool implements AgentTool {
 
     /**
      * Create a default command validator based on the operating system.
+     * 根据操作系统创建默认命令验证器。
      *
      * @return Platform-specific command validator
      */
@@ -365,13 +371,18 @@ public class ShellCommandTool implements AgentTool {
     /**
      * Execute a shell command and return the return code, standard output, and
      * standard error within tags.
+     * 执行 shell 命令，并在标签内返回返回代码、标准输出和标准错误。
      *
      * <p>Security features:
      * <ul>
      *   <li>Command whitelist validation - only whitelisted commands execute directly</li>
+     *   命令白名单验证 - 只有列入白名单的命令才能直接执行
      *   <li>Multiple command detection - prevents command chaining attacks (&amp;, |, ;)</li>
+     *   多重命令检测 - 防止命令链攻击（&amp;、|、;）
      *   <li>User approval callback - requests permission for non-whitelisted commands</li>
+     *   用户批准回调 - 请求对非白名单命令的权限
      *   <li>Platform-specific validation - different rules for Windows and Unix/Linux/macOS</li>
+     *   平台特定的验证——Windows 和 Unix/Linux/macOS 的规则不同
      * </ul>
      *
      * @param command The shell command to execute
@@ -605,6 +616,7 @@ public class ShellCommandTool implements AgentTool {
 
     /**
      * Request user approval for command execution via callback.
+     * 通过回调请求用户批准命令执行。
      *
      * @param command The command to approve
      * @return true if approved, false otherwise

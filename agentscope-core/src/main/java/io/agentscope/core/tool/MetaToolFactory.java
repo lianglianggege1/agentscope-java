@@ -24,6 +24,7 @@ import reactor.core.publisher.Mono;
 
 /**
  * Factory for creating meta tools that allow agents to dynamically manage tool groups.
+ * 用于创建元工具的工厂，允许代理动态管理工具组。
  */
 class MetaToolFactory {
 

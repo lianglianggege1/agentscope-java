@@ -32,13 +32,19 @@ import reactor.core.publisher.Mono;
  * AgentTool implementation that wraps an MCP (Model Context Protocol) tool.
  * This class bridges MCP tools to the AgentScope tool system, allowing
  * agents to invoke remote MCP tools seamlessly.
+ * 包装 MCP（模型上下文协议）工具的 AgentTool 实现。
+ * 此类将 MCP 工具桥接到 AgentScope 工具系统，允许代理无缝调用远程 MCP 工具。
  *
  * <p>Features:
  * <ul>
  *   <li>Converts AgentScope tool calls to MCP protocol calls</li>
+ *       将 AgentScope 工具调用转换为 MCP 协议调用
  *   <li>Handles parameter merging with preset arguments</li>
+ *       处理参数与预设参数的合并
  *   <li>Converts MCP results to AgentScope ToolResultBlocks</li>
+ *       将 MCP 结果转换为 AgentScope ToolResultBlocks
  *   <li>Supports reactive execution with Mono</li>
+ *       支持使用 Mono 进行反应式执行
  * </ul>
  *
  * <p>Example usage:
@@ -134,10 +140,19 @@ public class McpTool implements AgentTool {
 
     /**
      * Executes this MCP tool asynchronously with the given parameters.
+     * 使用给定参数异步执行此 MCP 工具。
      *
      * <p>This method merges any preset arguments with the input arguments (input takes precedence),
      * calls the remote MCP tool via the client wrapper, and converts the result to a
      * {@link ToolResultBlock}. If an error occurs, it returns an error result instead of failing.
+     * 
+     * 此方法将任何预设参数与输入参数合并（输入优先），通过客户端包装器调用远程 MCP 工具，并将结果转换为 ToolResultBlock。如果发生错误，它会返回错误结果而不是失败。
+        指定者：AgentTool 中的 callAsync(...)
+
+        参数：
+        param 工具调用参数，包含toolUseBlock、input和agent
+        返回：
+        当 MCP 调用完成时发出工具结果的 Mono
      *
      * @param param The tool call parameters containing toolUseBlock, input, and agent
      * @return a Mono that emits the tool result when the MCP call completes

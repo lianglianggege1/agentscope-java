@@ -29,6 +29,8 @@ import java.util.stream.Collectors;
  * Utility class for converting between MCP content types and AgentScope content blocks.
  * This converter handles the translation of MCP protocol data structures to AgentScope's
  * internal representation.
+ * 用于在 MCP 内容类型和 AgentScope 内容块之间进行转换的实用程序类。
+ * 该转换器负责将 MCP 协议数据结构转换为 AgentScope 的内部表示形式
  *
  * <p>Supported conversions:
  * <ul>

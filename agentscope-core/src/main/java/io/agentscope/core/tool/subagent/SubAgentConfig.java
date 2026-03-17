@@ -114,9 +114,11 @@ public class SubAgentConfig {
 
     /**
      * Gets whether to forward sub-agent events to the parent agent.
+     * 获取是否将子代理事件转发给父代理。
      *
      * <p>When enabled, events from the sub-agent (reasoning chunks, tool execution chunks) are
      * forwarded via ToolEmitter to the parent agent's hooks.
+     * 启用后，子代理的事件（推理块、工具执行块）将通过 ToolEmitter 转发到父代理的钩子。
      *
      * @return true if events should be forwarded (default: true)
      */
@@ -126,6 +128,7 @@ public class SubAgentConfig {
 
     /**
      * Gets the stream options for event forwarding.
+     * 获取事件转发的流选项。
      *
      * <p>Controls which event types to forward and streaming mode (incremental vs cumulative). Only
      * applicable when {@link #isForwardEvents()} returns true.

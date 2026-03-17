@@ -41,9 +41,16 @@ import reactor.core.publisher.Mono;
  *   <li>Viewing from the end using negative indices (e.g., last 100 lines: [-100, -1])</li>
  *   <li>Listing files and directories in a specified directory with full paths</li>
  * </ul>
+ * 用于查看文本文件内容（可选择指定行范围）和列出目录内容的工具。
+ * 此工具提供以下功能：
+ * 查看整个文件内容
+ * 查看特定行范围（例如，第 1-100 行）
+ * 使用负索引从末尾开始查看（例如，最后 100 行：[-100, -1]）
+ * 列出指定目录中的文件和目录及其完整路径
  *
  * <p>Security: When baseDir is specified, all file operations are restricted to that directory
  * to prevent unauthorized file access.
+ * 安全性：指定 baseDir 时，所有文件操作都将限制在该目录中，以防止未经授权的文件访问。
  */
 public class ReadFileTool {
 
@@ -52,6 +59,8 @@ public class ReadFileTool {
     /**
      * Base directory to restrict file access. If null, no restriction is applied.
      * This prevents path traversal attacks and unauthorized file access.
+     * 限制文件访问的基本目录。如果为空，则不应用任何限制。
+     * 这可以防止路径遍历攻击和未经授权的文件访问。
      */
     private final Path baseDir;
 

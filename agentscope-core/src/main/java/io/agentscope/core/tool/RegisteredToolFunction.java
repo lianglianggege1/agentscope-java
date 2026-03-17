@@ -21,9 +21,11 @@ import java.util.Map;
 
 /**
  * Wrapper for AgentTool with metadata for schema extension and execution.
+ * AgentTool 的包装器，带有用于模式扩展和执行的元数据。
  *
  * <p>This class wraps an AgentTool and adds additional metadata such as extended schema
  * information, MCP client association, and preset parameters.
+ * 此类封装了 AgentTool，并添加了额外的元数据，例如扩展架构信息、MCP 客户端关联和预设参数。
  */
 class RegisteredToolFunction {
 

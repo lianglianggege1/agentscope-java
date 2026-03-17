@@ -44,10 +44,13 @@ class DefaultToolEmitter implements ToolEmitter {
 
     /**
      * Emits a tool result chunk to the registered callback.
+     * 将工具结果块发送到已注册的回调函数。
      *
      * <p>This implementation delivers the chunk to the callback function (which typically forwards
      * it to hooks via {@code onActingChunk()} events). If either the callback or chunk is null,
      * this method silently does nothing.
+     * 此实现将数据块传递给回调函数（回调函数通常会通过 onActingChunk() 事件将其转发给钩子函数）。如果回调函数或数据块为空，则此方法不会执行任何操作。
+     * 由 ToolEmitter 中的 emit(...) 指定
      *
      * @param chunk The tool result chunk to emit (may be null)
      */

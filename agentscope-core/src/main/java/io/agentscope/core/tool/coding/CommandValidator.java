@@ -19,6 +19,7 @@ import java.util.Set;
 
 /**
  * Interface for validating shell commands before execution.
+ * 用于在执行 shell 命令之前对其进行验证的接口。
  *
  * <p><b>Validation Flow:</b>
  * <ol>

@@ -24,6 +24,7 @@ import java.util.List;
 
 /**
  * Utility methods shared by text file tools.
+ * 文本文件工具所可用的方法
  */
 public class FileToolUtils {
 
@@ -80,6 +81,7 @@ public class FileToolUtils {
 
     /**
      * Calculate the view ranges for displaying file content after modifications.
+     * 计算修改后文件内容的显示视图范围。
      *
      * @param originalLineCount Original number of lines
      * @param newLineCount New number of lines after modification
@@ -109,6 +111,7 @@ public class FileToolUtils {
 
     /**
      * View a specific range of lines from a text file.
+     * 查看文本文件中特定范围的行。
      *
      * @param filePath The file path
      * @param startLine Start line number (1-based)

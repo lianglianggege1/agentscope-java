@@ -31,7 +31,9 @@ import reactor.core.publisher.Mono;
 
 /**
  * Invokes tool methods with type conversion and error handling.
+ * 调用工具方法，并进行类型转换和错误处理。
  * This class handles reflection-based method invocation and parameter conversion.
+ * 此类处理基于反射的方法调用和参数转换。
  */
 class ToolMethodInvoker {
 

@@ -28,6 +28,8 @@ import reactor.core.scheduler.Schedulers;
  * Wrapper for synchronous MCP clients that converts blocking calls to reactive Mono types.
  * This implementation delegates to {@link McpSyncClient} and wraps blocking operations
  * in Reactor's boundedElastic scheduler to avoid blocking the event loop.
+ * 同步 MCP 客户端的包装器，可将阻塞调用转换为反应式 Mono 类型。
+ * 此实现委托给 McpSyncClient 并将阻塞操作包装在 Reactor 的有界弹性调度程序中，以避免阻塞事件循环。
  *
  * <p>Example usage:
  * <pre>{@code

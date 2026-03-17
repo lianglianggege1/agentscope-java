@@ -19,9 +19,12 @@ import io.agentscope.core.agent.Agent;
 
 /**
  * Factory interface for creating agent instances.
+ * 用于创建代理实例的工厂接口。
  *
  * <p>Since ReActAgent is not thread-safe, this provider pattern ensures that each tool call gets a
  * fresh agent instance. This is similar to Spring's ObjectProvider pattern.
+ * 由于 ReActAgent 不是线程安全的，这种提供程序模式确保每次工具调用都会获得一个全新的代理实例。
+ * 这类似于 Spring 的 ObjectProvider 模式。
  *
  * <p>Example usage:
  *
