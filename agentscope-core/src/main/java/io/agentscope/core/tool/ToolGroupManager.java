@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Manages tool groups and their activation states.
+ * 管理工具组及其激活状态。
  */
 class ToolGroupManager {
 

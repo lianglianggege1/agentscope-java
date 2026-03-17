@@ -25,8 +25,10 @@ import reactor.core.publisher.Mono;
 
 /**
  * Wrapper for asynchronous MCP clients using Project Reactor.
+ * 使用Project Reactor的异步MCP客户端的包装器。
  * This implementation delegates to {@link McpAsyncClient} and provides
  * reactive operations that return Mono types.
+ * 此实现委托给{@link McpAsyncClient}，并提供返回Mono类型的响应式操作。
  *
  * <p>Example usage:
  * <pre>{@code
@@ -60,6 +62,8 @@ public class McpAsyncClientWrapper extends McpClientWrapper {
      * <p>This method connects to the MCP server, discovers available tools, and caches them for
      * later use. If already initialized, this method returns immediately without re-initializing.
      *
+     *  初始化异步MCP客户端连接并缓存可用工具。
+     * 此方法连接到MCP服务器，发现可用工具，并缓存它们以供以后使用。如果已经初始化，此方法将立即返回，而无需重新初始化。
      * @return a Mono that completes when initialization is finished
      */
     @Override
@@ -97,7 +101,9 @@ public class McpAsyncClientWrapper extends McpClientWrapper {
      *
      * <p>This method queries the MCP server for its current list of tools. The client must be
      * initialized before calling this method.
-     *
+     * 列出MCP服务器上可用的所有工具。
+     * 此方法向MCP服务器查询其当前的工具列表。在调用此方法之前，必须初始化客户端。
+     * 重写：McpClientWrapper中的listTools（）
      * @return a Mono emitting the list of available tools
      * @throws IllegalStateException if the client is not initialized
      */
@@ -113,9 +119,11 @@ public class McpAsyncClientWrapper extends McpClientWrapper {
 
     /**
      * Invokes a tool on the MCP server asynchronously.
+     * 异步调用MCP服务器上的工具。
      *
      * <p>This method sends a tool call request to the MCP server and returns the result
      * asynchronously. The client must be initialized before calling this method.
+     * 此方法向MCP服务器发送工具调用请求，并异步返回结果。在调用此方法之前，必须初始化客户端。
      *
      * @param toolName the name of the tool to call
      * @param arguments the arguments to pass to the tool
@@ -155,9 +163,11 @@ public class McpAsyncClientWrapper extends McpClientWrapper {
 
     /**
      * Closes the MCP client connection and releases all resources.
+     * 关闭MCP客户端连接并释放所有资源。
      *
      * <p>This method attempts to close the client gracefully, falling back to forceful closure if
      * graceful closure fails. This method is idempotent and can be called multiple times safely.
+     * 此方法尝试优雅地关闭客户端，如果优雅关闭失败，则退回到强制关闭。此方法是幂等的，可以安全地多次调用。
      */
     @Override
     public void close() {

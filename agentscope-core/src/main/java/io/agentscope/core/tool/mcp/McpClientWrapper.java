@@ -29,9 +29,13 @@ import reactor.core.publisher.Mono;
  * <p>The wrapper handles:
  * <ul>
  *   <li>Client initialization and connection management</li>
+ *       客户端初始化和连接管理
  *   <li>Tool discovery and caching</li>
+ *       工具发现和缓存
  *   <li>Tool invocation through the MCP protocol</li>
+ *       通过MCP协议调用工具
  *   <li>Resource cleanup on close</li>
+ *       关闭时进行资源清理
  * </ul>
  *
  * @see McpAsyncClientWrapper

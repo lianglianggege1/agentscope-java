@@ -44,12 +44,17 @@ import reactor.core.publisher.Mono;
 
 /**
  * Builder for creating MCP client wrappers with fluent configuration.
+ * 用于创建具有流畅配置的MCP客户端包装器的生成器。
  *
  * <p>Supports three transport types:
+ *    支持三种传输类型：
  * <ul>
  *   <li>StdIO - for local process communication</li>
+ *       StdIO-用于本地过程通信
  *   <li>SSE - for HTTP Server-Sent Events (stateful)</li>
+ *       SSE-用于HTTP服务器发送事件（有状态）
  *   <li>StreamableHTTP - for HTTP streaming (stateless)</li>
+ *       StreamableHTTP-用于HTTP流（无状态）
  * </ul>
  *
  * <p>Example usage:
