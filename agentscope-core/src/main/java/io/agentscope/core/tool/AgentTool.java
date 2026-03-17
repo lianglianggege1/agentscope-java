@@ -78,6 +78,7 @@ public interface AgentTool {
 
     /**
      * Execute the tool with the given parameters (asynchronous).
+     * 执行工具（异步）。
      *
      * <p>This method accepts a {@link ToolCallParam} object containing all necessary context for
      * tool execution, including:

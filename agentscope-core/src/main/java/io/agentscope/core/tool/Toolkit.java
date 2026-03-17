@@ -185,7 +185,7 @@ public class Toolkit {
         Method[] methods = clazz.getDeclaredMethods();
 
         for (Method method : methods) {
-            if (method.isAnnotationPresent(Tool.class)) {
+            if (method.isAnnotationPresent(Tool.class)) {//重点
                 Tool toolAnnotation = method.getAnnotation(Tool.class);
                 String toolName =
                         toolAnnotation.name().isEmpty() ? method.getName() : toolAnnotation.name();

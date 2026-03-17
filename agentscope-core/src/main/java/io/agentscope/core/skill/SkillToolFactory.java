@@ -151,6 +151,7 @@ class SkillToolFactory {
 
     /**
      * Implementation of skill resource loading logic.
+     * 技能资源加载逻辑实现
      *
      * @param skillId The unique identifier of the skill
      * @param path The path to the resource file
