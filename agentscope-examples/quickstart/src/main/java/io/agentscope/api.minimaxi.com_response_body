@@ -1,0 +1,66 @@
+event: message_start
+data: {"type":"message_start","message":{"id":"060966dfad836de0aeefd2e126a09347","type":"message","role":"assistant","content":[],"model":"MiniMax-M2.5","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":272,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":6141},"service_tier":"standard"}}
+
+event: ping
+data: {"type":"ping"}
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"用户"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"问我有没有天气工具，想查今天北京的天气。\n\n让我看看我可用的工具。根据之前的对话，我有：\n1. load_skill_through_path - 加载技能\n2."}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" list_directory - 列出目录\n3. execute_shell_command - 执行shell命令\n4. write_text_file - 写文件\n5. insert_text_file - 插入文件"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"\n6. view_text_file - 查看文件\n\n我没有天气相关的工具。我可以尝试通过执行shell命令来查询"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"天气，比如使用curl请求天气API，或者我可以告诉用户我没有天气工具。\n\n让我尝试用shell命令来"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"查询天气。中国常用的天气API可能是免费的，比如心知天气或者其他天气服务。让我试试看"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"。"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"eaff7e80c692adefcd032dec9b815228bc6029832dea60eaf96ad7e1bad7ab15"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0}
+
+event: content_block_start
+data: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"让我看看有没有天气相关的工具。我可以尝试用命令行查询天气：\n"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":1}
+
+event: content_block_start
+data: {"type":"content_block_start","index":2,"content_block":{"type":"tool_use","id":"call_function_1ioiijtk4fr2_1","name":"execute_shell_command","input":{}}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"{"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"\"command\": \"curl -s \\\"wttr.in/Beijing?format=j1\\\"\", \"timeout\": "}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"10}"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":2}
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"input_tokens":272,"output_tokens":202,"cache_creation_input_tokens":0,"cache_read_input_tokens":6141}}
+
+event: message_stop
+data: {"type":"message_stop"}
+
