@@ -26,13 +26,17 @@ import java.util.List;
 
 /**
  * Knowledge retrieval tools for Agentic RAG mode.
+ * 用于Agentic RAG mode的知识检索工具。
  *
  * <p>This class provides tool methods that can be registered with agents to enable
  * autonomous knowledge retrieval. Agents can call these tools to search the knowledge
  * base when they need information.
+ * 此类提供了可以向Agent注册的工具方法，
+ * 以实现自主知识检索。Agent可以在需要信息时调用这些工具来搜索知识库。
  *
  * <p>This is the Agentic mode implementation - agents decide when and how to retrieve
  * knowledge from the knowledge base.
+ * 这是Agentic mode 实现——agents决定何时以及如何从知识库中检索知识。
  *
  * <p>Example usage:
  * <pre>{@code
@@ -68,15 +72,19 @@ public class KnowledgeRetrievalTools {
 
     /**
      * Retrieves relevant documents from the knowledge base.
+     * 检索知识库中的相关文档。
      *
      * <p>This tool method allows agents to search the knowledge base for information
      * relevant to a query. The agent can specify how many documents to retrieve.
+     * 这个工具方法允许agents搜索知识库中的相关信息。agent可以指定要检索的文档数量。
      *
      * <p>If the agent has conversation history in memory, that history will be automatically
      * included in the retrieval configuration. Knowledge bases that support multi-turn
      * conversation context (like Bailian) can use this history to improve retrieval accuracy.
+     * 如果agent有对话历史记录，那么该历史记录将自动包含在检索配置中。支持多轮会话上下文的知识库（如Bailian）
      *
      * <p>Use this tool when:
+     *    何时使用这个工具
      * <ul>
      *   <li>The user asks questions about stored knowledge
      *   <li>You need to find specific information from the knowledge base

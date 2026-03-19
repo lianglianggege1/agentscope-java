@@ -32,17 +32,26 @@ import reactor.core.publisher.Mono;
 
 /**
  * Generic RAG Hook for automatic knowledge retrieval before reasoning.
+ * 通用的 RAG Hook，用于自动知识检索。
  *
  * <p>This hook implements the Generic RAG mode, where knowledge is automatically retrieved
  * and injected into the prompt before each reasoning step. Unlike Agentic mode (where agents
  * decide when to retrieve), Generic mode always retrieves relevant knowledge for user queries.
+ * 这个Hook 实现了通用 RAG 模式，
+ * 在每个推理步骤之前，自动检索知识并注入到提示中。
+ * 与智能体模式（智能体决定何时检索）不同，通用模式总是检索用户查询相关的知识。
  *
  * <p>This hook intercepts {@link PreReasoningEvent} and:
+ *    这个hook 拦截了 PreReasoningEvent 事件。 执行推理之前，自动检索知识并注入到提示中。
  * <ol>
  *   <li>Extracts the query from user messages</li>
+ *       提取用户消息中的查询
  *   <li>Retrieves relevant documents from the knowledge base</li>
+ *       检索相关的文档
  *   <li>Injects the retrieved knowledge as a system message</li>
+ *       插入检索到的知识作为系统消息
  *   <li>Modifies the input messages to include the knowledge context</li>
+ *       修改输入消息，使其包含知识上下文
  * </ol>
  *
  * <p>Example usage:
@@ -71,8 +80,10 @@ public class GenericRAGHook implements Hook {
 
     /**
      * Creates a GenericRAGHook with default configuration.
+     * 创造一个通用 RAG Hook，使用默认配置。
      *
      * <p>Default configuration:
+     *    默认配置：
      * <ul>
      *   <li>Limit: 5 documents</li>
      *   <li>Score threshold: 0.5</li>
@@ -87,6 +98,7 @@ public class GenericRAGHook implements Hook {
 
     /**
      * Creates a GenericRAGHook with custom configuration.
+     * 创造一个通用 RAG Hook，使用自定义配置。
      *
      * @param knowledge the knowledge base to retrieve from
      * @param defaultConfig the default retrieval configuration
@@ -116,11 +128,13 @@ public class GenericRAGHook implements Hook {
     @Override
     public int priority() {
         // High priority to execute early in the hook chain
+        // 高优先级，执行早于hook链中的其他钩子
         return 50;
     }
 
     /**
      * Handles PreCallEvent by retrieving knowledge and enhancing messages.
+     * 处理 PreCallEvent，检索知识并增强消息。
      *
      * @param event the PreReasoningEvent
      * @return Mono containing the potentially modified event
@@ -132,12 +146,14 @@ public class GenericRAGHook implements Hook {
         }
 
         // Extract query text from messages (finds the last user message from back to front)
+        // 从消息中提取查询文本（从后向前查找最后一个用户消息）
         String query = extractQueryFromMessages(inputMessages);
         if (query == null || query.trim().isEmpty()) {
             return Mono.just(event);
         }
 
         // Retrieve relevant documents
+        // 检索相关的文档
         return knowledge
                 .retrieve(query, defaultConfig)
                 .flatMap(
@@ -147,6 +163,7 @@ public class GenericRAGHook implements Hook {
                             }
                             List<Msg> enhancedMessages = new ArrayList<>();
                             // Build enhanced messages with knowledge context
+                            // 构建带有知识上下文的增强消息
                             Msg enhancedMessage = createEnhancedMessages(retrievedDocs);
                             enhancedMessages.addAll(inputMessages);
                             enhancedMessages.add(enhancedMessage);
@@ -163,9 +180,11 @@ public class GenericRAGHook implements Hook {
 
     /**
      * Extracts query text from message list.
+     * 从消息列表中提取查询文本。
      *
      * <p>Finds the last user message as the query source (not just the last message, which could be
      * ASSISTANT or TOOL in ReAct loops).
+     * 寻找最后一个用户消息作为查询源（而不是仅最后一个消息，该消息可以是 ReAct 循环中的 ASSISTANT 或 TOOL）。
      *
      * @param messages the message list
      * @return the extracted query text, or empty string if no user message found
@@ -188,8 +207,10 @@ public class GenericRAGHook implements Hook {
 
     /**
      * Creates enhanced message list with knowledge context injected.
+     * 创建带有知识上下文注入的增强消息列表。
      *
      * <p>The knowledge is injected as a system message at the beginning of the message list.
+     * 知识作为系统消息注入到消息列表的开头。
      *
      * @param retrievedDocs the retrieved documents
      * @return the enhanced message list with knowledge context
@@ -206,8 +227,10 @@ public class GenericRAGHook implements Hook {
 
     /**
      * Builds knowledge content string from retrieved documents.
+     * 构建从检索的文档中生成的知识内容字符串。
      *
      * <p>Formats documents with scores and content for inclusion in the prompt.
+     * 格式化文档以供提示包含
      *
      * @param documents the retrieved documents
      * @return the formatted knowledge content string
@@ -230,6 +253,7 @@ public class GenericRAGHook implements Hook {
 
     /**
      * Gets the knowledge base used by this hook.
+     * 获取此hook使用的知识库。
      *
      * @return the knowledge base
      */
@@ -239,6 +263,7 @@ public class GenericRAGHook implements Hook {
 
     /**
      * Gets the default retrieval configuration.
+     * 获取默认的检索配置。
      *
      * @return the default config
      */
