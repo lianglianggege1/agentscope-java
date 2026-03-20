@@ -92,7 +92,7 @@ class McpClientBuilderTest {
     void testStreamableHttpTransport() {
         McpClientBuilder builder =
                 McpClientBuilder.create("http-client")
-                        .streamableHttpTransport("https://mcp.example.com/http");
+                        .streamableHttpTransport("https://cscmcp.58corp.com/mcp");
 
         assertNotNull(builder);
     }
