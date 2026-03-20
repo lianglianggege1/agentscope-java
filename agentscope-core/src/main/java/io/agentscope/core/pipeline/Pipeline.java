@@ -20,11 +20,13 @@ import reactor.core.publisher.Mono;
 
 /**
  * Base interface for pipeline execution in AgentScope.
+ * 基础的流水线执行接口在AgentScope
  *
  * Pipelines provide orchestration of agents and operations in various patterns
  * such as sequential, parallel (fanout), or custom flows.
+ * Pipelines可以以各种模式（例如顺序、并行（扇出）或自定义流程）来编排代理和操作。
  *
- * @param <T> Type of the pipeline result
+ * @param <T> Type of the pipeline result 管道结果类型
  */
 public interface Pipeline<T> {
 
@@ -38,17 +40,19 @@ public interface Pipeline<T> {
 
     /**
      * Execute the pipeline with the given input message and structured output.
+     * 使用给定的输入消息和结构化输出执行管道。
      *
-     * @param input Input message to process through the pipeline
-     * @param structuredOutputClass The class type for structured output
+     * @param input Input message to process through the pipeline 要在管道中处理的输入消息
+     * @param structuredOutputClass The class type for structured output 结构化输出的类类型
      * @return Mono containing the pipeline result with structured output
      */
     Mono<T> execute(Msg input, Class<?> structuredOutputClass);
 
     /**
      * Execute the pipeline with no input (for pipelines that don't need input).
+     * 执行无输入管道（适用于不需要输入的管道）。
      *
-     * @return Mono containing the pipeline result
+     * @return Mono containing the pipeline result 包含管道结果的 Mono
      */
     default Mono<T> execute() {
         return execute((Msg) null);
@@ -56,6 +60,7 @@ public interface Pipeline<T> {
 
     /**
      * Execute the pipeline with no input but with structured output.
+     * 执行管道操作，不输入数据，但输出结构化数据。
      *
      * @param structuredOutputClass The class type for structured output
      * @return Mono containing the pipeline result with structured output
@@ -65,9 +70,9 @@ public interface Pipeline<T> {
     }
 
     /**
-     * Get a description of this pipeline.
+     * Get a description of this pipeline. 获取该管道的描述。
      *
-     * @return Human-readable description of the pipeline
+     * @return Human-readable description of the pipeline 人类可以读懂的pipeline描述
      */
     default String getDescription() {
         return getClass().getSimpleName();

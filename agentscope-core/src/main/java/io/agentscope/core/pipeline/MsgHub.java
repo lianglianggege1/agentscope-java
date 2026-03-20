@@ -31,10 +31,13 @@ import reactor.core.publisher.Mono;
 
 /**
  * MsgHub is designed to share messages among a group of agents.
+ * MsgHub 旨在实现一组代理之间的消息共享。
  *
  * <p>MsgHub manages message broadcasting and subscription in multi-agent conversations.
  * When agents are added to a MsgHub, they automatically observe each other's messages
  * without explicit message passing code.
+ * MsgHub 管理多代理对话中的消息广播和订阅。当代理添加到 MsgHub 时，
+ * 它们会自动监听彼此的消息，而无需显式编写消息传递代码。
  *
  * <p><b>Features:</b>
  * <ul>
@@ -44,6 +47,11 @@ import reactor.core.publisher.Mono;
  *   <li><b>Manual Broadcasting:</b> Broadcast messages manually when needed</li>
  *   <li><b>Announcement Support:</b> Send initial messages when entering the hub</li>
  *   <li><b>Lifecycle Management:</b> Automatic cleanup with try-with-resources</li>
+ * 自动广播：任何参与者的消息都会自动广播给所有其他参与者
+* 动态参与者：在对话过程中添加或移除代理
+* 手动广播：根据需要手动广播消息
+* 公告支持：进入中心时发送初始消息
+* 生命周期管理：使用 try-with-resources 进行自动清理
  * </ul>
  *
  * <p><b>Usage Example:</b>
@@ -91,7 +99,9 @@ import reactor.core.publisher.Mono;
  *
  * <p><b>Thread Safety:</b>
  * MsgHub uses CopyOnWriteArrayList for thread-safe participant management.
+ * MsgHub 使用 CopyOnWriteArrayList 进行线程安全的参与者管理。
  * However, individual agent instances should not be invoked concurrently.
+ * 但是，不应该同时调用各个代理实例。
  *
  * @see Agent
  * @see AgentBase#resetSubscribers(String, List)
@@ -109,6 +119,7 @@ public class MsgHub implements AutoCloseable {
 
     /**
      * Private constructor. Use builder() to create instances.
+     * 私有构造函数。请使用 builder() 来创建实例。
      *
      * @param builder Builder instance
      */
@@ -121,6 +132,7 @@ public class MsgHub implements AutoCloseable {
 
     /**
      * Get the name of this MsgHub.
+     * 获取消息Hub的名称。
      *
      * @return MsgHub name
      */
@@ -130,6 +142,7 @@ public class MsgHub implements AutoCloseable {
 
     /**
      * Get the list of current participants.
+     * 获取当前参与者列表。
      *
      * @return Unmodifiable view of participants
      */
@@ -139,6 +152,7 @@ public class MsgHub implements AutoCloseable {
 
     /**
      * Check if auto-broadcast is enabled.
+     * 判断是否启用自动广播。
      *
      * @return True if auto-broadcast is enabled
      */
@@ -149,9 +163,13 @@ public class MsgHub implements AutoCloseable {
     /**
      * Enter the MsgHub context.
      * This method initializes subscriber relationships and broadcasts announcement messages.
+     * 进入消息Hub上下文。
+     * 此方法初始化订阅者关系并广播公告消息。
+     * 
      *
      * <p>Must be called before using the hub. Typically called in a try-with-resources block
      * or explicitly managed with enter()/exit().
+     * 必须在使用中心节点之前调用。通常在 try-with-resources 代码块中调用，或使用 enter()/exit() 显式管理。
      *
      * @return Mono containing this MsgHub instance
      */

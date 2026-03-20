@@ -30,21 +30,23 @@ import reactor.core.scheduler.Schedulers;
 
 /**
  * Fanout pipeline implementation for parallel agent execution.
+ * 实现用于并行代理执行的扇出管道。
  *
  * This pipeline distributes the same input to multiple agents and executes
  * them either concurrently or sequentially, collecting all results.
+ * 该管道将​​相同的输入分发给多个代理，并让它们并发或顺序执行，收集所有结果。
  *
  * Execution flow:
  * Input -> [Agent1, Agent2, ..., AgentN] -> [Output1, Output2, ..., OutputN]
  *
  * Features:
- * - Fan-out pattern execution (one input, multiple outputs)
- * - Configurable concurrent vs sequential execution
- * - Input isolation (each agent gets a copy of the input)
- * - Result aggregation into a list
- * - Enhanced error handling with detailed agent failure information
- * - Composite exception collection for multiple agent failures
- * - Individual agent error isolation without affecting others
+ * - Fan-out pattern execution (one input, multiple outputs) 扇出模式执行（一个输入，多个输出）
+ * - Configurable concurrent vs sequential execution 可配置的并发执行与顺序执行
+ * - Input isolation (each agent gets a copy of the input) 输入隔离（每个代理都获得一份输入副本）
+ * - Result aggregation into a list 将结果汇总成列表
+ * - Enhanced error handling with detailed agent failure information 增强了错误处理能力，提供了详细的代理故障信息
+ * - Composite exception collection for multiple agent failures 针对多个Agent故障的复合异常集合
+ * - Individual agent error isolation without affecting others 隔离单个Agent错误而不影响其他代理
  */
 public class FanoutPipeline implements Pipeline<List<Msg>> {
 
@@ -55,10 +57,12 @@ public class FanoutPipeline implements Pipeline<List<Msg>> {
 
     /**
      * Create a fanout pipeline with the specified agents and execution mode.
+     * 创建具有指定智能体和执行模式的扇出管道。
      * Uses boundedElastic scheduler by default for concurrent execution.
+     * 默认情况下使用 boundedElastic 调度器进行并发执行。
      *
-     * @param agents List of agents to execute in parallel
-     * @param enableConcurrent True for concurrent execution, false for sequential
+     * @param agents List of agents to execute in parallel 要并行执行的智能体列表
+     * @param enableConcurrent True for concurrent execution, false for sequential 并发执行时为真，顺序执行时为假。
      */
     public FanoutPipeline(List<AgentBase> agents, boolean enableConcurrent) {
         this.agents = List.copyOf(agents != null ? agents : List.of());
@@ -72,10 +76,11 @@ public class FanoutPipeline implements Pipeline<List<Msg>> {
 
     /**
      * Create a fanout pipeline with the specified agents, execution mode and scheduler.
+     * 创建具有指定代理、执行模式和调度程序的扇出管道。
      *
-     * @param agents List of agents to execute in parallel
-     * @param enableConcurrent True for concurrent execution, false for sequential
-     * @param scheduler Custom scheduler for execution
+     * @param agents List of agents to execute in parallel 要并行执行的代理列表
+     * @param enableConcurrent True for concurrent execution, false for sequential 并发执行时为真，顺序执行时为假。
+     * @param scheduler Custom scheduler for execution 自定义执行调度器
      */
     public FanoutPipeline(List<AgentBase> agents, boolean enableConcurrent, Scheduler scheduler) {
         this.agents = List.copyOf(agents != null ? agents : List.of());
@@ -89,8 +94,9 @@ public class FanoutPipeline implements Pipeline<List<Msg>> {
 
     /**
      * Create a fanout pipeline with concurrent execution enabled by default.
+     * 创建默认启用并发执行的扇出管道。
      *
-     * @param agents List of agents to execute in parallel
+     * @param agents List of agents to execute in parallel 要并行执行的代理列表
      */
     public FanoutPipeline(List<AgentBase> agents) {
         this(agents, true);
@@ -113,16 +119,21 @@ public class FanoutPipeline implements Pipeline<List<Msg>> {
 
     /**
      * Execute agents concurrently using reactive merge with true parallelism.
+     * 使用响应式合并实现真正的并行性，并发执行代理。
      * All agents are executed even if some fail, but the all error is propagated.
+     * 即使部分代理失败，所有代理都会执行，但所有错误都会传播。
      *
      * <p>Implementation: Each agent's call is subscribed on a separate thread from the
      * configured scheduler, enabling true concurrent execution of HTTP requests to the LLM API.
      * By default, the {@link Schedulers#boundedElastic()} scheduler is used, which is optimal
      * for I/O-bound operations. A custom scheduler can also be provided via constructor.
+     * 实现方式：每个代理的调用都订阅在与配置的调度器不同的线程上，从而实现对 LLM API 的 HTTP 请求的真正并发执行。
+     * 默认情况下，使用 Schedulers.boundedElastic() 调度器，该调度器最适合 I/O 密集型操作。
+     * 也可以通过构造函数提供自定义调度器。
      *
-     * @param input Input message to distribute to all agents
-     * @param structuredOutputClass The class type for structured output (optional)
-     * @return Mono containing list of all agent results
+     * @param input Input message to distribute to all agents 输入要分发给所有代理的消息
+     * @param structuredOutputClass The class type for structured output (optional) 结构化输出的类类型（可选）
+     * @return Mono containing list of all agent results 包含所有代理结果列表的 Mono
      */
     private Mono<List<Msg>> executeConcurrent(Msg input, Class<?> structuredOutputClass) {
         // Collect all agent results and errors
@@ -170,10 +181,11 @@ public class FanoutPipeline implements Pipeline<List<Msg>> {
 
     /**
      * Execute agents sequentially with independent inputs.
+     * 按顺序执行代理，每个代理使用独立的输入。
      *
-     * @param input Input message to distribute to all agents
-     * @param structuredOutputClass The class type for structured output (optional)
-     * @return Mono containing list of all agent results
+     * @param input Input message to distribute to all agents 输入要分发给所有代理的消息
+     * @param structuredOutputClass The class type for structured output (optional) 结构化输出的类类型（可选）
+     * @return Mono containing list of all agent results 包含所有代理结果列表的 Mono
      */
     private Mono<List<Msg>> executeSequential(Msg input, Class<?> structuredOutputClass) {
         List<Mono<Msg>> chain = new ArrayList<>();
@@ -190,6 +202,7 @@ public class FanoutPipeline implements Pipeline<List<Msg>> {
 
     /**
      * Get the list of agents in this pipeline.
+     * 获取此销售渠道中的代理商列表。
      *
      * @return Copy of the agents list
      */
@@ -199,6 +212,7 @@ public class FanoutPipeline implements Pipeline<List<Msg>> {
 
     /**
      * Get the number of agents in this pipeline.
+     * 获取此管道中的代理商数量。
      *
      * @return Number of agents
      */
@@ -208,6 +222,7 @@ public class FanoutPipeline implements Pipeline<List<Msg>> {
 
     /**
      * Check if this pipeline is empty (has no agents).
+     * 检查此管道是否为空（没有代理）。
      *
      * @return True if pipeline has no agents
      */
@@ -217,6 +232,7 @@ public class FanoutPipeline implements Pipeline<List<Msg>> {
 
     /**
      * Check if concurrent execution is enabled.
+     * 检查是否启用并发执行。
      *
      * @return True if agents execute concurrently
      */
@@ -233,9 +249,11 @@ public class FanoutPipeline implements Pipeline<List<Msg>> {
 
     /**
      * Stream execution events from all agents with default options.
+     * 使用默认选项从所有代理流式传输执行事件​​。
      *
      * <p>Events from multiple agents are merged (concurrent mode) or concatenated
      * (sequential mode) based on the pipeline configuration.
+     * 根据管道配置，来自多个代理的事件将被合并（并发模式）或连接（顺序模式）。
      *
      * @param input Input message to distribute to all agents
      * @return Flux of events emitted during execution from all agents
