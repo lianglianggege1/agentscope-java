@@ -55,6 +55,7 @@ public enum RAGMode {
 
     /**
      * Disabled mode: No RAG functionality.
+     * 禁用模式：无RAG功能。
      *
      * <p>Knowledge retrieval is not enabled for this agent.
      * 禁用模式：无RAG功能。

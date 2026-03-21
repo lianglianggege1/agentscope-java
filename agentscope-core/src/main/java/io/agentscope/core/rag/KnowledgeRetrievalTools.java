@@ -87,14 +87,17 @@ public class KnowledgeRetrievalTools {
      *    何时使用这个工具
      * <ul>
      *   <li>The user asks questions about stored knowledge
+     *       用户询问存储的知识内容
      *   <li>You need to find specific information from the knowledge base
+     *       你需要从知识库中查找具体信息
      *   <li>You want to provide context-aware responses based on stored documents
+     *       你希望基于存储的文档提供上下文感知的回复
      * </ul>
      *
-     * @param query the search query to find relevant documents
-     * @param limit the maximum number of documents to retrieve (default: 5)
-     * @param agent the agent making the call (automatically injected by framework)
-     * @return a formatted string containing the retrieved documents and their scores
+     * @param query the search query to find relevant documents 查找相关文档的搜索查询
+     * @param limit the maximum number of documents to retrieve (default: 5) 要检索的最大文档数（默认值：5）
+     * @param agent the agent making the call (automatically injected by framework) 进行调用的代理（由框架自动注入）
+     * @return a formatted string containing the retrieved documents and their scores 包含检索到的文档及其分数的格式化字符串
      */
     @Tool(
             name = "retrieve_knowledge",
