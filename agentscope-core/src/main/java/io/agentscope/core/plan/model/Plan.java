@@ -23,9 +23,12 @@ import java.util.UUID;
 
 /**
  * Represents a plan containing a sequence of subtasks.
+ * 表示一个计划，包含一个或多个子任务
  *
  * <p>A plan breaks down a complex task into manageable subtasks with clear goals and expected
  * outcomes. It tracks the overall progress and provides a structured approach to task execution.
+ *    计划将复杂的任务分解为具有明确目标和预期结果的可管理子任务。
+ *    它跟踪整体进度，并提供结构化的任务执行方法。
  *
  * <p><b>Usage Example:</b>
  *
@@ -69,8 +72,9 @@ public class Plan {
 
     /**
      * Create a new plan.
+     * 创造一个计划
      *
-     * @param name The plan name (should be concise, not exceed 10 words)
+     * @param name The plan name (should be concise, not exceed 10 words) 
      * @param description The plan description including constraints and targets
      * @param expectedOutcome The expected outcome, specific and measurable
      * @param subtasks The list of subtasks that make up the plan

@@ -21,18 +21,26 @@ import io.agentscope.core.plan.model.SubTask;
 
 /**
  * Default implementation of PlanToHint that generates contextual hints based on plan state.
+ * 默认实现：计划提示生成器
  *
  * <p>Provides prompt templates and logic for generating hints at different stages of plan
  * execution.
+ * 提供提示模板和逻辑，用于在计划执行的不同阶段生成提示。
  *
  * <p>The generator provides hints for five scenarios:
+ *    生成器为五种场景提供提示：
  *
  * <ul>
  *   <li><b>No Plan:</b> Guides agent to create a plan for complex tasks
+ *          无计划：</b>指导代理为复杂任务创建计划
  *   <li><b>At the Beginning:</b> All subtasks are TODO
+ *          开始时：</b>所有子任务都是TODO
  *   <li><b>Subtask In Progress:</b> One subtask is actively being executed
+ *          子任务正在进行中：</b>一个子任务正在积极执行中
  *   <li><b>No Subtask In Progress:</b> Some tasks done, but none currently in progress
+ *          无正在进行的子任务：</b>一些任务已完成，但目前没有正在进行的任务
  *   <li><b>At the End:</b> All subtasks are done or abandoned
+ *          最后：</b>所有子任务都已完成或放弃
  * </ul>
  */
 public class DefaultPlanToHint implements PlanToHint {

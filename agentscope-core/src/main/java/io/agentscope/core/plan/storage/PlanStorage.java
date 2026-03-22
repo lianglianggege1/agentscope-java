@@ -21,6 +21,7 @@ import reactor.core.publisher.Mono;
 
 /**
  * Storage interface for persisting and retrieving plans.
+ * 为保存和检查存储计划
  *
  * <p>Implementations can store plans in memory, database, or any other persistent storage.
  */
@@ -28,6 +29,7 @@ public interface PlanStorage {
 
     /**
      * Add a plan to storage.
+     * 添加一个计划去存储
      *
      * @param plan The plan to store
      * @return Mono that completes when the plan is stored
@@ -36,6 +38,7 @@ public interface PlanStorage {
 
     /**
      * Get a plan by its ID.
+     * 获取一个计划通过其ID
      *
      * @param planId The plan ID
      * @return Mono emitting the plan, or empty if not found
@@ -44,6 +47,7 @@ public interface PlanStorage {
 
     /**
      * Get all plans from storage.
+     * 从存储中获取所有计划
      *
      * @return Mono emitting a list of all plans
      */

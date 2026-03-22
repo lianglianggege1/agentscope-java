@@ -21,11 +21,15 @@ import java.time.format.DateTimeFormatter;
 
 /**
  * Represents a subtask within a plan.
+ * 代表一个子任务
+ * 
  *
  * <p>
  * A subtask is a unit of work with a specific goal and expected outcome. It has
  * a state that
  * tracks its progress through the execution lifecycle.
+ * 子任务是一个具有特定目标和预期结果的工作单元。
+ * 它有一个状态，可以跟踪其在执行生命周期中的进度。
  *
  * <p>
  * <b>Usage Example:</b>

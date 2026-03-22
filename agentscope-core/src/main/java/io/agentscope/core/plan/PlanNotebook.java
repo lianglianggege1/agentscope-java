@@ -42,20 +42,28 @@ import reactor.core.publisher.Mono;
 
 /**
  * Plan notebook for managing complex tasks through structured planning.
+ * 通过结构化计划管理复杂任务的计划笔记本。
  *
  * <p>Provides tool functions for agents to create, manage, and track plans. Automatically injects
  * contextual hints to guide agent execution through a hook-based mechanism.
+ * 为智能体创建、管理和跟踪计划提供工具功能。自动注入上下文提示，通过基于钩子的机制指导代理执行。
  *
  * <p><b>Core Features:</b>
+ *       核心特点：
  *
  * <ul>
  *   <li><b>Plan Management:</b> Create, revise, and finish plans with multiple subtasks
+ *          计划管理：</b>创建、修改和完成具有多个子任务的计划
  *   <li><b>Automatic Hint Injection:</b> Injects contextual hints before each reasoning step
+ *          自动提示注入：</b>在每个推理步骤之前注入上下文提示
  *   <li><b>State Tracking:</b> Tracks subtask states (todo/in_progress/done/abandoned)
+ *          状态跟踪：</b>跟踪子任务状态（todo/in_progress/done/delegated）
  *   <li><b>Historical Plans:</b> Stores and recovers historical plans
+ *          历史计划：</b>存储和恢复历史计划
  * </ul>
  *
  * <p><b>Usage Example:</b>
+ *       使用示例：
  *
  * <pre>{@code
  * // Create PlanNotebook with custom configuration
@@ -120,6 +128,7 @@ public class PlanNotebook implements StateModule {
     private final Map<String, BiConsumer<PlanNotebook, Plan>> changeHooks;
 
     /** Key prefix for storage, allows multiple instances to coexist in the same session. */
+    /**存储的密钥前缀允许多个实例在同一会话中共存。 */
     private String keyPrefix = "planNotebook";
 
     private PlanNotebook(Builder builder) {
@@ -183,9 +192,10 @@ public class PlanNotebook implements StateModule {
 
         /**
          * Sets the strategy for converting plans to hints.
+         * 设置将计划转换为提示的策略。
          *
-         * @param planToHint The plan-to-hint converter implementation
-         * @return This builder for method chaining
+         * @param planToHint The plan-to-hint converter implementation 提示转换器实现的计划
+         * @return This builder for method chaining 这个方法链构建器
          */
         public Builder planToHint(PlanToHint planToHint) {
             this.planToHint = planToHint;
@@ -194,9 +204,10 @@ public class PlanNotebook implements StateModule {
 
         /**
          * Sets the storage backend for persisting historical plans.
+         * 设置用于持久化历史计划的存储后端。
          *
-         * @param storage The plan storage implementation
-         * @return This builder for method chaining
+         * @param storage The plan storage implementation 存储实现
+         * @return This builder for method chaining 这个方法链构建器
          */
         public Builder storage(PlanStorage storage) {
             this.storage = storage;
@@ -205,6 +216,7 @@ public class PlanNotebook implements StateModule {
 
         /**
          * Sets the maximum number of subtasks allowed per plan.
+         * 设置每个计划允许的最大子任务数。
          *
          * @param maxSubtasks Maximum subtasks (null for unlimited)
          * @return This builder for method chaining
@@ -216,13 +228,16 @@ public class PlanNotebook implements StateModule {
 
         /**
          * Sets whether to include "wait for user confirmation" rule in hints.
+         * 设置是否在提示中包含"等待用户确认"规则。
          *
          * <p>When enabled (default), hints will include a rule requiring the agent to wait for
          * explicit user confirmation before executing plans. When disabled, the agent may proceed
          * with execution immediately after creating a plan.
+         * 启用时（默认），提示将包括一条规则，要求代理在执行计划之前等待明确的用户确认。
+         * 禁用后，代理可以在创建计划后立即继续执行。
          *
          * @param needUserConfirm true to require user confirmation, false to allow immediate
-         *     execution
+         *     execution needUserConfirm true表示需要用户确认，false表示允许立即执行
          * @return This builder for method chaining
          */
         public Builder needUserConfirm(boolean needUserConfirm) {
@@ -232,10 +247,12 @@ public class PlanNotebook implements StateModule {
 
         /**
          * Sets the key prefix for state storage.
+         * 设置状态存储的密钥前缀。
          *
          * <p>Use this when multiple PlanNotebook instances need to coexist in the same session.
-         *
-         * @param keyPrefix the prefix for storage keys (e.g., "mainPlan", "subPlan")
+         *    当多个PlanNotebook实例需要在同一会话中共存时，请使用此选项。
+         * @param keyPrefix the prefix for storage keys (e.g., "mainPlan", "subPlan") 
+         *                  存储密钥的前缀（例如，“mainPlan”、“subPlan”）
          * @return This builder for method chaining
          */
         public Builder keyPrefix(String keyPrefix) {
@@ -245,8 +262,9 @@ public class PlanNotebook implements StateModule {
 
         /**
          * Builds a new PlanNotebook with the configured settings.
+         * 使用配置的设置构建新的PlanNotebook。
          *
-         * @return A new PlanNotebook instance
+         * @return A new PlanNotebook instance 一个新的PlanNotebook实例
          */
         public PlanNotebook build() {
             return new PlanNotebook(this);
@@ -257,11 +275,12 @@ public class PlanNotebook implements StateModule {
 
     /**
      * Create a plan by given name and sub-tasks.
+     * 创建一个计划，根据给定的名称和子任务。
      *
-     * @param name The plan name, should be concise, descriptive and not exceed 10 words
-     * @param description The plan description, including the constraints, target and outcome
-     * @param expectedOutcome The expected outcome of the plan
-     * @param subtasks A list of sequential sub-tasks that make up the plan
+     * @param name The plan name, should be concise, descriptive and not exceed 10 words 这个计划的名字，应该简洁、描述性和不超过10个单词
+     * @param description The plan description, including the constraints, target and outcome 这个计划的描述，包括约束、目标和结果
+     * @param expectedOutcome The expected outcome of the plan 计划的预期结果
+     * @param subtasks A list of sequential sub-tasks that make up the plan 
      * @return Tool response message
      */
     @Tool(name = "create_plan", description = "Create a plan by given name and sub-tasks")
@@ -331,6 +350,7 @@ public class PlanNotebook implements StateModule {
 
     /**
      * Update the current plan's name, description, or expected outcome.
+     * 更新当前计划的名称、描述或预期结果。
      *
      * @param name The new plan name (optional, pass null or empty to keep unchanged)
      * @param description The new plan description (optional, pass null or empty to keep unchanged)
@@ -401,7 +421,8 @@ public class PlanNotebook implements StateModule {
     }
 
     /**
-     * Create a plan with SubTask objects (convenience method for tests and Java code).
+     * Create a plan with SubTask objects (convenience method for tests and Java code). 
+     * 使用SubTask对象创建计划（测试和Java代码的便利方法）。
      *
      * @param name The plan name
      * @param description The plan description
@@ -416,8 +437,9 @@ public class PlanNotebook implements StateModule {
 
     /**
      * Helper method to convert a list of SubTask objects to a list of Maps.
+     * 助手方法，用于将子任务对象列表转换为贴图列表。
      *
-     * @param subtasks List of SubTask objects
+     * @param subtasks List of SubTask objects  子任务对象列表
      * @return List of Maps
      */
     public static List<Map<String, Object>> subtasksToMaps(List<SubTask> subtasks) {
@@ -438,6 +460,7 @@ public class PlanNotebook implements StateModule {
 
     /**
      * Helper method to convert a SubTask object to a Map.
+     * 助手方法，将子任务对象转换为映射。
      *
      * @param subtask SubTask object
      * @return Map representation
@@ -457,11 +480,12 @@ public class PlanNotebook implements StateModule {
 
     /**
      * Revise the current plan by adding, revising or deleting a sub-task.
+     * 通过添加、修改或删除子任务来修改当前计划。
      *
-     * @param subtaskIdx The index of the sub-task to be revised, starting from 0
-     * @param action The action to be performed: add/revise/delete
-     * @param subtaskMap The sub-task to be added or revised (required for add/revise)
-     * @return Tool response message
+     * @param subtaskIdx The index of the sub-task to be revised, starting from 0 要修订的子任务的索引，从0开始
+     * @param action The action to be performed: add/revise/delete 要执行的操作：添加/修改/删除
+     * @param subtaskMap The sub-task to be added or revised (required for add/revise) 要添加或修改的子任务（添加/修改时需要）
+     * @return Tool response message 工具响应消息
      */
     @Tool(
             name = "revise_current_plan",
@@ -567,6 +591,7 @@ public class PlanNotebook implements StateModule {
 
     /**
      * Update the state of a subtask by given index and state.
+     * 更新一个子任务的状态
      *
      * <p>Note: To mark a subtask as done, you SHOULD call {@link #finishSubtask} instead with the
      * specific outcome.
@@ -736,6 +761,7 @@ public class PlanNotebook implements StateModule {
 
     /**
      * View the details of the sub-tasks by given indexes.
+     * 查看某个子任务
      *
      * @param indexes The indexes of the sub-tasks to be viewed, starting from 0
      * @return Tool response message with subtask details
@@ -774,6 +800,7 @@ public class PlanNotebook implements StateModule {
 
     /**
      * Get the number of subtasks in the current plan.
+     * 获取当前计划中的子任务数量。
      *
      * @return Tool response message with subtask count
      */
@@ -815,10 +842,11 @@ public class PlanNotebook implements StateModule {
 
     /**
      * Finish the current plan by given outcome, or abandon it.
+     * 完成当前计划，或者放弃计划。
      *
-     * @param stateStr The state to finish the plan: done/abandoned
-     * @param outcome The specific outcome of the plan if done, or reason if abandoned
-     * @return Tool response message
+     * @param stateStr The state to finish the plan: done/abandoned 计划完成状态：已完成/放弃
+     * @param outcome The specific outcome of the plan if done, or reason if abandoned 特殊的输出结果，或者放弃计划原因
+     * @return Tool response message 返回响应消息
      */
     @Tool(
             name = "finish_plan",
@@ -964,12 +992,15 @@ public class PlanNotebook implements StateModule {
 
     /**
      * Gets the current hint message based on plan state.
+     * 得到当前 hint 消息，根据计划状态。
      *
      * <p>This is called internally by the injected hook before each reasoning step to provide
      * contextual guidance to the agent.
+     * 这个方法是在注入的钩子内部调用的，在每个推理步骤之前提供上下文指南给代理。
      *
      * @return A Mono emitting a USER role message containing the hint, or empty Mono if no hint is
      *     applicable
+     *     一个Mono 发射一个 USER 角色消息，包含 hint，如果没有 hint，则返回一个空的 Mono
      */
     public Mono<Msg> getCurrentHint() {
         String hintContent = planToHint.generateHint(currentPlan, this);
@@ -986,6 +1017,7 @@ public class PlanNotebook implements StateModule {
 
     /**
      * Gets the current active plan.
+     * 获取当前激活计划。
      *
      * @return The current plan, or null if no plan is active
      */
@@ -995,6 +1027,7 @@ public class PlanNotebook implements StateModule {
 
     /**
      * Checks if user confirmation is required before executing plans.
+     * 检查是否在执行计划之前需要用户确认。
      *
      * @return true if user confirmation is required, false otherwise
      */
@@ -1004,6 +1037,7 @@ public class PlanNotebook implements StateModule {
 
     /**
      * Gets the maximum number of subtasks allowed per plan.
+     * 获取计划允许的最大子任务数。
      *
      * @return maximum number of subtasks
      */
@@ -1013,9 +1047,11 @@ public class PlanNotebook implements StateModule {
 
     /**
      * Adds a change hook that will be triggered whenever the plan changes.
+     * 添加一个改变钩子，当计划改变时将触发。
      *
      * <p>The hook receives the PlanNotebook instance and the current plan (which may be null if the
      * plan was finished or cleared).
+     * 钩子接收 PlanNotebook 实例和当前计划（如果计划已结束或清除，则计划可能为 null）。
      *
      * @param id unique identifier for the hook (used for removal)
      * @param hook the callback to execute when plan changes
@@ -1026,6 +1062,7 @@ public class PlanNotebook implements StateModule {
 
     /**
      * Removes a previously registered change hook.
+     * 删除一个先前注册的更改钩子。
      *
      * @param id the identifier of the hook to remove
      */
@@ -1041,6 +1078,7 @@ public class PlanNotebook implements StateModule {
 
     /**
      * Converts a Map representation of a subtask to a SubTask object.
+     * 转换一个 Map 表示的子任务为 SubTask 对象。
      *
      * <p>Handles null values by providing defaults: empty strings for description and outcome,
      * "Unnamed Subtask" for missing names.

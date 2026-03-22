@@ -24,10 +24,13 @@ import reactor.core.publisher.Mono;
 
 /**
  * In-memory implementation of PlanStorage.
+ * 计划存储
  *
  * <p>Stores plans in a concurrent hash map for thread-safe access. This implementation is suitable
  * for development and testing. For production use cases requiring persistence, implement a
  * database-backed storage.
+ * 将计划存储在并发哈希映射中，
+ * 以实现线程安全访问。此实现适用于开发和测试。对于需要持久性的生产用例，实现数据库支持的存储。
  */
 public class InMemoryPlanStorage implements PlanStorage {
 
@@ -35,6 +38,7 @@ public class InMemoryPlanStorage implements PlanStorage {
 
     /**
      * Adds a plan to the storage.
+     * 将计划添加到存储中。
      *
      * <p>If a plan with the same ID already exists, it will be replaced.
      *
@@ -48,6 +52,7 @@ public class InMemoryPlanStorage implements PlanStorage {
 
     /**
      * Retrieves a plan by its ID.
+     * 按计划ID检索计划。
      *
      * @param planId The unique identifier of the plan
      * @return A Mono emitting the plan if found, or empty if not found
@@ -59,6 +64,7 @@ public class InMemoryPlanStorage implements PlanStorage {
 
     /**
      * Retrieves all stored plans.
+     * 检索所有存储的计划。
      *
      * @return A Mono emitting a list of all plans (may be empty)
      */

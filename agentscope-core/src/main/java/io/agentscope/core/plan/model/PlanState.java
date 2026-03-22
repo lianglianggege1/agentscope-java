@@ -17,6 +17,7 @@ package io.agentscope.core.plan.model;
 
 /**
  * State of a plan.
+ * 计划的状态
  *
  * <p>Represents the overall status of a plan during its lifecycle.
  */

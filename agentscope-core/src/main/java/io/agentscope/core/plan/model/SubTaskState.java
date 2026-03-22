@@ -17,6 +17,7 @@ package io.agentscope.core.plan.model;
 
 /**
  * State of a subtask in a plan.
+ * 在一个计划里面的子任务状态
  *
  * <p>Represents the current status of a subtask during plan execution.
  */
