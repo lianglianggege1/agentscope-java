@@ -30,28 +30,46 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Agent Card Builder For Agent Scope A2A Server.
+ * agent card 创造器为Agent Scope A2A Server
  *
  * <p> The Converter will convert input {@link ConfigurableAgentCard} to an {@link AgentCard} instance, available
  * {@link TransportProperties} and {@link AgentRunner}.
  *
  * <p>Attributes of {@link AgentCard} build rules:
+ * AgentCard创造器规则描述
  * <ul>
  *     <li>name: first from {@link ConfigurableAgentCard}, default from {@link AgentRunner#getAgentName()}.</li>
+ *               首先从{@link ConfigurableAgentCard}中获取，默认从{@link AgentRunner#getAgentName()}中获取。
  *     <li>description: first from {@link ConfigurableAgentCard}, default from {@link AgentRunner#getAgentDescription()} ()}.</li>
+ *               首先从{@link ConfigurableAgentCard}中获取，默认从{@link AgentRunner#getAgentDescription()}中获取。
  *     <li>provider: only from {@link ConfigurableAgentCard}, default null.</li>
+ *         仅从{@link ConfigurableAgentCard}中获取，默认为null。
  *     <li>version: only from {@link ConfigurableAgentCard}, default 1.0.0</li>
+ *         版本：仅从{@link ConfigurableAgentCard}中获取，默认为1.0.0
  *     <li>documentationUrl: only from {@link ConfigurableAgentCard}, default null.</li>
+ *         文档链接：仅从{@link ConfigurableAgentCard}中获取，默认为null。
  *     <li>capabilities: only from agentscope implementation, not supported to config.</li>
+ *         能力：仅从agentscope实现中获取，不支持配置。
  *     <li>defaultInputModes/defaultOutputModes: first from {@link ConfigurableAgentCard}, default `["text"]`.</li>
+ *         默认输入模式：首先从{@link ConfigurableAgentCard}中获取，默认为`["text"]`。
  *     <li>skills: first from {@link ConfigurableAgentCard}, default empty list.</li>
+ *         技能：首先从{@link ConfigurableAgentCard}中获取，默认为空列表。
  *     <li>supportsAuthenticatedExtendedCard: only {@code false} for now.</li>
+ *         supportsAuthenticatedExtendedCard: 现在仅返回false。
  *     <li>securitySchemes: only from {@link ConfigurableAgentCard}, default null.</li>
+ *         安全方案：仅从{@link ConfigurableAgentCard}中获取，默认为null。
  *     <li>security: only from {@link ConfigurableAgentCard}, default null.</li>
+ *         安全：仅从{@link ConfigurableAgentCard}中获取，默认为null。
  *     <li>iconUrl: only from {@link ConfigurableAgentCard}, default null.</li>
+ *         图标链接：仅从{@link ConfigurableAgentCard}中获取，默认为null。
  *     <li>additionalInterfaces: first from {@link ConfigurableAgentCard}, default from availableTransports.</li>
+ *         附加接口：首先从{@link ConfigurableAgentCard}中获取，默认为从availableTransports中获取。
  *     <li>preferredTransport: first from {@link ConfigurableAgentCard}, default is `JSONRPC`, if not found in availableTransports, will random one from availableTransports. </li>
+ *         首选传输：首先从{@link ConfigurableAgentCard}中获取，默认为`JSONRPC`，如果找不到，将随机从availableTransports中获取。
  *     <li>url: first from {@link ConfigurableAgentCard}, default from `JSONRPC` transportProperties, if not found in availableTransports, will random one from availableTransports. </li>
+ *         URL：首先从{@link ConfigurableAgentCard}中获取，默认为从`JSONRPC` transportProperties中获取，如果找不到，将随机从availableTransports中获取。
  *     <li>protocolVersion: only from agentscope implementation, not supported to config. current version is `0.3.0`</li>
+ *         协议版本：仅从agentscope实现中获取，不支持配置，当前版本为`0.3.0`
  * </ul>
  */
 public class AgentScopeAgentCardConverter {

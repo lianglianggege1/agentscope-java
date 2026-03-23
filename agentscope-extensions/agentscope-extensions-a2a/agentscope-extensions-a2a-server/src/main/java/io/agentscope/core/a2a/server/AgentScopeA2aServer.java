@@ -56,19 +56,24 @@ import org.slf4j.LoggerFactory;
  *
  * <p>The core enter class for developer to export agent as A2A Server by agentscope, Developers should build server
  * with:
+ * 开发人员通过agentscope将代理导出为A2A服务器的核心入口类，开发人员应使用以下内容构建服务器：
  * <ul>
- *     <li>Required: Custom {@link Agent} such as {@link ReActAgent}. </li>
- *     <li>Optional: Custom AgentCard. </li>
- *     <li>Optional: Choose supported to export transport, such as `JSONRPC`. </li>
- *     <li>Optional: A2A Registry(s) when server ready to access request. </li>
+ *     <li>Required: Custom {@link Agent} such as {@link ReActAgent}. 必需：自定义｛@link代理｝，如｛@link ReActAgent｝。</li>
+ *     <li>Optional: Custom AgentCard. 可选：自定义代理卡。</li>
+ *     <li>Optional: Choose supported to export transport, such as `JSONRPC`. 可选：选择支持导出传输，如`JSONRPC `。</li>
+ *     <li>Optional: A2A Registry(s) when server ready to access request. 可选：服务器准备好访问请求时的A2A注册表。</li>
  *     <li>Optional: A2A Server Feature implementations, {@link TaskStore}, {@link QueueManager},
- *     {@link PushNotificationConfigStore}, {@link PushNotificationSender}.</li>
+ *     {@link PushNotificationConfigStore}, {@link PushNotificationSender}.
+ *     可选：A2A服务器功能实现、｛@link TaskStore｝、｛@linkQueueManager｝、｛@linkPushNotificationConfigStore｝、｝@linkPushNotificationSender｝。
+ *     </li>
  * </ul>
  *
  * <p>The Server is not listen ports and export endpoints. The main logic for this Server class is build and assemble
  * all component for handle a2a request.
+ * 服务器不是侦听端口和导出终结点。此Server类的主要逻辑是构建和组装用于处理a2a请求的所有组件。
  *
  * <p>For example, Developers want to export JSON-RPC transport for A2A server, they should do follow the simplest steps:
+ * 例如，开发人员想要导出A2A服务器的JSON-RPC传输，他们应该遵循最简单的步骤：
  * <ol>
  *     <li>Build Custom {@link Agent}, such as {@link ReActAgent} with {@link ReActAgent.Builder}.</li>
  *     <li>Create Builder of {@link AgentScopeA2aServer} with required {@link ReActAgent.Builder}.</li>
@@ -154,9 +159,11 @@ public class AgentScopeA2aServer {
 
     /**
      * Call this method when all endpoint ready to access.
+     * 当所有端点都准备好访问时调用此方法。
      *
      * <p>By default, it should be called after web server ready or other network endpoint ready. To let AgentScope end
      * some A2A Server operation such as register A2A Registry,
+     * 默认情况下，它应该在web服务器就绪或其他网络端点就绪后调用。为了让AgentScope结束一些A2A服务器操作，例如注册A2A注册表，
      */
     public void postEndpointReady() {
         agentRegistry.register(agentCard, transportProperties);
@@ -164,6 +171,7 @@ public class AgentScopeA2aServer {
 
     /**
      * Get a Builder of {@link AgentScopeA2aServer} from {@link ReActAgent.Builder}.
+     * 从｛@link ReActAgent.Builder｝获取｛@link AgentScope A2aServer｝的生成器。
      *
      * <p>For Most situation, will use default {@link ReActAgentWithBuilderRunner} as the {@link AgentRunner}
      *

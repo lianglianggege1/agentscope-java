@@ -20,6 +20,7 @@ package io.agentscope.core.a2a.server.executor;
  * Properties about agent execution.
  *
  * <p>Some of these properties are used to configure the agent execution in {@link AgentScopeAgentExecutor}.
+ * 有些配置是用来配置{@link AgentScopeAgentExecutor}。
  */
 public class AgentExecuteProperties {
 

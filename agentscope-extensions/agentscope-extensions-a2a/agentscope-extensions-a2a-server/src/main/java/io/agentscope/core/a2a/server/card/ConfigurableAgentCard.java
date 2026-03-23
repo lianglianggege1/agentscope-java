@@ -25,9 +25,11 @@ import java.util.Map;
 
 /**
  * Configurable attribute for export agent card of this agent.
+ * 此智能体的额外代理卡的可配置属性。
  *
  * <p>
  * These attributes are used to generate agent card which export by well-known URL and register to A2A Registries.
+ * 这些属性用于生成代理卡，该代理卡通过众所周知的URL导出并注册到A2A注册表。
  * </p>
  */
 public class ConfigurableAgentCard {
