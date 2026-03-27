@@ -47,9 +47,7 @@ import reactor.core.publisher.Mono;
  *   <li>Extracts the query from user messages</li>
  *       提取用户消息中的查询
  *   <li>Retrieves relevant documents from the knowledge base</li>
- *       检索相关的文档
  *   <li>Injects the retrieved knowledge as a system message</li>
- *       插入检索到的知识作为系统消息
  *   <li>Modifies the input messages to include the knowledge context</li>
  *       修改输入消息，使其包含知识上下文
  * </ol>
@@ -93,7 +91,7 @@ public class GenericRAGHook implements Hook {
      * @throws IllegalArgumentException if knowledgeBase is null
      */
     public GenericRAGHook(Knowledge knowledge) {
-        this(knowledge, RetrieveConfig.builder().limit(5).scoreThreshold(0.5).build());
+        this(knowledge, RetrieveConfig.builder().build());
     }
 
     /**
@@ -219,8 +217,8 @@ public class GenericRAGHook implements Hook {
         String knowledgeContent = buildKnowledgeContent(retrievedDocs);
 
         return Msg.builder()
-                .name("system")
-                .role(MsgRole.SYSTEM)
+                .name("user")
+                .role(MsgRole.USER)
                 .content(TextBlock.builder().text(knowledgeContent).build())
                 .build();
     }

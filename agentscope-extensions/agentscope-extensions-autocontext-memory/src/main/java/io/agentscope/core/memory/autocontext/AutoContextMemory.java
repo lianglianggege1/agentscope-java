@@ -45,36 +45,57 @@ import reactor.core.publisher.Mono;
 
 /**
  * AutoContextMemory - Intelligent context memory management system.
+ * 自动上下文记忆- 智能上下文记忆系统
  *
  * <p>AutoContextMemory implements the {@link Memory} interface and provides automated
  * context compression, offloading, and summarization to optimize LLM context window usage.
  * When conversation history exceeds configured thresholds, the system automatically applies
  * multiple compression strategies to reduce context size while preserving important information.
+ * AutoContextMemory 实现了 Memory 接口，并提供自动上下文压缩、卸载和摘要功能，
+ * 以优化 LLM 上下文窗口的使用。当对话历史记录超过配置的阈值时，
+ * 系统会自动应用多种压缩策略来减小上下文大小，同时保留重要信息。
  *
  * <p>Key features:
+ *    关键功能：
  * <ul>
  *   <li>Automatic compression when message count or token count exceeds thresholds</li>
+ *       当消息数量或令牌数量超过阈值时，系统将自动应用多个压缩策略来减小上下文大小，同时保留重要信息。
  *   <li>Six progressive compression strategies (from lightweight to heavyweight)</li>
+ *       六个渐进式压缩策略（从轻量级到重量级）
  *   <li>Intelligent summarization using LLM models</li>
+ *       使用 LLM 模型进行智能摘要
  *   <li>Content offloading to external storage</li>
+ *       卸载到外部存储
  *   <li>Tool call interface preservation during compression</li>
+ *       在压缩过程中保持工具调用接口
  *   <li>Dual storage mechanism (working storage and original storage)</li>
+ *       双存储机制（工作存储和原始存储）
  * </ul>
  *
  * <p>Compression strategies (applied in order):
+ *    压缩策略（按顺序应用）：
  * <ol>
  *   <li>Compress historical tool invocations</li>
+ *       压缩历史工具调用
  *   <li>Offload large messages (with lastKeep protection)</li>
+ *       卸载大型消息（有最后保存保护）
  *   <li>Offload large messages (without protection)</li>
+ *       卸载大型消息（无保护）
  *   <li>Summarize historical conversation rounds</li>
+ *       压缩历史对话轮次
  *   <li>Summarize large messages in current round (with LLM summary and offload)</li>
+ *       压缩当前轮次大型消息（使用 LLM 摘要和卸载）
  *   <li>Compress current round messages</li>
+ *       压缩当前轮次消息
  * </ol>
  *
  * <p>Storage architecture:
+ *    存储架构：
  * <ul>
  *   <li>Working Memory Storage: Stores compressed messages for actual conversations</li>
+ *       工作内存存储用于实际对话的压缩和卸载消息
  *   <li>Original Memory Storage: Stores complete, uncompressed message history</li>
+ *       原始内存存储保存完整的未压缩消息历史记录
  * </ul>
  */
 public class AutoContextMemory implements StateModule, Memory, ContextOffLoader {
@@ -83,13 +104,17 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
 
     /**
      * Working memory storage for compressed and offloaded messages.
+     * 工作记忆存储用于压缩和卸载的消息。
      * This storage is used for actual conversations and may contain compressed summaries.
+     * 存储工作记忆用于压缩和卸载的消息。
      */
     private List<Msg> workingMemoryStorage;
 
     /**
      * Original memory storage for complete, uncompressed message history.
+     * 原始记忆存储保存完整的未压缩消息历史记录。
      * This storage maintains the full conversation history in its original form (append-only).
+     * 原始记忆存储保存完整的未压缩消息历史记录。
      */
     private List<Msg> originalMemoryStorage;
 
@@ -97,20 +122,26 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
 
     /**
      * List of compression events that occurred during context management.
+     * 压缩事件列表，用于记录在记忆管理过程中发生的压缩操作。
      * Records information about each compression operation including timing, token reduction,
      * and message positioning.
+     * 记录信息，包括时间、令牌减少和消息位置等信息。
      */
     private List<CompressionEvent> compressionEvents;
 
     /**
      * Auto context configuration containing thresholds and settings.
+     * 自动上下文配置，包含阈值和设置。
      * Defines compression triggers, storage options, and offloading behavior.
+     * 定义压缩触发器、存储选项和卸载行为。
      */
     private final AutoContextConfig autoContextConfig;
 
     /**
      * LLM model used for generating summaries and compressing content.
+     * LLM模型用于生成摘要和压缩内容。
      * Required for intelligent compression and summarization operations.
+     * 智能压缩和摘要操作所必需。
      */
     private Model model;
 
@@ -118,20 +149,26 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
      * Optional PlanNotebook instance for plan-aware compression.
      * When provided, compression prompts will be adjusted based on current plan state
      * to preserve plan-related information.
+     * 可选的 PlanNotebook 实例，
+     * 用于实现计划感知压缩。启用后，压缩提示将根据当前计划状态进行调整，以保留与计划相关的信息。
      *
      * <p>Note: This field is set via {@link #attachPlanNote(PlanNotebook)} method,
      * typically called after ReActAgent is created and has a PlanNotebook instance.
+     * 注意：此字段通过 attachPlanNote(PlanNotebook) 方法设置，
+     * 该方法通常在 ReActAgent 创建并具有 PlanNotebook 实例后调用。
      */
     private PlanNotebook planNotebook;
 
     /**
      * Custom prompt configuration from AutoContextConfig.
      * If null, default prompts from {@link Prompts} will be used.
+     * 从 AutoContextConfig 配置自定义提示符。如果为空，则使用 Prompts 中的默认提示符。
      */
     private final PromptConfig customPrompt;
 
     /**
      * Creates a new AutoContextMemory instance with the specified configuration and model.
+     * 使用指定的配置和模型创建一个新的 AutoContextMemory 实例。
      *
      * @param autoContextConfig the configuration for auto context management
      * @param model the LLM model to use for compression and summarization
@@ -160,22 +197,33 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
 
     /**
      * Compresses the working memory if thresholds are reached.
+     * 当达到阈值时，压缩工作内存。
      *
      * <p>This method checks if compression is needed based on message count and token count
      * thresholds, and applies compression strategies if necessary. The compression modifies
      * the working memory storage in place.
+     * 该方法根据消息数量和令牌数量阈值检查是否需要压缩，
+     * 并在必要时应用压缩策略。压缩操作会直接修改工作内存的存储空间。
      *
      * <p>This method should be called at a deterministic point in the execution flow,
      * typically via a PreReasoningHook, to ensure compression happens before LLM reasoning.
+     * 应该在执行流程中的确定性点调用此方法，通常通过 PreReasoningHook 调用，以确保在 LLM 推理之前进行压缩。
      *
      * <p>Compression strategies are applied in order until one succeeds:
+     *    压缩策略会按顺序应用，直到找到一种为止：
      * <ol>
      *   <li>Compress previous round tool invocations</li>
+     *       压缩上一轮工具调用
      *   <li>Offload previous round large messages (with lastKeep protection)</li>
+     *       卸载上一轮的大消息（使用 lastKeep 保护）
      *   <li>Offload previous round large messages (without lastKeep protection)</li>
+     *        卸载上一轮的大消息（不使用 lastKeep 保护）
      *   <li>Summarize previous round conversations</li>
+     *       压缩上一轮的对话
      *   <li>Summarize and offload current round large messages</li>
+     *       压缩当前轮的大消息
      *   <li>Summarize current round messages</li>
+     *       压缩当前轮的消息
      * </ol>
      *
      * @return true if compression was performed, false if no compression was needed
@@ -201,21 +249,29 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
                 calculateToken,
                 thresholdToken);
 
-        // Strategy 1: Compress previous round tool invocations
+        // Strategy 1: Compress previous round tool invocations 
+        // 压缩上一轮工具调用
         log.info("Strategy 1: Checking for previous round tool invocations to compress");
         int toolIters = 5;
         boolean toolCompressed = false;
         int compressionCount = 0;
+        int cursorStartIndex = 0;
         while (toolIters > 0) {
             toolIters--;
             List<Msg> currentMsgs = new ArrayList<>(workingMemoryStorage);
             Pair<Integer, Integer> toolMsgIndices =
-                    extractPrevToolMsgsForCompress(currentMsgs, autoContextConfig.getLastKeep());
+                    extractPrevToolMsgsForCompress(
+                            currentMsgs, autoContextConfig.getLastKeep(), cursorStartIndex);
             if (toolMsgIndices != null) {
-                summaryToolsMessages(currentMsgs, toolMsgIndices);
-                replaceWorkingMessage(currentMsgs);
-                toolCompressed = true;
-                compressionCount++;
+                boolean actuallyCompressed = summaryToolsMessages(currentMsgs, toolMsgIndices);
+                if (actuallyCompressed) {
+                    replaceWorkingMessage(currentMsgs);
+                    toolCompressed = true;
+                    compressionCount++;
+                    cursorStartIndex = toolMsgIndices.first() + 1;
+                } else {
+                    cursorStartIndex = toolMsgIndices.second() + 1;
+                }
             } else {
                 break;
             }
@@ -225,10 +281,13 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
                     "Strategy 1: APPLIED - Compressed {} tool invocation groups", compressionCount);
             return true;
         } else {
-            log.info("Strategy 1: SKIPPED - No compressible tool invocations found");
+            log.info(
+                    "Strategy 1: SKIPPED - No compressible tool invocations found (or skipped due"
+                            + " to low tokens)");
         }
 
         // Strategy 2: Offload previous round large messages (with lastKeep protection)
+        // 第二步：卸载上一轮的大消息（使用 lastKeep 保护）
         log.info(
                 "Strategy 2: Checking for previous round large messages (with lastKeep"
                         + " protection)");
@@ -304,8 +363,9 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
 
     /**
      * Records a compression event that occurred during context management.
+     * 记录上下文管理期间发生的压缩事件。
      *
-     * @param eventType the type of compression event
+     * @param eventType the type of compression event 
      * @param startIndex the start index of the compressed message range in allMessages
      * @param endIndex the end index of the compressed message range in allMessages
      * @param allMessages the complete message list (before compression)
@@ -340,17 +400,23 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
 
     /**
      * Summarize current round of conversation messages.
+     * 总结当前一轮对话信息。
      *
      * <p>This method is called when historical messages have been compressed and offloaded,
      * but the context still exceeds the limit. This indicates that the current round's content
      * is too large and needs compression.
+     * 这个方法被调用时，表示历史消息已被压缩并卸载，但上下文仍然超出限制。这表明当前轮的内容太大，需要压缩。
      *
      * <p>Strategy:
      * 1. Find the latest user message
+     *    寻找最新的用户消息
      * 2. Merge and compress all messages after it (typically tool calls and tool results,
      *    usually no assistant message yet)
+     *    合并并压缩它之后的所有消息（通常没有助手消息 yet）
      * 3. Preserve tool call interfaces (name, parameters)
+     *    保留工具调用接口（名称，参数）
      * 4. Compress tool results, merging multiple results and keeping key information
+     *    压缩工具结果，合并多个结果并保留关键信息
      *
      * @param rawMessages the list of messages to process
      * @return true if summary was actually performed, false otherwise
@@ -419,6 +485,7 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
         }
 
         // Record compression event (before replacing messages to preserve indices)
+        // 记录压缩事件（在替换消息以保留索引之前）
         recordCompressionEvent(
                 CompressionEvent.CURRENT_ROUND_MESSAGE_COMPRESS,
                 startIndex,
@@ -428,6 +495,7 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
                 metadata);
 
         // Step 5: Replace original messages with compressed one
+        // 替换原始消息为压缩消息
         rawMessages.subList(startIndex, endIndex + 1).clear();
         rawMessages.add(startIndex, compressedMsg);
 
@@ -440,17 +508,24 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
 
     /**
      * Summarize large messages in the current round that exceed the threshold.
+     * 总结当前轮中超出阈值的大型消息。
      *
      * <p>This method is called to compress large messages in the current round (messages after
      * the latest user message) that exceed the largePayloadThreshold. Unlike simple offloading
      * which only provides a preview, this method uses LLM to generate intelligent summaries
      * while preserving critical information.
+     * 此方法用于压缩当前轮次（最新用户消息之后的消息）中超过 largePayloadThreshold 阈值的大型消息。
+     * 与仅提供预览的简单卸载不同，此方法使用 LLM 生成智能摘要，同时保留关键信息。
      *
      * <p>Strategy:
      * 1. Find the latest user message
+     *     寻找最新的用户消息
      * 2. Check messages after it for content exceeding largePayloadThreshold
+     *    检查它之后的内容是否超过 largePayloadThreshold
      * 3. For each large message, generate an LLM summary and offload the original
+     *    对于每个大型消息，生成 LLM 摘要并卸载原始消息。
      * 4. Replace large messages with summarized versions
+     *    用摘要版本替换冗长消息
      *
      * @param rawMessages the list of messages to process
      * @return true if any messages were summarized and offloaded, false otherwise
@@ -516,6 +591,7 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
                     uuid);
 
             // Step 5: Generate summary using LLM
+            // 使用大模型生成摘要
             Msg summaryMsg = generateLargeMessageSummary(msg, uuid);
 
             // Build metadata for compression event
@@ -550,6 +626,7 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
 
     /**
      * Generate a summary of a large message using the model.
+     * 使用模型生成大型消息的摘要。
      *
      * @param message the message to summarize
      * @param offloadUuid the UUID of offloaded message
@@ -670,6 +747,7 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
 
     /**
      * Generate a compressed summary of current round messages using the model.
+     * 使用大模型压缩当前轮消息
      *
      * @param messages the messages to summarize
      * @param offloadUuid the UUID of offloaded content (if any)
@@ -803,9 +881,10 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
      * Summarize current round of conversation messages.
      *
      * @param rawMessages the list of messages to process
+     * @param toolMsgIndices the pair of start and end indices
      * @return true if summary was actually performed, false otherwise
      */
-    private void summaryToolsMessages(
+    private boolean summaryToolsMessages(
             List<Msg> rawMessages, Pair<Integer, Integer> toolMsgIndices) {
         int startIndex = toolMsgIndices.first();
         int endIndex = toolMsgIndices.second();
@@ -831,7 +910,7 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
                             + " ({})",
                     originalTokens,
                     threshold);
-            return;
+            return false;
         }
 
         log.info(
@@ -863,6 +942,8 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
                 metadata);
 
         MsgUtils.replaceMsg(rawMessages, startIndex, endIndex, toolsSummary);
+
+        return true;
     }
 
     /**
@@ -1299,22 +1380,27 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
      * Extract tool messages from raw messages for compression.
      *
      * <p>This method finds consecutive tool invocation messages in historical conversations
-     * that can be compressed. It searches for sequences of more than  consecutive tool messages
-     * before the latest assistant message.
+     * that can be compressed. It searches, using a cursor-based {@code searchStartIndex},
+     * for sequences of more than a minimum number of consecutive tool messages that appear
+     * before the latest assistant message that should be preserved.
      *
      * <p>Strategy:
-     * 1. If rawMessages has less than lastKeep messages, return null
-     * 2. Find the latest assistant message and protect it and all messages after it
-     * 3. Search from the beginning for the oldest consecutive tool messages (more than minConsecutiveToolMessages consecutive)
-     *    that can be compressed
-     * 4. If no assistant message is found, protect the last N messages (lastKeep)
+     * 1. If {@code rawMessages} has less than {@code lastKeep} messages, return {@code null}.
+     * 2. Identify the latest assistant message and treat it and all messages after it as
+     *    protected content that will not be compressed.
+     * 3. Starting from {@code searchStartIndex}, search for the oldest range of consecutive
+     *    tool messages (more than {@code minConsecutiveToolMessages} consecutive) that lies
+     *    entirely before the protected region and can be compressed.
+     * 4. If no eligible assistant message or compressible tool-message sequence is found
+     *    in the searchable range, return {@code null}.
      *
      * @param rawMessages all raw messages
      * @param lastKeep number of recent messages to keep uncompressed
-     * @return Pair containing startIndex and endIndex (inclusive) of compressible tool messages, or null if none found
+     * @param searchStartIndex the index to start searching from (used as a cursor)
+     * @return Pair containing startIndex and endIndex (inclusive) of compressible tool messages, or {@code null} if none found
      */
     private Pair<Integer, Integer> extractPrevToolMsgsForCompress(
-            List<Msg> rawMessages, int lastKeep) {
+            List<Msg> rawMessages, int lastKeep, int searchStartIndex) {
         if (rawMessages == null || rawMessages.isEmpty()) {
             return null;
         }
@@ -1348,8 +1434,8 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
         int consecutiveCount = 0;
         int startIndex = -1;
         int endIndex = -1;
-
-        for (int i = 0; i < searchEndIndex; i++) {
+        int actualStart = Math.max(0, searchStartIndex);
+        for (int i = actualStart; i < searchEndIndex; i++) {
             Msg msg = rawMessages.get(i);
             if (MsgUtils.isToolMessage(msg)) {
                 if (consecutiveCount == 0) {
@@ -1689,6 +1775,7 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
 
     /**
      * Adds plan-aware hint message to the message list if a plan is active.
+     * 如果计划处于活动状态，则向消息列表中添加计划感知提示消息。
      *
      * <p>This method creates and adds a plan-aware hint message to the provided message list if
      * there is an active plan. The hint message is added at the end of the list to leverage the

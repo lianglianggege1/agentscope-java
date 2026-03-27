@@ -222,9 +222,9 @@ public abstract class StructuredOutputCapableAgent extends AgentBase {
                                     })
                             .doFinally(
                                     signal -> {
-                                        // Cleanup: remove hook and unregister tool
                                         removeHook(hook);
-                                        toolkit.removeTool(STRUCTURED_OUTPUT_TOOL_NAME);
+                                        toolkit.removeToolIfSame(
+                                                STRUCTURED_OUTPUT_TOOL_NAME, structuredOutputTool);
                                     });
                 });
     }
