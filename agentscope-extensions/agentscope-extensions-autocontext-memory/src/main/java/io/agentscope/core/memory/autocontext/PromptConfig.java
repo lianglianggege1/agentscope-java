@@ -17,16 +17,24 @@ package io.agentscope.core.memory.autocontext;
 
 /**
  * Configuration class for compression prompts used by AutoContextMemory.
+ * AutoContextMemory 使用的压缩提示的配置类。
  *
  * <p>This class allows customization of the prompts used in different compression strategies.
  * All prompts are optional - if not specified, default prompts from {@link Prompts} will be used.
+ * 此类允许自定义不同压缩策略中使用的提示信息。
+ * 所有提示信息均为可选——如果未指定，则将使用 {@link Prompts} 中的默认提示信息。
  *
  * <p><b>Configurable Prompts:</b>
+ *       可配置提示：
  * <ul>
  *   <li><b>Strategy 1:</b> Previous round tool invocation compression</li>
+ *                          上一轮工具调用压缩
  *   <li><b>Strategy 4:</b> Previous round conversation summarization</li>
+ *                          上一轮对话总结
  *   <li><b>Strategy 5:</b> Current round large message summarization</li>
+ *                           当前轮大消息总结
  *   <li><b>Strategy 6:</b> Current round message compression</li>
+ *                          当前轮消息压缩
  * </ul>
  *
  * <p><b>Usage Example:</b>

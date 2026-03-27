@@ -37,6 +37,8 @@ import java.util.stream.Collectors;
  * <p>This class provides methods for converting between {@link Msg} objects and JSON-compatible
  * formats (Map structures) for state persistence. It handles polymorphic types like ContentBlock
  * and its subtypes (TextBlock, ToolUseBlock, ToolResultBlock, etc.) using Jackson ObjectMapper.
+ * 此类提供在 Msg 对象和 JSON 兼容格式（Map 结构）之间进行转换的方法，以实现状态持久化。
+ * 它使用 Jackson ObjectMapper 处理多态类型，例如 ContentBlock 及其子类型（TextBlock、ToolUseBlock、ToolResultBlock 等）。
  *
  * <p><b>Key Features:</b>
  * <ul>

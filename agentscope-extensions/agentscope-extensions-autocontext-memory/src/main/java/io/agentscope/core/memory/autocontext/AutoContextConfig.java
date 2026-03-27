@@ -17,19 +17,27 @@ package io.agentscope.core.memory.autocontext;
 
 /**
  * Configuration class for AutoContextMemory.
+ * AutoContextMemory配置类
  *
  * <p>This class contains all configurable parameters for the AutoContextMemory system,
  * including storage backends, compression thresholds, and offloading settings.
+ * 此类包含 AutoContextMemory 系统的所有可配置参数，包括存储后端、压缩阈值和卸载设置。
  *
  * <p><b>Key Configuration Areas:</b>
+ *       主要配置区域：
  * <ul>
  *   <li><b>Storage:</b> Working storage and original history storage backends</li>
+ *          工作存储和原始历史存储后端
  *   <li><b>Compression Triggers:</b> Message count and token count thresholds</li>
+ *          消息计数和标记数阈值
  *   <li><b>Offloading:</b> Large payload thresholds and preview lengths</li>
+ *          大负载阈值和预览长度
  *   <li><b>Protection:</b> Number of recent messages to keep uncompressed</li>
+ *          保留最近几条消息未压缩
  * </ul>
  *
  * <p>All fields have default values and can be customized via builder pattern.
+ *    所有字段有字段有默认值，可以通过构建模式进行自定义。
  */
 public class AutoContextConfig {
 

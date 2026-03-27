@@ -34,6 +34,7 @@ public interface AgentRegistry {
 
     /**
      * Do registry operation by AgentCard and deployProperties.
+     * 通过 AgentCard 和 deployProperties 执行注册表操作。
      *
      * @param agentCard           agent card of this agent
      * @param transportProperties transports properties

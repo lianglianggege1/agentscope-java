@@ -17,11 +17,14 @@ package io.agentscope.core.memory.autocontext;
 
 /**
  * Generic pair record to hold two values of potentially different types.
+ * 用于存储两个可能不同类型的值的通用对记录。
  *
  * <p>This record is used throughout AutoContextMemory to represent pairs of related values,
  * such as start and end indices for message ranges, or other paired data structures.
+ * 此记录在 AutoContextMemory 中广泛用于表示相关值对，例如消息范围的起始索引和结束索引，或其他成对的数据结构。
  *
  * <p>Common usage examples:
+ *    常见用法示例：
  * <ul>
  *   <li>Message index ranges: {@code Pair<Integer, Integer>} for (startIndex, endIndex)</li>
  *   <li>User-assistant pairs: {@code Pair<Integer, Integer>} for (userIndex, assistantIndex)</li>

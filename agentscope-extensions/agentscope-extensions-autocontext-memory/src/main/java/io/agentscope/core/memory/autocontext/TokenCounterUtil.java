@@ -25,10 +25,12 @@ import java.util.Map;
 
 /**
  * Utility class for estimating token count in messages.
+ * 用于估算消息中标记数量的实用工具类。
  *
  * <p>This class provides methods to estimate the number of input tokens that would be
  * consumed when sending messages to an LLM. The estimation uses a character-based
  * approximation that works reasonably well for both English and Chinese text.
+ * 此类提供了一些方法，用于估算向 LLM 发送消息时需要消耗的输入词元数量。该估算方法采用基于字符的近似计算，对英文和中文文本均适用。
  *
  * <p>Token estimation strategy:
  * <ul>

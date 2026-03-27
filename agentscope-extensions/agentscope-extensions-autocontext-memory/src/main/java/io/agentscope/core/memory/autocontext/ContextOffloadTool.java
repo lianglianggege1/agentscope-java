@@ -23,11 +23,13 @@ import java.util.List;
 
 /**
  * Tool for reloading offloaded context messages.
+ * 用于重新加载已卸载的上下文消息的工具。
  *
  * <p>This tool allows agents to retrieve previously offloaded context messages
  * by their UUID. When context compression occurs, tool invocation messages are
  * offloaded to storage with a UUID, and this tool can be used to restore them
  * when needed.
+ * 该工具允许代理通过 UUID 检索先前卸载的上下文消息。当发生上下文压缩时，工具调用消息会以 UUID 的形式卸载到存储中，需要时可以使用此工具将其恢复。
  */
 public class ContextOffloadTool {
 

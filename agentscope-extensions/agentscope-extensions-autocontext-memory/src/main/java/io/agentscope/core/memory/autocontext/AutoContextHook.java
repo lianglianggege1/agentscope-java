@@ -36,22 +36,30 @@ import reactor.core.publisher.Mono;
 
 /**
  * Hook for automatically registering AutoContextMemory integration with ReActAgent.
+ * 用于自动注册 AutoContextMemory 与 ReActAgent 集成的钩子。
  *
  * <p>This hook automatically performs the following setup when a ReActAgent with
  * AutoContextMemory is first called:
+ * 当首次调用带有 AutoContextMemory 的 ReActAgent 时，此钩子会自动执行以下设置：
  * <ol>
  *   <li>Registers {@link ContextOffloadTool} to the agent's toolkit</li>
+ *       注册ContextOffloadTool 到代理的 toolkit 中
  *   <li>Attaches the agent's PlanNotebook to AutoContextMemory (if available)</li>
+ *       将代理的 PlanNotebook 附加到 AutoContextMemory（如果可用）
  * </ol>
  *
  * <p>Additionally, this hook handles {@link PreReasoningEvent} to trigger memory
  * compression before LLM reasoning. This ensures compression happens at a
  * deterministic point in the execution flow, and the compressed messages are
  * used for reasoning.
+ * 此外，此钩子会处理 {@link PreReasoningEvent}，以便在 LLM 推理之前触发内存压缩。
+ * 这确保了压缩发生在执行流程中的确定点，并且压缩后的消息将用于推理。
  *
  * <p>This hook ensures that AutoContextMemory is properly integrated with the agent
  * without requiring manual setup steps. It uses an internal flag to ensure setup
  * is only performed once, even if the hook is called multiple times.
+ * 此钩子函数确保 AutoContextMemory 与代理正确集成，无需手动设置步骤。
+ * 它使用一个内部标志来确保即使多次调用此钩子函数，也只执行一次设置。
  *
  * <p><b>Usage Example:</b>
  * <pre>{@code

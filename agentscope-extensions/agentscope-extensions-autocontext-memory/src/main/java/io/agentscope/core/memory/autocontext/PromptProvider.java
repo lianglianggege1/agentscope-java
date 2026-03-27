@@ -17,9 +17,11 @@ package io.agentscope.core.memory.autocontext;
 
 /**
  * Utility class for providing prompts with fallback to defaults.
+ * 用于提供提示信息并回退到默认值的实用类
  *
  * <p>This class provides a unified interface for retrieving prompts, with automatic fallback to
  * default prompts from {@link Prompts} when custom prompts are not provided.
+ * 此类提供了一个统一的接口来检索提示，当未提供自定义提示时，会自动回退到提示中的默认提示。
  */
 public class PromptProvider {
 

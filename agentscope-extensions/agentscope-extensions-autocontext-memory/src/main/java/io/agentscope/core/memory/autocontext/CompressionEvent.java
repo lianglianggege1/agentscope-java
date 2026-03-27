@@ -20,9 +20,11 @@ import java.util.Map;
 
 /**
  * Represents a compression event that occurred in AutoContextMemory.
+ * 表示在 AutoContextMemory 中发生的压缩事件。
  *
  * <p>This class records information about context compression operations, including the type of
  * compression, timing, token reduction, and message positioning information.
+ * 此类记录有关上下文压缩操作的信息，包括压缩类型、时间、标记缩减和消息定位信息。
  */
 public class CompressionEvent implements State {
 

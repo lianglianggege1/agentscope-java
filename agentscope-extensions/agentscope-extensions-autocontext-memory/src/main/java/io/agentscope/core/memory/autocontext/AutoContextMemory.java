@@ -711,6 +711,7 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
 
     /**
      * Merge and compress current round messages (typically tool calls and tool results).
+     * 合并并压缩当前轮消息（通常为工具调用和工具结果）。
      *
      * @param messages the messages to merge and compress
      * @return compressed message
@@ -726,6 +727,7 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
         offload(uuid, originalMessages);
 
         // Use model to generate a compressed summary from message list
+        // 使用大模型
         return generateCurrentRoundSummaryFromMessages(messages, uuid);
     }
 
@@ -879,6 +881,7 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
 
     /**
      * Summarize current round of conversation messages.
+     * 总结当前一轮对话信息。
      *
      * @param rawMessages the list of messages to process
      * @param toolMsgIndices the pair of start and end indices
@@ -1523,32 +1526,45 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
 
     /**
      * Compresses a list of tool invocation messages using LLM summarization.
+     * 使用 LLM 摘要压缩工具调用消息列表。
      *
      * <p>This method uses an LLM model to intelligently compress tool invocation messages,
      * preserving key information such as tool names, parameters, and important results while
      * reducing the overall token count. The compression is performed as part of Strategy 1
      * (compress historical tool invocations) to manage context window limits.
+     * 此方法使用LLM模型智能压缩工具调用信息，保留关键信息，例如工具名称、参数和重要结果，同时减少总令牌计数。
+     * 此方法作为策略1（压缩历史工具调用）的一部分，管理上下文窗口限制。
      *
      * <p><b>Process:</b>
+     *      
      * <ol>
      *   <li>Constructs a prompt with the tool invocation messages sandwiched between
      *       compression instructions</li>
+     *       构建一个提示符，其中工具调用消息夹在压缩指令之间。
      *   <li>Sends the prompt to the LLM model for summarization</li>
+     *       向LLM模型发送提示以进行摘要
      *   <li>Formats the compressed result with optional offload hint (if UUID is provided)</li>
+     *       使用可选的卸载提示（如果提供了 UUID）对压缩结果进行格式化。
      *   <li>Returns a new ASSISTANT message containing the compressed summary</li>
+     *       返回包含压缩摘要的新ASSISTANT消息。
      * </ol>
      *
      * <p><b>Special Handling:</b>
+     *       特殊处理：
      * The method handles plan note related tools specially (see {@link #summaryToolsMessages}),
      * which are simplified without LLM interaction. This method is only called for non-plan
      * tool invocations.
+     * 这个方法处理计划笔记相关的工具特别（请参阅{@link #summaryToolsMessages}），它们被简化，没有LLM交互。
      *
      * <p><b>Offload Integration:</b>
+     *       卸载集成
      * If an {@code offloadUUid} is provided, the compressed message will include a hint
      * indicating that the original content can be reloaded using the UUID via
      * {@link ContextOffloadTool}.
+     * 如果提供了UUID，则压缩的消息将包含一个提示，该提示指示可以使用UUID重新加载原始内容
      *
      * @param messages the list of tool invocation messages to compress (must not be null or empty)
+     *                  要压缩的工具调用消息列表（不能为空且不能为空）
      * @param offloadUUid the UUID of the offloaded original messages, or null if not offloaded
      * @return a new ASSISTANT message containing the compressed tool invocation summary
      * @throws RuntimeException if LLM processing fails or is interrupted
@@ -1658,13 +1674,18 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
 
     /**
      * Attaches a PlanNotebook instance to enable plan-aware compression.
+     * 附加 PlanNotebook 实例以启用计划感知压缩。
      *
      * <p>This method should be called after the ReActAgent is created and has a PlanNotebook.
      * When a PlanNotebook is attached, compression operations will automatically include
      * plan context information to preserve plan-related information during compression.
-     *
+     * 此方法应在 ReActAgent 创建完毕并拥有 PlanNotebook 之后调用。
+     * 附加 PlanNotebook 后，压缩操作将自动包含计划上下文信息，以便在压缩过程中保留与计划相关的信息。
+     * 
      * <p>This method can be called multiple times to update or replace the PlanNotebook.
      * Passing null will detach the current PlanNotebook and disable plan-aware compression.
+     * 可以多次调用此方法来更新或替换 PlanNotebook。
+     * 传递 null 值将分离当前的 PlanNotebook 并禁用计划感知压缩。
      *
      * @param planNotebook the PlanNotebook instance to attach, or null to detach
      */
@@ -1679,10 +1700,13 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
 
     /**
      * Gets the current plan state information for compression context.
+     * 获取用于压缩上下文的当前计划状态信息。
      *
      * <p>This method generates a generic plan-aware hint message that is fixed to be placed
      * <b>after</b> the messages that need to be compressed. The content uses "above messages"
      * terminology to refer to the messages that appear before this hint in the message list.
+     * 此方法生成一条通用的、与计划相关的提示消息，该消息固定放置在需要压缩的消息之后。
+     * 消息内容使用“上方消息”术语来指代消息列表中出现在此提示消息之前的消息。
      *
      * @return Plan state information as a formatted string, or null if no plan is active
      */
@@ -1813,6 +1837,7 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
 
     /**
      * Gets the user-assistant interaction messages from original memory storage.
+     * 得到用户-助手对话消息从原始内存存储中。
      *
      * <p>This method filters the original memory storage to return only messages that represent
      * the actual interaction dialogue between the user and assistant. It includes:
@@ -1909,8 +1934,10 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
 
     /**
      * Save memory state to the session.
+     * 保存内存状态到会话。
      *
      * <p>Saves working memory and original memory messages to the session storage.
+     *    保存工作内存和原始内存消息到会话存储。
      *
      * @param session the session to save state to
      * @param sessionKey the session identifier
@@ -1944,8 +1971,10 @@ public class AutoContextMemory implements StateModule, Memory, ContextOffLoader 
 
     /**
      * Load memory state from the session.
+     * 读取内存状态从会话。
      *
      * <p>Loads working memory and original memory messages from the session storage.
+     *    读取工作内存和原始内存消息从会话存储。
      *
      * @param session the session to load state from
      * @param sessionKey the session identifier
