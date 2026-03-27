@@ -31,11 +31,15 @@ import reactor.core.scheduler.Schedulers;
 
 /**
  * HTTP client for interacting with the Mem0 API.
+ * 用于与 Mem0 API 交互的 HTTP 客户端。
  *
  * <p>Supports both Platform Mem0 and self-hosted Mem0 deployments:
+ *    同时支持平台 Mem0 和自托管 Mem0 部署：
  * <ul>
  *   <li><b>Platform Mem0:</b> Uses endpoints /v1/memories/ and /v2/memories/search/</li>
+ *          平台 Mem0：</b> 使用端点 /v1/memories/ 和 /v2/memories/search/
  *   <li><b>Self-hosted Mem0:</b> Uses endpoints /memories and /memories/search</li>
+ *          自托管 Mem0：</b> 使用端点 /memories 和 /memories/search
  * </ul>
  *
  * <p>By default, the client uses Platform Mem0 endpoints. To use self-hosted Mem0,
@@ -121,16 +125,18 @@ public class Mem0Client {
 
     /**
      * Executes a POST request and returns the raw response body as a string.
+     * 执行 POST 请求并将原始响应正文作为字符串返回。
      *
      * <p>This is a low-level method that handles HTTP communication, JSON serialization,
      * and error handling. The response parsing is left to the caller.
+     * 这是一个底层方法，负责处理 HTTP 通信、JSON 序列化和错误处理。响应解析由调用者负责。
      *
-     * @param endpoint The API endpoint path (e.g., "/v1/memories")
-     * @param request The request object to serialize as JSON
-     * @param operationName A human-readable name for the operation (for error messages)
-     * @param <T> The request type
-     * @return A Mono emitting the raw response body as a string
-     * @throws IOException If the HTTP request fails
+     * @param endpoint The API endpoint path (e.g., "/v1/memories")  API 端点路径（例如，“/v1/memories”）
+     * @param request The request object to serialize as JSON        要序列化为 JSON 的请求对象
+     * @param operationName A human-readable name for the operation (for error messages) 操作的易读名称（用于错误消息）
+     * @param <T> The request type 请求类型
+     * @return A Mono emitting the raw response body as a string  一个 Mono 对象，以字符串形式发出原始响应体。
+     * @throws IOException If the HTTP request fails  如果 HTTP 请求失败
      */
     private <T> Mono<String> executePostRaw(String endpoint, T request, String operationName) {
         return Mono.fromCallable(
@@ -187,9 +193,11 @@ public class Mem0Client {
 
     /**
      * Executes a POST request to the Mem0 API and parses the response.
+     * 向 Mem0 API 执行 POST 请求并解析响应。
      *
      * <p>This is a generic method that handles HTTP communication, JSON serialization,
      * error handling, and response parsing for all POST endpoints.
+     * 这是一个通用方法，用于处理所有 POST 端点的 HTTP 通信、JSON 序列化、错误处理和响应解析。
      *
      * @param endpoint The API endpoint path (e.g., "/v1/memories")
      * @param request The request object to serialize as JSON
@@ -208,13 +216,17 @@ public class Mem0Client {
 
     /**
      * Adds memories to Mem0 by sending messages for processing.
+     * 通过发送消息进行处理，将内存添加到 Mem0。
      *
      * <p>This method calls the {@code POST /v1/memories} endpoint. Mem0 will process
      * the messages and extract memorable information using LLM inference (unless
      * {@code infer} is set to false in the request).
+     * 此方法调用 POST /v1/memories 端点。
+     * Mem0 将处理消息并使用 LLM 推理提取记忆信息（除非请求中将 infer 设置为 false）。
      *
      * <p>The operation is performed asynchronously on the bounded elastic scheduler
      * to avoid blocking the caller thread.
+     * 该操作在有界弹性调度器上异步执行，以避免阻塞调用线程。
      *
      * @param request The add request containing messages and metadata
      * @return A Mono emitting the response with extracted memories
@@ -225,12 +237,16 @@ public class Mem0Client {
 
     /**
      * Searches memories in Mem0 using semantic similarity.
+     * 使用语义相似性在 Mem0 中搜索内存。
      *
      * <p>This method calls the {@code POST /v2/memories/search/} endpoint to find
      * memories relevant to the query string. Results are ordered by relevance score
      * (highest first).
+     * 此方法调用 POST /v2/memories/search/ 端点，查找与查询字符串相关的记忆。
+     * 结果按相关性得分排序（得分最高排在最前面）。
      *
      * <p>Automatically compatible with two Mem0 API response formats:
+     * 自动兼容两种 Mem0 API 响应格式：
      * <ul>
      *   <li><b>format v1.1</b> — response is a JSON object with a {@code results} field
      *       (e.g. {@code {"results": [...]}}), deserialized directly into
@@ -268,9 +284,11 @@ public class Mem0Client {
 
     /**
      * Shuts down the HTTP client and releases resources.
+     * 关闭 HTTP 客户端并释放资源。
      *
      * <p>This method should be called when the client is no longer needed.
      * After calling this method, the client should not be used for further requests.
+     * 当不再需要客户端时，应调用此方法。调用此方法后，不应再使用该客户端处理任何请求。
      */
     public void shutdown() {
         httpClient.dispatcher().executorService().shutdown();

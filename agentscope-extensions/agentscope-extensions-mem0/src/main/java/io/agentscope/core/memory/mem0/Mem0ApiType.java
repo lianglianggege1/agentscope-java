@@ -17,8 +17,10 @@ package io.agentscope.core.memory.mem0;
 
 /**
  * Enumeration of Mem0 API deployment types.
+ * Mem0 API部署类型枚举。
  *
  * <p>Mem0 provides two deployment options with different API endpoints and authentication:
+ *    Mem0 提供两种部署选项，具有不同的 API 端点和身份验证方式：
  * <ul>
  *   <li><b>PLATFORM</b>: Official cloud service with endpoints /v1/memories/ and /v2/memories/search/,
  *       using {@code Authorization: Token <apiKey>} header</li>

@@ -25,6 +25,7 @@ import reactor.core.publisher.Mono;
 
 /**
  * Toolkit extension for Higress AI Gateway integration.
+ * 用于 Higress AI 网关集成的工具包扩展。
  *
  * <p>This toolkit extends {@link Toolkit} to provide Higress-specific functionality
  * while inheriting all standard toolkit features.

@@ -29,10 +29,12 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Represents the result of calling the x_higress_tool_search tool.
+ * 表示调用 x_higress_tool_search 工具的结果。
  *
  * <p>The x_higress_tool_search tool returns a list of recommended tools based on
  * semantic similarity to the query. This class provides methods to parse and access
  * the search results.
+ * x_higress_tool_search 工具会根据与查询的语义相似度返回推荐工具列表。此类提供解析和访问搜索结果的方法。
  *
  * <p>Example response structure from Higress:
  * <pre>{@code
