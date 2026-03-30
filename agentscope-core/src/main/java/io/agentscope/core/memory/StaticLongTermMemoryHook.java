@@ -32,20 +32,27 @@ import reactor.core.publisher.Mono;
 
 /**
  * Static Long-Term Memory Hook for automatic memory management.
+ * 静态长期记忆钩子，用于自动管理长期记忆。
  *
  * <p>This hook implements the STATIC_CONTROL mode for long-term memory, where memory
  * retrieval and recording are handled automatically by the framework without agent
  * involvement. The hook:
+ * 此钩子实现了长期记忆的静态控制模式，在该模式下，记忆的检索和记录由框架自动处理，无需智能体参与。
  * <ol>
  *   <li>Retrieves relevant memories before reasoning (PreReasoningEvent)</li>
+ *       在推理之前检索相关记忆（推理前事件）
  *   <li>Injects retrieved memories as system messages for context</li>
+ *       将检索到的记忆作为系统消息注入到上下文中
  *   <li>Records conversations to long-term memory after agent replies (PostCallEvent)</li>
+ *       记录智能体回复后的对话到长期记忆中（推理后事件）
  * </ol>
  *
  * <p><b>When to Use:</b>
  * <ul>
  *   <li>STATIC_CONTROL mode: Framework manages memory automatically</li>
+ *         框架自动管理长期记忆
  *   <li>BOTH mode: Combined with agent control tools</li>
+ *         与智能体控制工具结合使用
  * </ul>
  *
  * <p><b>Usage Example:</b>

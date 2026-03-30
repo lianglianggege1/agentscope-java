@@ -21,10 +21,13 @@ import java.util.List;
 
 /**
  * Interface for memory components that store and manage conversation history.
+ * 用于存储和管理对话历史记忆的内存组件接口
  *
  * <p>Memory extends StateModule to provide state persistence capabilities, allowing conversation
  * history to be saved and restored through sessions. Different memory implementations can provide
  * various storage strategies such as in-memory, database-backed, or window-based storage.
+ * Memory扩展了StateModule以提供状态持久化功能，允许通过会话保存和恢复会话历史。
+ * 不同的内存实现可以提供各种存储策略，如内存、数据库支持、窗口存储等。
  */
 public interface Memory extends StateModule {
 

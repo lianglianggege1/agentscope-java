@@ -21,27 +21,36 @@ import reactor.core.publisher.Mono;
 
 /**
  * Abstract base class for long-term memory implementations.
+ * 基本抽象类长期记忆实现
  *
  * <p>This class provides a time-series memory management system that persists information
  * beyond individual conversation sessions. Long-term memory enables agents to:
+ * 这个类提供一个时间序列记忆管理系统，该系统在会话会话之间持久化信息。
  * <ul>
  *   <li>Remember user preferences, habits, and personal information across sessions
+ *       记住用户偏好、习惯和个人信息
  *   <li>Learn from past interactions and improve over time
+ *       从过去进行学习并随着时间的推移而改进
  *   <li>Maintain context for long-running tasks or projects
+ *       保持长 Running 任务或项目的上下文
  *   <li>Build personalized experiences based on historical data
+ *       构建基于历史数据的个性化体验
  * </ul>
  *
  * <p>This class defines the core memory API for framework-level integration:
+ *    这个类定义框架级集成的核心记忆API：
  * <ul>
- *   <li>{@link #record(List)} - Record messages to memory (called by framework)
- *   <li>{@link #retrieve(Msg)} - Retrieve relevant memories (called by framework)
+ *   <li>{@link #record(List)} - Record messages to memory (called by framework) 记录信息到记忆（由框架调用）
+ *   <li>{@link #retrieve(Msg)} - Retrieve relevant memories (called by framework) 取回相关记忆（由框架调用）
  * </ul>
  *
  * <p>For agent-controlled memory operations (AGENT_CONTROL mode), use {@link LongTermMemoryTools}
  * which provides tool functions that adapt these core methods for agent use.
+ * 对于代理控制记忆操作（AGENT_CONTROL模式），请使用LongTermMemoryTools，该工具将这些核心方法适配为代理使用。
  *
  * <p>All methods are asynchronous and return Reactor {@link Mono} types for non-blocking
  * integration with the agent framework.
+ * 全部方法都是异步的，并返回Reactor的Mono类型，用于非阻塞集成到代理框架中。
  *
  * <p><b>Usage Example:</b>
  * <pre>{@code

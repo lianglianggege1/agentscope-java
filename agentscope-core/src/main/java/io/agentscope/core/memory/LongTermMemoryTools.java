@@ -26,13 +26,17 @@ import reactor.core.publisher.Mono;
 
 /**
  * Tool adapter that exposes long-term memory operations as agent-callable tools.
+ * 工具适配器，将长期记忆操作转换为代理可调用工具。
  *
  * <p>This class provides a clean separation between the core memory API (defined in
  * {@link LongTermMemory}) and the tool interface used by agents. It adapts the
  * developer-facing {@code record()} and {@code retrieve()} methods into tool functions
  * with agent-friendly signatures.
+ * 这个类提供了一个干净的分离，将核心记忆API（定义在{@link LongTermMemory}）与代理可调用工具接口。
+ * 它适配开发者面向的{@code record()}和{@code retrieve()}方法，并将其转换为代理可调用工具函数。
  *
  * <p><b>Architecture:</b>
+ *       架构
  * <ul>
  *   <li><b>LongTermMemoryBase:</b> Defines core storage API ({@code record()}, {@code retrieve()})
  *   <li><b>LongTermMemoryTools:</b> Adapts core API to tool interface for agent control
