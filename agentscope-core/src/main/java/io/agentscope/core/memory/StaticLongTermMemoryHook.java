@@ -124,6 +124,7 @@ public class StaticLongTermMemoryHook implements Hook {
 
     /**
      * Handles PreReasoningEvent by retrieving relevant memories and injecting them.
+     * 处理推理前的事件，检索相关的记忆并注入。
      *
      * <p>Retrieves memories relevant to the user's query and injects them as a system
      * message at the beginning of the message list. The memories are wrapped in
@@ -182,6 +183,7 @@ public class StaticLongTermMemoryHook implements Hook {
 
     /**
      * Handles PostCallEvent by recording conversation to long-term memory.
+     * 处理推理后的事件，将对话记录到长期记忆中。
      *
      * <p>Records all messages from the agent's memory to long-term storage. This allows
      * the long-term memory backend (e.g., Mem0) to extract memorable information from
@@ -212,6 +214,7 @@ public class StaticLongTermMemoryHook implements Hook {
 
     /**
      * Extracts the last user message from the message list.
+     * 提取最后一条用户消息。
      *
      * <p>Scans the message list from end to start to find the most recent user message,
      * which is typically the current query that should be used for memory retrieval.

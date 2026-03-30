@@ -39,8 +39,11 @@ import reactor.core.publisher.Mono;
  *       架构
  * <ul>
  *   <li><b>LongTermMemoryBase:</b> Defines core storage API ({@code record()}, {@code retrieve()})
+ *          LongTermMemoryBase: 定义核心存储API（record()，retrieve()）
  *   <li><b>LongTermMemoryTools:</b> Adapts core API to tool interface for agent control
+ *           LongTermMemoryTools: 将核心API适配为代理可调工具接口
  *   <li><b>ReActAgent:</b> Registers tools when {@code AGENT_CONTROL} mode is enabled
+ *           ReActAgent: 当{@code AGENT_CONTROL}模式启用时注册
  * </ul>
  *
  * <p><b>Usage Example:</b>
@@ -97,6 +100,7 @@ public class LongTermMemoryTools {
 
     /**
      * Tool function for agent to record important information to long-term memory.
+     * 这个方法是代理用来记录重要的信息到长期记忆的。
      *
      * @param thinking Agent's reasoning about what to record and why
      * @param content List of specific facts to remember (should be clear and concise)
@@ -155,6 +159,7 @@ public class LongTermMemoryTools {
 
     /**
      * Tool function for agent to retrieve information from long-term memory.
+     * 这个方法是代理用来从长期记忆中检索信息的。
      *
      * <p>This method adapts the agent's keyword input into a query message and calls
      * the underlying memory's {@link LongTermMemory#retrieve(Msg)} method.
