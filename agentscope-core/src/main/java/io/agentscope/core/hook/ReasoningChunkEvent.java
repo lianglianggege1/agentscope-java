@@ -22,26 +22,27 @@ import java.util.Objects;
 
 /**
  * Event fired during reasoning streaming.
+ * 推理流期间触发的事件。
  *
  * <p><b>Modifiable:</b> No (notification-only)
- *
+ *       不可修改： 仅作为通知
  * <p><b>Context:</b>
  * <ul>
  *   <li>{@link #getAgent()} - The agent instance</li>
  *   <li>{@link #getMemory()} - Agent's memory</li>
  *   <li>{@link #getModelName()} - The model name</li>
  *   <li>{@link #getGenerateOptions()} - The generation options</li>
- *   <li>{@link #getIncrementalChunk()} - Only the new content in this chunk</li>
- *   <li>{@link #getAccumulated()} - The full accumulated message so far</li>
+ *   <li>{@link #getIncrementalChunk()} - Only the new content in this chunk 此块中仅包含新内容</li>
+ *   <li>{@link #getAccumulated()} - The full accumulated message so far 目前为止所有累积的信息</li>
  * </ul>
  *
  * <p><b>Use Cases:</b>
  * <ul>
- *   <li>Use {@link #getIncrementalChunk()} for incremental display (append-only)</li>
- *   <li>Use {@link #getAccumulated()} for full context display (replace entire text)</li>
- *   <li>Display streaming output in real-time</li>
- *   <li>Monitor reasoning progress</li>
- *   <li>Log streaming content</li>
+ *   <li>Use {@link #getIncrementalChunk()} for incremental display (append-only) 使用 {@link #getIncrementalChunk()} 进行增量显示（仅追加）</li>
+ *   <li>Use {@link #getAccumulated()} for full context display (replace entire text) 使用 {@link #getAccumulated()} 显示完整上下文（替换全部文本）</li>
+ *   <li>Display streaming output in real-time 实时显示流媒体输出</li>
+ *   <li>Monitor reasoning progress 监控推理进度</li>
+ *   <li>Log streaming content 日志流内容</li>
  * </ul>
  *
  * <p><b>Example:</b>

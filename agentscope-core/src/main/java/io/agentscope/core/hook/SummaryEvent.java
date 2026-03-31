@@ -21,9 +21,11 @@ import java.util.Objects;
 
 /**
  * Base class for summary-related events.
+ * 摘要相关事件的基类
  *
  * <p>This sealed class provides common context for all summary events that occur
  * when a ReActAgent reaches its maximum iterations and generates a summary:
+ * 这个密封类为 ReActAgent 达到最大迭代次数并生成摘要时发生的所有摘要事件提供通用上下文：
  * <ul>
  *   <li>{@link #getModelName()} - The model name (e.g., "qwen-plus", "gpt-4")</li>
  *   <li>{@link #getGenerateOptions()} - The generation options (temperature, etc.)</li>
@@ -31,9 +33,9 @@ import java.util.Objects;
  *
  * <p>Subclasses represent different stages of the summary process:
  * <ul>
- *   <li>{@link PreSummaryEvent} - Before summary generation</li>
- *   <li>{@link SummaryChunkEvent} - During streaming</li>
- *   <li>{@link PostSummaryEvent} - After summary generation completes</li>
+ *   <li>{@link PreSummaryEvent} - Before summary generation 在总结生成之前</li>
+ *   <li>{@link SummaryChunkEvent} - During streaming 在总结处理流之间</li>
+ *   <li>{@link PostSummaryEvent} - After summary generation completes 在总结生成完成之后</li>
  * </ul>
  *
  * @see PreSummaryEvent

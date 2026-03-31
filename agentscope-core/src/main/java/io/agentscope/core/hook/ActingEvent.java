@@ -21,18 +21,24 @@ import io.agentscope.core.tool.Toolkit;
 
 /**
  * Base class for tool execution (acting) related events.
+ * 工具执行（执行）相关的事件的基类
  *
  * <p>This sealed class provides common context for all acting events:
+ *    这个密封类提供了所有执行事件的公共上下文：
  * <ul>
- *   <li>{@link #getToolkit()} - The toolkit instance</li>
- *   <li>{@link #getToolUse()} - The tool being executed</li>
+ *   <li>{@link #getToolkit()} - The toolkit instance 工具包实例</li>
+ *   <li>{@link #getToolUse()} - The tool being executed 正在执行的工具</li>
  * </ul>
  *
  * <p>Subclasses represent different stages of tool execution:
+ *    子类表示工具执行（执行）的不同阶段：
  * <ul>
  *   <li>{@link PreActingEvent} - Before tool execution</li>
+ *       在工具执行之前
  *   <li>{@link PostActingEvent} - After tool execution</li>
+ *       在工具执行之后
  *   <li>{@link ActingChunkEvent} - During tool streaming</li>
+ *       在工具流式处理期间
  * </ul>
  *
  * @see PreActingEvent

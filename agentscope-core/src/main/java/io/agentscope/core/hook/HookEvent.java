@@ -22,20 +22,25 @@ import java.util.Objects;
 
 /**
  * Base class for all hook events.
+ * 所有hook事件的基类
  *
  * <p>This is a sealed class - only the predefined event types are permitted.
+ * 这是一个密封类 - 只允许预定义的事件类型。
  * This enables exhaustive pattern matching in switch expressions.
+ * 启用 exhaustive pattern matching 在 switch 表达式中。
  *
  * <p>All events provide access to common context:
+ *    所有事件都提供了获取共同背景信息的途径：
  * <ul>
- *   <li>{@link #getAgent()} - The agent instance</li>
- *   <li>{@link #getMemory()} - Convenient access to agent's memory (may be null)</li>
- *   <li>{@link #getType()} - The event type</li>
- *   <li>{@link #getTimestamp()} - When the event occurred</li>
+ *   <li>{@link #getAgent()} - The agent instance 智能体实例</li>
+ *   <li>{@link #getMemory()} - Convenient access to agent's memory (may be null) 方便的访问智能体的记忆（可能为空） </li>
+ *   <li>{@link #getType()} - The event type 事件类型</li>
+ *   <li>{@link #getTimestamp()} - When the event occurred 事件发生时</li>
  * </ul>
  *
  * <p><b>Modifiability:</b> Whether an event allows modification is determined by
  * the presence of setter methods in the concrete event class.
+ * <b>Modifiability:</b> 确定事件是否允许修改的方式是，在具体事件类中存在设置方法。
  *
  * @see Hook
  * @see HookEventType

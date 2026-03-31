@@ -24,8 +24,10 @@ import java.util.Objects;
 
 /**
  * Event fired before summary generation when max iterations is reached.
+ * 当达到最大迭代次数时，在生成摘要之前触发事件。
  *
  * <p><b>Modifiable:</b> Yes - {@link #setInputMessages(List)}, {@link #setGenerateOptions(GenerateOptions)}
+ *       可变的 - {@link #setInputMessages(List)}, {@link #setGenerateOptions(GenerateOptions)}
  *
  * <p><b>Context:</b>
  * <ul>
@@ -34,16 +36,23 @@ import java.util.Objects;
  *   <li>{@link #getModelName()} - The model name (e.g., "qwen-plus")</li>
  *   <li>{@link #getGenerateOptions()} - The generation options (temperature, etc.)</li>
  *   <li>{@link #getInputMessages()} - Messages to send to LLM for summary (modifiable)</li>
+ *                                     发送给LLM以获取摘要的消息（可修改）
  *   <li>{@link #getMaxIterations()} - The maximum iterations configured for the agent</li>
+ *                                     为智能体配置的最大迭代次数
  *   <li>{@link #getCurrentIteration()} - The current iteration count when summary triggered</li>
+ *                                         触发摘要时的当前迭代计数
  * </ul>
  *
  * <p><b>Use Cases:</b>
  * <ul>
  *   <li>Inject additional context into the summary prompt</li>
+ *       在摘要提示中添加更多上下文信息 
  *   <li>Modify the summary system instructions</li>
+ *       修改摘要系统指令
  *   <li>Change generation parameters for summary</li>
+ *       摘要的更改生成参数
  *   <li>Log summary generation input</li>
+ *       日志摘要生成输入
  * </ul>
  */
 public final class PreSummaryEvent extends SummaryEvent {

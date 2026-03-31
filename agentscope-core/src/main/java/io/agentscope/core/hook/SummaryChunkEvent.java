@@ -22,8 +22,10 @@ import java.util.Objects;
 
 /**
  * Event fired during summary streaming.
+ * 摘要流传输期间触发事件。
  *
  * <p><b>Modifiable:</b> No (notification-only)
+ *       不可修改 - 仅通知
  *
  * <p><b>Context:</b>
  * <ul>

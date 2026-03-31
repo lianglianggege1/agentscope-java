@@ -24,24 +24,30 @@ import java.util.Objects;
 
 /**
  * Event fired before LLM reasoning.
+ * 在LLM推理之前执行的事件
  *
  * <p><b>Modifiable:</b> Yes - {@link #setInputMessages(List)}
- *
+ *       可修改：Yes - {@link #setInputMessages(List)}
  * <p><b>Context:</b>
  * <ul>
- *   <li>{@link #getAgent()} - The agent instance</li>
- *   <li>{@link #getMemory()} - Agent's memory</li>
- *   <li>{@link #getModelName()} - The model name (e.g., "qwen-plus")</li>
- *   <li>{@link #getGenerateOptions()} - The generation options (temperature, etc.)</li>
- *   <li>{@link #getInputMessages()} - Messages to send to LLM (modifiable)</li>
+ *   <li>{@link #getAgent()} - The agent instance 智能体实例</li>
+ *   <li>{@link #getMemory()} - Agent's memory 智能体的记忆</li>
+ *   <li>{@link #getModelName()} - The model name (e.g., "qwen-plus") 模型的名称（例如： "qwen-plus"）</li>
+ *   <li>{@link #getGenerateOptions()} - The generation options (temperature, etc.) 可生成的选项（温度等）</li>
+ *   <li>{@link #getInputMessages()} - Messages to send to LLM (modifiable)要发送给LLM的消息（可修改） </li>
  * </ul>
  *
  * <p><b>Use Cases:</b>
+ *       使用用例：
  * <ul>
  *   <li>Inject hints or additional context into the prompt</li>
+ *       在提示中插入提示信息或补充上下文
  *   <li>Filter or modify existing messages</li>
+ *       筛选或修改现有消息
  *   <li>Add system instructions dynamically</li>
+ *       动态添加系统指令
  *   <li>Log reasoning input</li>
+ *       记录推理输入
  * </ul>
  */
 public final class PreReasoningEvent extends ReasoningEvent {

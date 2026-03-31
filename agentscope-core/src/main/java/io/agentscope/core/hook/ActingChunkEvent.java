@@ -23,6 +23,7 @@ import java.util.Objects;
 
 /**
  * Event fired during tool execution streaming.
+ * 在工具执行流程中触发的事件。
  *
  * <p><b>Modifiable:</b> No (notification-only)
  *
@@ -32,7 +33,7 @@ import java.util.Objects;
  *   <li>{@link #getMemory()} - Agent's memory</li>
  *   <li>{@link #getToolkit()} - The toolkit instance</li>
  *   <li>{@link #getToolUse()} - The tool being executed</li>
- *   <li>{@link #getChunk()} - The streaming chunk from ToolEmitter</li>
+ *   <li>{@link #getChunk()} - The streaming chunk from ToolEmitter 来自 ToolEmitter 的流式数据块</li>
  * </ul>
  *
  * <p><b>Note:</b> These chunks are emitted by tools via {@link
@@ -42,8 +43,11 @@ import java.util.Objects;
  * <p><b>Use Cases:</b>
  * <ul>
  *   <li>Display tool execution progress</li>
+ *       显示工具执行进度
  *   <li>Log intermediate tool outputs</li>
+ *       记录中间工具输出
  *   <li>Monitor long-running tool operations</li>
+ *       监控长时间运行的工具操作
  * </ul>
  */
 public final class ActingChunkEvent extends ActingEvent {

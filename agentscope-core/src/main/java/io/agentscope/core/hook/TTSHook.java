@@ -29,14 +29,18 @@ import reactor.core.scheduler.Schedulers;
 
 /**
  * Hook for real-time Text-to-Speech synthesis during agent execution.
+ * 在代理执行期间实现实时文本到语音合成的钩子。
  *
  * <p>This hook implements "speak as you generate" by listening to streaming
  * reasoning events and synthesizing speech in real-time.
+ * 该钩子通过监听流式推理事件并实时合成语音来实现“边生成边说”。
  *
  * <p><b>Two Usage Modes:</b>
  * <ul>
  *   <li><b>Local Playback (CLI/Desktop):</b> Use audioPlayer for direct playback</li>
+ *          本地播放（命令行/桌面）：</b> 使用 audioPlayer 直接播放
  *   <li><b>Server Mode (Web/SSE):</b> Use audioCallback to return audio to frontend</li>
+ *          服务器模式（Web/SSE）：</b> 使用 audioCallback 将音频返回给前端
  * </ul>
  *
  * <p><b>Example 1: Local Playback (CLI/Testing)</b>

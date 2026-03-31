@@ -21,18 +21,21 @@ import java.util.Objects;
 
 /**
  * Base class for reasoning-related events.
+ * 与推理有关系事件的基本类
  *
  * <p>This sealed class provides common context for all reasoning events:
+ *    这个密封类为所有推理事件提供了通用上下文：
  * <ul>
  *   <li>{@link #getModelName()} - The model name (e.g., "qwen-plus", "gpt-4")</li>
  *   <li>{@link #getGenerateOptions()} - The generation options (temperature, etc.)</li>
  * </ul>
  *
  * <p>Subclasses represent different stages of the reasoning process:
+ *    子类表示推理过程的不同阶段：
  * <ul>
- *   <li>{@link PreReasoningEvent} - Before LLM call</li>
- *   <li>{@link PostReasoningEvent} - After LLM call</li>
- *   <li>{@link ReasoningChunkEvent} - During streaming</li>
+ *   <li>{@link PreReasoningEvent} - Before LLM call 在调用LLM之前</li>
+ *   <li>{@link PostReasoningEvent} - After LLM call 在LLM调用之后</li>
+ *   <li>{@link ReasoningChunkEvent} - During streaming 在处理流中</li>
  * </ul>
  *
  * @see PreReasoningEvent
@@ -47,6 +50,7 @@ public abstract sealed class ReasoningEvent extends HookEvent
 
     /**
      * Constructor for ReasoningEvent.
+     * 推理事件构造函数
      *
      * @param type The event type (must not be null)
      * @param agent The agent instance (must not be null)

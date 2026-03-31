@@ -21,6 +21,7 @@ import java.util.List;
 
 /**
  * Event fired before agent starts processing.
+ * 在agent开始之前触发
  *
  * <p><b>Modifiable:</b> No (notification-only)
  *
@@ -32,9 +33,9 @@ import java.util.List;
  *
  * <p><b>Use Cases:</b>
  * <ul>
- *   <li>Log the start of agent execution</li>
- *   <li>Initialize execution-specific resources</li>
- *   <li>Track agent invocation metrics</li>
+ *   <li>Log the start of agent execution 开始执行的日志</li>
+ *   <li>Initialize execution-specific resources 初始化特定于执行的资源</li>
+ *   <li>Track agent invocation metrics 跟踪代理调用指标</li>
  * </ul>
  */
 public final class PreCallEvent extends HookEvent {

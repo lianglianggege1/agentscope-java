@@ -21,6 +21,7 @@ import java.util.Objects;
 
 /**
  * Event fired after agent completes processing.
+ * 在agent完成之后触发事件
  *
  * <p><b>Modifiable:</b> Yes - {@link #setFinalMessage(Msg)}
  *
@@ -33,10 +34,10 @@ import java.util.Objects;
  *
  * <p><b>Use Cases:</b>
  * <ul>
- *   <li>Post-process the final agent response</li>
- *   <li>Add final metadata or formatting</li>
- *   <li>Filter or sanitize output</li>
- *   <li>Log outgoing responses</li>
+ *   <li>Post-process the final agent response 对最终代理响应进行后处理</li>
+ *   <li>Add final metadata or formatting 添加最终的元数据或格式化</li>
+ *   <li>Filter or sanitize output 过滤或消毒输出</li>
+ *   <li>Log outgoing responses 记录发出的响应</li>
  * </ul>
  */
 public final class PostCallEvent extends HookEvent {

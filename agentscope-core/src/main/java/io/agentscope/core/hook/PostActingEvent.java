@@ -23,8 +23,10 @@ import io.agentscope.core.tool.Toolkit;
 
 /**
  * Event fired after tool execution completes.
+ * 在工具执行完成后触发的事件
  *
  * <p><b>Modifiable:</b> Yes - {@link #setToolResult(ToolResultBlock)}
+ *       可修改 -  {@link #setToolResult(ToolResultBlock)}
  *
  * <p><b>Context:</b>
  * <ul>
@@ -36,15 +38,22 @@ import io.agentscope.core.tool.Toolkit;
  * </ul>
  *
  * <p><b>Note:</b> This is called once per tool execution.
+ * 每次工具执行时都会调用一次。
  *
  * <p><b>Use Cases:</b>
  * <ul>
  *   <li>Post-process individual tool results</li>
+ *       后处理单个工具的结果
  *   <li>Filter or sanitize tool output</li>
+ *       过滤或净化工具输出
  *   <li>Add metadata to results</li>
+ *       向结果添加元数据
  *   <li>Handle tool execution errors</li>
+ *       处理工具执行错误
  *   <li>Transform result format</li>
+ *       转换结果格式
  *   <li>Request to stop the agent for human review via {@link #stopAgent()}</li>
+ *       请求通过 {@link #stopAgent()} 停止代理程序以进行人工审核
  * </ul>
  */
 public final class PostActingEvent extends ActingEvent {

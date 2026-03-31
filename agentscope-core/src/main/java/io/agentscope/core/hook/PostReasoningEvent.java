@@ -24,8 +24,10 @@ import java.util.List;
 
 /**
  * Event fired after LLM reasoning completes.
+ * 在LLM推理之后完成
  *
  * <p><b>Modifiable:</b> Yes - {@link #setReasoningMessage(Msg)}
+ *       是可以修改的
  *
  * <p><b>Context:</b>
  * <ul>
@@ -38,14 +40,20 @@ import java.util.List;
  *
  * <p><b>Note:</b> Message content may include text blocks, thinking blocks, and tool use blocks.
  * You can modify any of these before the agent processes tool calls.
+ * 消息内容可以是文本、思考、工具使用块。你可以在agent调用工具之前你可以修改任何东西
  *
  * <p><b>Use Cases:</b>
  * <ul>
  *   <li>Filter or modify tool calls before execution</li>
+ *       在执行之前过滤或修改工具调用
  *   <li>Add/remove content blocks</li>
+ *       添加或删除内容块
  *   <li>Modify text or thinking content</li>
+ *       修改文本或思考块
  *   <li>Add metadata</li>
+ *       增加元数据
  *   <li>Request to stop the agent for human review via {@link #stopAgent()}</li>
+ *     请求通过 {@link #stopAgent()} 停止代理以进行人工审核
  * </ul>
  */
 public final class PostReasoningEvent extends ReasoningEvent {

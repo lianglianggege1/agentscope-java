@@ -20,8 +20,10 @@ import java.util.Objects;
 
 /**
  * Event fired when an error occurs during agent execution.
+ * 智能体执行过程中发生错误时触发的事件。
  *
  * <p><b>Modifiable:</b> No (notification-only)
+ *       可修改：否（仅通知）
  *
  * <p><b>Context:</b>
  * <ul>
@@ -33,9 +35,13 @@ import java.util.Objects;
  * <p><b>Use Cases:</b>
  * <ul>
  *   <li>Log errors with context</li>
+ *       使用上下文记录错误
  *   <li>Send error notifications</li>
+ *       发送错误通知
  *   <li>Collect error metrics</li>
+ *       收集错误指标
  *   <li>Implement custom error handling</li>
+ *       实现自定义错误处理
  * </ul>
  */
 public final class ErrorEvent extends HookEvent {
