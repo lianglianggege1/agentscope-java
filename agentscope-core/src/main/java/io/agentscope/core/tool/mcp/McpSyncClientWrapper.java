@@ -48,6 +48,7 @@ public class McpSyncClientWrapper extends McpClientWrapper {
 
     /**
      * Constructs a new synchronous MCP client wrapper.
+     * 构建一个新的同步 MCP 客户端包装器。
      *
      * @param name unique identifier for this client
      * @param client the underlying sync MCP client
@@ -59,10 +60,14 @@ public class McpSyncClientWrapper extends McpClientWrapper {
 
     /**
      * Initializes the sync MCP client connection and caches available tools.
+     * 初始化同步 MCP 客户端连接并缓存可用工具。
      *
      * <p>This method wraps the blocking synchronous client operations in a reactive Mono that runs
      * on the boundedElastic scheduler to avoid blocking the event loop. If already initialized,
      * this method returns immediately without re-initializing.
+     * 此方法将阻塞的同步客户端操作封装在一个响应式 Mono 中，
+     * 该 Mono 运行在 boundedElastic 调度器上，以避免阻塞事件循环。
+     * 如果 Mono 已初始化，则此方法会立即返回，而不会重新初始化。
      *
      * @return a Mono that completes when initialization is finished
      */
@@ -102,9 +107,11 @@ public class McpSyncClientWrapper extends McpClientWrapper {
 
     /**
      * Lists all tools available from the MCP server.
+     * 列出MCP服务器上所有可用的工具。
      *
      * <p>This method wraps the blocking synchronous listTools call in a reactive Mono. The client
      * must be initialized before calling this method.
+     * 此方法将阻塞式同步 listTools 调用封装在响应式 Mono 中。调用此方法前必须先初始化客户端。
      *
      * @return a Mono emitting the list of available tools
      * @throws IllegalStateException if the client is not initialized
@@ -122,9 +129,12 @@ public class McpSyncClientWrapper extends McpClientWrapper {
 
     /**
      * Invokes a tool on the MCP server, wrapping the blocking call in a reactive Mono.
+     * 调用 MCP 服务器上的工具，将阻塞调用包装在响应式 Mono 中。
      *
      * <p>This method wraps the blocking synchronous callTool operation in a Mono that runs on the
      * boundedElastic scheduler. The client must be initialized before calling this method.
+     * 此方法将阻塞式同步 callTool 操作封装在一个 Mono 中，
+     * 该 Mono 运行在 boundedElastic 调度器上。调用此方法之前，必须先初始化客户端。
      *
      * @param toolName the name of the tool to call
      * @param arguments the arguments to pass to the tool
@@ -168,9 +178,11 @@ public class McpSyncClientWrapper extends McpClientWrapper {
 
     /**
      * Closes the MCP client connection and releases all resources.
+     * 关闭 MCP 客户端连接并释放所有资源。
      *
      * <p>This method attempts to close the client gracefully, falling back to forceful closure if
      * graceful closure fails. This method is idempotent and can be called multiple times safely.
+     * 此方法尝试以优雅的方式关闭客户端，如果优雅关闭失败，则回退到强制关闭。此方法是幂等的，可以安全地多次调用。
      */
     @Override
     public void close() {

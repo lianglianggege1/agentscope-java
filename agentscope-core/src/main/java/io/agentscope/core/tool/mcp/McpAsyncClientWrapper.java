@@ -47,6 +47,7 @@ public class McpAsyncClientWrapper extends McpClientWrapper {
 
     /**
      * Constructs a new asynchronous MCP client wrapper.
+     * 构建一个新的异步 MCP 客户端包装器。
      *
      * @param name unique identifier for this client
      * @param client the underlying async MCP client
@@ -58,12 +59,13 @@ public class McpAsyncClientWrapper extends McpClientWrapper {
 
     /**
      * Initializes the async MCP client connection and caches available tools.
+     * 初始化异步 MCP 客户端连接并缓存可用工具。
      *
      * <p>This method connects to the MCP server, discovers available tools, and caches them for
      * later use. If already initialized, this method returns immediately without re-initializing.
-     *
-     *  初始化异步MCP客户端连接并缓存可用工具。
+     * 初始化异步MCP客户端连接并缓存可用工具。
      * 此方法连接到MCP服务器，发现可用工具，并缓存它们以供以后使用。如果已经初始化，此方法将立即返回，而无需重新初始化。
+     *
      * @return a Mono that completes when initialization is finished
      */
     @Override
