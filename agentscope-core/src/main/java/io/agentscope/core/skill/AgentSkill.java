@@ -27,8 +27,9 @@ import java.util.Set;
  * 代表一个智能体技能，它可以被代理者加载和使用。
  *
  * <p>A skill consists of:
+ *    一个skill包含以下内容：
  * <ul>
- *   <li>Name and description - identifying the skill
+ *   <li>Name and description - identifying the skill 技能的标识
  *   <li>Skill content - the actual skill implementation or instructions 实际的技能实施或指导
  *   <li>Resources - supporting files or data referenced by the skill 技能引用的支持文件或数据
  *   <li>Version and source - tracking skill origin and versioning 跟踪技能来源和版本控制
@@ -37,7 +38,7 @@ import java.util.Set;
  * <p><b>Creation options:</b>
  * <ul>
  *   <li>From markdown with YAML frontmatter - metadata extracted automatically 自动提取元数据
- *   <li>From explicit parameters - direct construction with all fields 与所有领域直接施工
+ *   <li>From explicit parameters - direct construction with all fields 直接与所有字段构建
  *   <li>From builder - for creating modified versions of existing skills 用于创建现有技能的修改版本
  * </ul>
  *
@@ -71,9 +72,11 @@ public class AgentSkill {
 
     /**
      * Creates an AgentSkill with explicit parameters.
+     * 创建带有明确参数的 AgentSkill。
      *
      * <p>Use this constructor when you want to create a skill directly without parsing
      * markdown. Uses "custom" as the default source.
+     * 当您想直接创建技能而不解析 Markdown 时，请使用此构造函数。默认使用“custom”作为源。
      *
      * @param name Skill name (must not be null or empty)
      * @param description Skill description (must not be null or empty)

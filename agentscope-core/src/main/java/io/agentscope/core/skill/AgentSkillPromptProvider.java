@@ -17,11 +17,11 @@ package io.agentscope.core.skill;
 
 /**
  * Generates skill system prompts for agents to understand available skills.
- * 生成技能系统prompts
+ * 生成技能系统提示，帮助智能体了解可用技能。
  *
  * <p>This provider creates system prompts containing information about available skills
  * that the LLM can dynamically load and use.
- * 这个提供者创建系统prompt，包含有关可用技能的信息，以便LLM动态加载和使用。
+ * 该提供商创建系统提示，其中包含有关可用技能的信息，LLM 可以动态加载和使用这些技能。
  *
  * <p><b>Usage example:</b>
  * <pre>{@code
@@ -34,6 +34,41 @@ public class AgentSkillPromptProvider {
     private final String instruction;
     private final String template;
 
+    // ## 可用技能
+    //
+    // <usage>
+    //
+    // 技能提供专业能力和领域知识。当技能与当前任务匹配时，请使用它们。
+    //
+    // 如何使用技能：
+    //
+    // - 加载技能：load_skill_through_path(skillId="<skill-id>", path="SKILL.md")
+    //
+    // - 技能将被激活，并加载包含详细说明的文档
+    //
+    // - 可以使用同一工具加载其他资源（脚本、资产、参考资料），但路径不同
+    //
+    // 路径信息：
+    //
+    // 加载技能时，响应将包含：
+    //
+    // - 所有技能资源的精确路径
+    //
+    // - 访问技能文件的代码示例
+    //
+    // - 该技能的特定使用说明
+    //
+    // 模板字段说明：
+    //
+    // - <name>：技能的显示名称
+    //
+    // - <description>：何时以及如何使用此技能
+    //
+    // - <skill-id>：load_skill_through_path 工具的唯一标识符
+    //
+    // </usage>
+    //
+    // <available_skills>
     public static final String DEFAULT_AGENT_SKILL_INSTRUCTION =
             """
             ## Available Skills
@@ -76,6 +111,7 @@ public class AgentSkillPromptProvider {
 
     /**
      * Creates a skill prompt provider.
+     * 创建技能提示提供程序。
      *
      * @param registry The skill registry containing registered skills
      */
@@ -85,10 +121,14 @@ public class AgentSkillPromptProvider {
 
     /**
      * Creates a skill prompt provider with custom instruction and template.
+     * 创建带有自定义指令和模板的技能提示提供程序。
      *
      * @param registry The skill registry containing registered skills
+     *                 包含已注册技能的技能注册表
      * @param instruction Custom instruction header (null or blank uses default)
+     *                    自定义指令头（空或空白使用默认值）
      * @param template Custom skill template (null or blank uses default)
+     *                 自定义技能模板（空或留空使用默认值）
      */
     public AgentSkillPromptProvider(SkillRegistry registry, String instruction, String template) {
         this.skillRegistry = registry;
@@ -102,10 +142,13 @@ public class AgentSkillPromptProvider {
 
     /**
      * Gets the skill system prompt for the agent.
+     * 获取智能体的技能系统提示。
      *
      * <p>Generates a system prompt containing all registered skills.
+     * 生成包含所有已注册技能的系统提示。
      *
      * @return The skill system prompt, or empty string if no skills exist
+     *         技能系统提示，如果没有技能则为空字符串。
      */
     public String getSkillSystemPrompt() {
         StringBuilder sb = new StringBuilder();
@@ -129,6 +172,7 @@ public class AgentSkillPromptProvider {
         // Close available_skills tag
         sb.append("</available_skills>");
 
+        // 按照默认的能生成完整的skills列表的系统提示词
         return sb.toString();
     }
 }

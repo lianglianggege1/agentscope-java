@@ -42,19 +42,23 @@ import java.util.concurrent.ConcurrentHashMap;
  * 设计原则：这是一个纯存储层。除非另有明确说明，所有参数均假定为非空值。参数验证应在工具包层执行。
  */
 class SkillRegistry {
+    // 技能就存在线程安全的集合中
     private final Map<String, AgentSkill> skills = new ConcurrentHashMap<>();
+    // 已经注册的技能也存在线程安全的集合中
     private final Map<String, RegisteredSkill> registeredSkills = new ConcurrentHashMap<>();
 
     // ==================== Registration ====================
 
     /**
      * Registers a skill with its metadata.
+     * 注册技能及其元数据。
      *
      * <p>If the skill is already registered, it will be replaced.
+     * 如果该技能已被注册，则会被替换。
      *
-     * @param skillId The unique skill identifier (must not be null)
-     * @param skill The skill implementation (must not be null)
-     * @param registered The registered skill wrapper containing metadata (must not be null)
+     * @param skillId The unique skill identifier (must not be null) 唯一技能标识符（不能为空）
+     * @param skill The skill implementation (must not be null) 技能实现（不能为空）
+     * @param registered The registered skill wrapper containing metadata (must not be null) 已注册的技能包装器包含元数据（不能为空）
      */
     void registerSkill(String skillId, AgentSkill skill, RegisteredSkill registered) {
         skills.put(skillId, skill);
@@ -65,9 +69,10 @@ class SkillRegistry {
 
     /**
      * Sets the activation state of a skill.
+     * 设置技能的激活状态。
      *
-     * @param skillId The skill ID (must not be null)
-     * @param active Whether to activate the skill
+     * @param skillId The skill ID (must not be null) 技能 ID（不能为空）
+     * @param active Whether to activate the skill 是否激活该技能
      */
     void setSkillActive(String skillId, boolean active) {
         RegisteredSkill registered = registeredSkills.get(skillId);
@@ -78,6 +83,7 @@ class SkillRegistry {
 
     /**
      * Sets the activation state of all skills.
+     * 设置所有技能的激活状态。
      *
      * @param active Whether to activate all skills
      */

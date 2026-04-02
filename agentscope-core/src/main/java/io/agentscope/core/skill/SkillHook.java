@@ -27,6 +27,7 @@ import java.util.List;
 import reactor.core.publisher.Mono;
 
 public class SkillHook implements Hook {
+    // 技能包
     private final SkillBox skillBox;
 
     public SkillHook(SkillBox skillBox) {
@@ -36,6 +37,7 @@ public class SkillHook implements Hook {
     @Override
     public <T extends HookEvent> Mono<T> onEvent(T event) {
         // Inject skill prompts
+        // 插入技能提示词
         if (event instanceof PreReasoningEvent preReasoningEvent) {
             String skillPrompt = skillBox.getSkillPrompt();
             if (skillPrompt != null && !skillPrompt.isEmpty()) {

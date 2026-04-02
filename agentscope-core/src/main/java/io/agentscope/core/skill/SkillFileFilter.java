@@ -28,7 +28,9 @@ public interface SkillFileFilter {
      * 确定是否应接受资源路径进行上载。
      *
      * @param resourcePath The resource path (relative to the skill root)
+     *                     资源路径（相对于技能根节点）
      * @return true if the resource should be uploaded, false otherwise
+     *              如果资源需要上传，则为 false；否则为 false。
      */
     boolean accept(String resourcePath);
 

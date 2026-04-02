@@ -73,8 +73,10 @@ public class ReadFileTool {
 
     /**
      * Creates a ReadFileTool with a base directory restriction.
+     * 创建一个带有基本目录限制的 ReadFileTool。
      *
      * @param baseDir The base directory to restrict file access to. If null, no restriction is applied.
+     *                要限制文件访问的基本目录。如果为空，则不应用任何限制。
      */
     public ReadFileTool(String baseDir) {
         this.baseDir = baseDir != null ? Paths.get(baseDir).toAbsolutePath().normalize() : null;

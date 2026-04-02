@@ -26,6 +26,7 @@ package io.agentscope.core.skill;
  */
 class RegisteredSkill {
     private final String skillId;
+    // 激活状态
     private boolean active; // whether this skill is being used by llm, if using need activate the
 
     /**
@@ -40,6 +41,7 @@ class RegisteredSkill {
 
     /**
      * Sets the activation state.
+     * 设置激活状态。
      *
      * @param active Whether to activate the skill
      */
@@ -67,6 +69,7 @@ class RegisteredSkill {
 
     /**
      * Gets the tool group name for this skill.
+     * 获取此技能的工具组名称。
      *
      * @return The tool group name
      */
