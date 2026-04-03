@@ -140,16 +140,26 @@ public class ReActAgent extends StructuredOutputCapableAgent {
     private static final Logger log = LoggerFactory.getLogger(ReActAgent.class);
 
     // ==================== Core Dependencies ====================
-
+    // 核心依赖
+    // 记忆
     private final Memory memory;
+    // 系统提示词
     private final String sysPrompt;
+    // 模型
     private final Model model;
+    // 最大迭代次数
     private final int maxIters;
+    // 模型执行配置
     private final ExecutionConfig modelExecutionConfig;
+    // 工具执行配置
     private final ExecutionConfig toolExecutionConfig;
+    // 生成选项
     private final GenerateOptions generateOptions;
+    // 笔记
     private final PlanNotebook planNotebook;
+    // 工具执行上下文
     private final ToolExecutionContext toolExecutionContext;
+    // 状态持久化
     private final StatePersistence statePersistence;
 
     // ==================== Constructor ====================
@@ -182,15 +192,21 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     /**
      * Save agent state to the session using the new API.
+     * 使用一个新API保存智能体状态到会话中
      *
      * <p>This method saves the state of all managed components according to the StatePersistence
      * configuration:
+     * 此方法根据StatePersistence配置保存所有受管组件的状态
      *
      * <ul>
      *   <li>Agent metadata (always saved)
+     *       智能体元数据（总是保存）
      *   <li>Memory messages (if memoryManaged is true)
+     *       内存消息（如果memoryManaged为true）
      *   <li>Toolkit activeGroups (if toolkitManaged is true)
+     *       工具包活动组（如果toolkitManaged为true）
      *   <li>PlanNotebook state (if planNotebookManaged is true)
+     *       笔记状态（如果planNotebookManaged为true）
      * </ul>
      *
      * @param session the session to save state to
@@ -199,17 +215,20 @@ public class ReActAgent extends StructuredOutputCapableAgent {
     @Override
     public void saveTo(Session session, SessionKey sessionKey) {
         // Save agent metadata
+        // 保存智能体元数据
         session.save(
                 sessionKey,
                 "agent_meta",
                 new AgentMetaState(getAgentId(), getName(), getDescription(), sysPrompt));
 
         // Save memory if managed
+        // 如果管理保存到记忆中
         if (statePersistence.memoryManaged()) {
             memory.saveTo(session, sessionKey);
         }
 
         // Save toolkit activeGroups if managed
+        // 如果管理保存到工具包活动组中
         if (statePersistence.toolkitManaged() && toolkit != null) {
             session.save(
                     sessionKey,
@@ -218,6 +237,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
         }
 
         // Save PlanNotebook if managed
+        // 如果管理保存到笔记中
         if (statePersistence.planNotebookManaged() && planNotebook != null) {
             planNotebook.saveTo(session, sessionKey);
         }
@@ -225,9 +245,11 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     /**
      * Load agent state from the session using the new API.
+     * 使用新API从会话中加载智能体状态
      *
      * <p>This method loads the state of all managed components according to the StatePersistence
      * configuration.
+     * 此方法根据 StatePersistence 配置加载所有受管组件的状态。
      *
      * @param session the session to load state from
      * @param sessionKey the session identifier
@@ -235,17 +257,20 @@ public class ReActAgent extends StructuredOutputCapableAgent {
     @Override
     public void loadFrom(Session session, SessionKey sessionKey) {
         // Load memory if managed
+        // 如果管理从记忆中加载
         if (statePersistence.memoryManaged()) {
             memory.loadFrom(session, sessionKey);
         }
 
         // Load toolkit activeGroups if managed
+        // 如果管理从工具包活动组中加载
         if (statePersistence.toolkitManaged() && toolkit != null) {
             session.get(sessionKey, "toolkit_activeGroups", ToolkitState.class)
                     .ifPresent(state -> toolkit.setActiveGroups(state.activeGroups()));
         }
 
         // Load PlanNotebook if managed
+        // 如果管理从笔记中加载
         if (statePersistence.planNotebookManaged() && planNotebook != null) {
             planNotebook.loadFrom(session, sessionKey);
         }
@@ -265,13 +290,16 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         // Has pending tools -> validate and add tool results
         validateAndAddToolResults(msgs, pendingIds);
+        // 有待处理的工具？执行工具 ： 继续迭代执行
         return hasPendingToolUse() ? acting(0) : executeIteration(0);
     }
 
     /**
      * Find the last assistant message in memory.
+     * 寻找记忆中最后一个助手消息。
      *
      * @return The last assistant message, or null if not found
+     *         最后的助手消息，如果没有找到则为null
      */
     private Msg findLastAssistantMsg() {
         List<Msg> memoryMsgs = memory.getMessages();
@@ -286,6 +314,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     /**
      * Check if there are pending tool calls without corresponding results.
+     * 检查是否有未处理的工具调用，没有对应的结果。
      *
      * @return true if there are pending tool calls
      */
@@ -295,6 +324,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     /**
      * Get the set of pending tool use IDs from the last assistant message.
+     * 从最后一个助手消息中获取待处理的工具调用ID集合。
      *
      * @return Set of tool use IDs that have no corresponding results in memory
      */
@@ -318,14 +348,20 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     /**
      * Validate input messages when there are pending tool calls, then add to memory.
+     * 当有待处理的工具调用时，验证输入消息，然后将其添加到内存中。
      *
      * <p>Validation rules:
+     *    验证规则：
      * <ul>
      *   <li>Empty input: no-op (will proceed to acting)</li>
+     *       空输入：无操作（将继续执行）
      *   <li>No tool results: throw error</li>
+     *       没有工具结果：抛出错误
      *   <li>Has tool results: validate IDs match pending, no duplicates</li>
+     *       存在工具结果：验证ID匹配待处理，没有重复
      *   <li>Partial results + text content: throw error (text only allowed when all tools
      *       completed)</li>
+     *       部分结果 + 文本内容：抛出错误（仅在所有工具完成时允许文本））
      * </ul>
      *
      * @param msgs The input messages to validate
@@ -350,6 +386,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
         }
 
         // Check for duplicate IDs
+        // 检查是否有重复的ID
         Set<String> providedIds = new HashSet<>();
         for (ToolResultBlock r : results) {
             if (!providedIds.add(r.getId())) {
@@ -358,6 +395,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
         }
 
         // Check all provided IDs match pending IDs
+        // 检查所有提供的ID是否与待处理的ID匹配
         Set<String> invalidIds =
                 providedIds.stream()
                         .filter(id -> !pendingIds.contains(id))
@@ -368,12 +406,14 @@ public class ReActAgent extends StructuredOutputCapableAgent {
         }
 
         // Check for non-ToolResultBlock content
+        // 检查是否有非ToolResultBlock的内容
         boolean hasTextContent =
                 msgs.stream()
                         .flatMap(m -> m.getContent().stream())
                         .anyMatch(block -> !(block instanceof ToolResultBlock));
 
         // If only partial results provided, text content is not allowed
+        // 仅提供部分结果时，不允许包含文本内容
         boolean isPartialResults = !providedIds.containsAll(pendingIds);
         if (isPartialResults && hasTextContent) {
             throw new IllegalStateException(
@@ -389,6 +429,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     /**
      * Add messages to memory if not null.
+     * 如果不为null，则将消息添加到内存中。
      *
      * @param msgs The messages to add
      */
@@ -399,63 +440,75 @@ public class ReActAgent extends StructuredOutputCapableAgent {
     }
 
     // ==================== Core ReAct Loop ====================
+    // 推理-行动循环核心
 
+    // 没有工具时的执行
     private Mono<Msg> executeIteration(int iter) {
+        // 推理
         return reasoning(iter, false);
     }
 
     /**
      * Execute the reasoning phase.
+     * 执行推理阶段。
+     * 有太多不清楚的地方了
      *
      * <p>This method streams from the model, accumulates chunks, notifies hooks, and
      * decides whether to continue to acting or return early (HITL stop, gotoReasoning, or finished).
+     * 此方法从模型流式传输数据，累积数据块，通知钩子，并决定是继续执行还是提前返回（HITL 停止、gotoReasoning 或完成）。
      *
-     * @param iter Current iteration number
-     * @param ignoreMaxIters If true, skip maxIters check (for gotoReasoning)
-     * @return Mono containing the final result message
+     * @param iter Current iteration number 当前迭代数
+     * @param ignoreMaxIters If true, skip maxIters check (for gotoReasoning) 如果为true，则跳过maxIters检查（用于gotoReasoning）
+     * @return Mono containing the final result message 含最终结果消息的Mono
      */
     private Mono<Msg> reasoning(int iter, boolean ignoreMaxIters) {
         // Check maxIters unless ignoreMaxIters is set
+        // 检查maxIters，除非ignoreMaxIters设置为true
         if (!ignoreMaxIters && iter >= maxIters) {
-            return summarizing();
+            // 到了最大迭代次数，执行
+            return summarizing(); //当达到最大迭代次数时生成总结。
         }
 
+        // TODO 暂时还不知道这里是什么意思  待分析 思考上下文
         ReasoningContext context = new ReasoningContext(getName());
 
-        return checkInterruptedAsync()
-                .then(notifyPreReasoningEvent(prepareMessages()))
+        return checkInterruptedAsync() // 检查是否被中断
+                .then(notifyPreReasoningEvent(prepareMessages())) // 通知预推理事件
                 .flatMapMany(
                         event -> {
                             GenerateOptions options =
                                     event.getEffectiveGenerateOptions() != null
-                                            ? event.getEffectiveGenerateOptions()
-                                            : buildGenerateOptions();
+                                            ? event.getEffectiveGenerateOptions() // 使用事件中的生成选项
+                                            : buildGenerateOptions(); // 使用默认的生成选项
                             return model.stream(
-                                            event.getInputMessages(),
-                                            toolkit.getToolSchemas(),
-                                            options)
+                                            event.getInputMessages(), // 输入消息
+                                            toolkit.getToolSchemas(), // 工具模式
+                                            options) 
                                     .concatMap(chunk -> checkInterruptedAsync().thenReturn(chunk));
                         })
                 .doOnNext(
                         chunk -> {
-                            List<Msg> chunkMsgs = context.processChunk(chunk);
+                            List<Msg> chunkMsgs = context.processChunk(chunk); // 处理数据块
                             // Notify streaming hooks for each chunk message
+                            // 从每一个块消息通知流式钩子
                             for (Msg msg : chunkMsgs) {
+                                // 通知推理块消息
                                 notifyReasoningChunk(msg, context).subscribe();
                             }
                         })
-                .then(Mono.defer(() -> Mono.justOrEmpty(context.buildFinalMessage())))
+                .then(Mono.defer(() -> Mono.justOrEmpty(context.buildFinalMessage()))) // 构建最终消息
                 .onErrorResume(
                         InterruptedException.class,
                         error -> {
                             // Save accumulated message before propagating interrupt
+                            // 在传播中断之前保存累积的消息
                             Msg msg = context.buildFinalMessage();
                             if (msg != null) {
                                 memory.addMessage(msg);
                             }
                             return Mono.error(error);
                         })
-                .flatMap(this::notifyPostReasoning)
+                .flatMap(this::notifyPostReasoning) // 通知后推理事件
                 .flatMap(
                         event -> {
                             Msg msg = event.getReasoningMessage();
@@ -478,37 +531,47 @@ public class ReActAgent extends StructuredOutputCapableAgent {
                                     gotoMsgs.forEach(memory::addMessage);
                                 }
                                 // Continue to next iteration, ignoring maxIters for this entry
+                                // 继续进行下一次迭代，忽略此条目的 maxIters 值
                                 return reasoning(iter + 1, true);
                             }
 
                             // Check finish conditions
+                            // 检查完成条件
                             if (isFinished(msg)) {
                                 return Mono.just(msg);
                             }
 
                             // Continue to acting
+                            // 继续进行执行
                             return checkInterruptedAsync().then(acting(iter));
                         })
                 .switchIfEmpty(
                         Mono.defer(
                                 () -> {
                                     // No message was produced
+                                    // 没有生成任何消息
                                     return Mono.justOrEmpty((Msg) null);
                                 }));
     }
 
     /**
      * Execute the acting phase.
+     * 执行执行阶段
      *
      * <p>This method executes only pending tools (those without results in memory),
      * notifies hooks for successful tool results, and decides whether to continue iteration
      * or return (HITL stop, suspended tools, or structured output).
+     * 此方法仅执行待处理工具（内存中没有结果的工具），通知Hook工具成功的结果，并决定是继续迭代还是返回（HITL停止、暂停工具或结构化输出）。
      *
      * <p>For tools that throw {@link io.agentscope.core.tool.ToolSuspendException}:
+     *    对于抛出{@link io.agentscope.core.tool.ToolSuspendException}的工具：
      * <ul>
      *   <li>The exception is caught by Toolkit and converted to a pending ToolResultBlock</li>
+     *       Toolkit 捕获到异常并将其转换为待处理的 ToolResultBlock
      *   <li>Successful results are stored in memory, pending results are not</li>
+     *       成功的结果存储在内存中，未决的结果则不存储
      *   <li>Returns Msg with {@link GenerateReason#TOOL_SUSPENDED} containing suspended ToolUseBlocks</li>
+     *       返回包含已暂停ToolUseBlocks的{@link GenerateReason#TOOL_SUSPENDED}消息
      * </ul>
      *
      * @param iter Current iteration number
@@ -516,23 +579,28 @@ public class ReActAgent extends StructuredOutputCapableAgent {
      */
     private Mono<Msg> acting(int iter) {
         // Extract only pending tool calls (those without results in memory)
+        // 仅提取待处理的工具调用（即内存中尚未有结果的调用）
         List<ToolUseBlock> pendingToolCalls = extractPendingToolCalls();
 
         if (pendingToolCalls.isEmpty()) {
             // No pending tools have been executed, continue to next iteration
+            // 没有执行任何待处理工具，继续进行下一次迭代
             return executeIteration(iter + 1);
         }
 
         // Forward tool chunks into ActingChunkEvent hooks without overwriting user callbacks.
+        // 将工具块转发到ActingChunkEvent挂钩中，同时不覆盖用户回调。
         toolkit.setInternalChunkCallback(
                 (toolUse, chunk) -> notifyActingChunk(toolUse, chunk).subscribe());
 
         // Execute only pending tools (those without results in memory)
+        // 仅执行待处理的工具（即内存中尚未有结果的调用）
         return notifyPreActingHooks(pendingToolCalls)
-                .flatMap(this::executeToolCalls)
+                .flatMap(this::executeToolCalls) // 执行工具调用并返回配对结果。
                 .flatMap(
                         results -> {
                             // Separate success and pending results
+                            // 分离成功和待处理的结果
                             List<Map.Entry<ToolUseBlock, ToolResultBlock>> successPairs =
                                     results.stream()
                                             .filter(e -> !e.getValue().isSuspended())
@@ -543,16 +611,20 @@ public class ReActAgent extends StructuredOutputCapableAgent {
                                             .toList();
 
                             // If no success results to process
+                            // 如果没有要处理的成功结果
                             if (successPairs.isEmpty()) {
                                 if (!pendingPairs.isEmpty()) {
+                                    // 构建一条包含已暂停工具调用以供用户执行的消息。
                                     return Mono.just(buildSuspendedMsg(pendingPairs));
                                 }
+                                // 执行下一轮迭代
                                 return executeIteration(iter + 1);
                             }
 
                             // Process success results through hooks and add to memory
+                            // 通过挂钩机制获取进程成功结果，并将其添加到内存中
                             return Flux.fromIterable(successPairs)
-                                    .concatMap(this::notifyPostActingHook)
+                                    .concatMap(this::notifyPostActingHook) // 通知PostActingEvent挂钩以获取单个工具结果，构建消息并将其添加到内存中。
                                     .last()
                                     .flatMap(
                                             event -> {
@@ -569,10 +641,12 @@ public class ReActAgent extends StructuredOutputCapableAgent {
                                                 // If there are pending results, build suspended Msg
                                                 if (!pendingPairs.isEmpty()) {
                                                     return Mono.just(
+                                                        // 构建一条包含已暂停工具调用以供用户执行的消息。
                                                             buildSuspendedMsg(pendingPairs));
                                                 }
 
                                                 // Continue next iteration
+                                                // 继续进行下一轮迭代
                                                 return executeIteration(iter + 1);
                                             });
                         });
@@ -580,9 +654,11 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     /**
      * Build a message containing suspended tool calls for user execution.
+     * 构建一条包含已暂停工具调用以供用户执行的消息。
      *
      * <p>The message contains both the ToolUseBlocks and corresponding pending ToolResultBlocks
      * for the suspended tools.
+     * 该消息既包含ToolUseBlocks，也包含已挂起工具对应的待处理ToolResultBlocks。
      *
      * @param pendingPairs List of (ToolUseBlock, pending ToolResultBlock) pairs
      * @return Msg with GenerateReason.TOOL_SUSPENDED
@@ -603,9 +679,12 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     /**
      * Execute tool calls and return paired results.
+     * 执行工具调用并返回配对结果。
      *
      * @param toolCalls The list of tool calls (potentially modified by PreActingEvent hooks)
+     *                  工具调用列表（可能被PreActingEvent挂钩修改）
      * @return Mono containing list of (ToolUseBlock, ToolResultBlock) pairs
+     *         包含(ToolUseBlock, ToolResultBlock)对列表的单例
      */
     private Mono<List<Map.Entry<ToolUseBlock, ToolResultBlock>>> executeToolCalls(
             List<ToolUseBlock> toolCalls) {
@@ -619,30 +698,44 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     /**
      * Notify PostActingEvent hook for a single tool result, build message and add to memory.
+     * 通知PostActingEvent挂钩以获取单个工具结果，构建消息并将其添加到内存中。
      */
     private Mono<PostActingEvent> notifyPostActingHook(
             Map.Entry<ToolUseBlock, ToolResultBlock> entry) {
+        // 获取工具调用
         ToolUseBlock toolUse = entry.getKey();
+        // 获取工具结果
         ToolResultBlock result = entry.getValue();
 
         // Build tool result message first so hooks can access it
+        // 先构建工具结果消息，以便挂钩可以访问它
         Msg toolMsg = ToolResultMessageBuilder.buildToolResultMsg(result, toolUse, getName());
 
         // Create event with toolResultMsg already set
+        // 创建已设置toolResultMsg的事件
         PostActingEvent event = new PostActingEvent(this, toolkit, toolUse, result);
         event.setToolResultMsg(toolMsg);
 
         // Notify hooks and add to memory
+        // 通知挂钩并添加到内存中
         return notifyHooks(event).doOnNext(e -> memory.addMessage(e.getToolResultMsg()));
     }
 
     /**
      * Generate summary when max iterations reached.
+     * 当达到最大迭代次数时生成总结。
      */
     protected Mono<Msg> summarizing() {
         log.debug("Maximum iterations reached. Generating summary...");
 
+        //准备总结的信息
         List<Msg> messageList = prepareSummaryMessages();
+        // 构建生成选项
+        // todo 总结到了一半 明天来了继续总结，
+        // 本部分收获：了解了Reasoning - acting loop 里面执行的具体细节
+        // 1.当有工具调用和无工具调用的处理流程
+        // 2.当达到最大迭代次数时的总结
+        // 3.agent runtime过程中如何与其他模块进行调度和信息传播
         GenerateOptions generateOptions = buildGenerateOptions();
 
         return notifyPreSummaryHook(messageList, generateOptions)

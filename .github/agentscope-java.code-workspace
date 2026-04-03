@@ -4,9 +4,6 @@
 			"path": ".."
 		},
 		{
-			"path": "../../java-sdk"
-		},
-		{
 			"path": "../../langchain4j"
 		}
 	],
