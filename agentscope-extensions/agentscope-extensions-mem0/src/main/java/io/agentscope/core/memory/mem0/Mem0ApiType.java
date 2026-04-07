@@ -30,9 +30,11 @@ package io.agentscope.core.memory.mem0;
  */
 public enum Mem0ApiType {
     /** Platform Mem0 (default) - official cloud service. */
+    /** 平台 Mem0 (默认) - 官方云服务。 */
     PLATFORM,
 
     /** Self-hosted Mem0 - user-deployed service. */
+    /** 自托管 Mem0 - 用户部署的服务。 */
     SELF_HOSTED;
 
     /**

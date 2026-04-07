@@ -26,33 +26,51 @@ import reactor.core.publisher.Mono;
 
 /**
  * Long-term memory implementation using Mem0 as the backend.
+ * 长久记忆实现，使用Mem0作为后端。
  *
  * <p>This implementation integrates with Mem0, a memory layer for AI applications that
  * provides persistent, searchable memory storage using vector embeddings and LLM-powered
  * memory extraction.
+ * 这个实现与Mem0一起使用，一个用于AI应用程序的记忆层，使用向量嵌入和LLM-Powered记忆提取进行持久、可搜索记忆存储。
  *
  * <p><b>Key Features:</b>
+ *       关键特性：
  * <ul>
- *   <li>Semantic memory search using vector embeddings
+ *   <li>Semantic memory search using vector embeddings 
+ *       使用向量嵌入进行语义记忆搜索
  *   <li>LLM-powered memory extraction and inference
+ *       LLM-Powered记忆提取和推理
  *   <li>Multi-tenant memory isolation (agent, user, run)
+ *       多租户记忆隔离（agent，用户，运行）
  *   <li>Custom metadata support for tagging and filtering memories
+ *       自定义元数据支持，用于标记和过滤记忆
  *   <li>Automatic fallback mechanisms to ensure reliable memory storage
+ *       确保可靠记忆存储的自动回退机制
  *   <li>Reactive, non-blocking operations
+ *       反应式，非阻塞操作
  * </ul>
  *
  * <p><b>Memory Isolation:</b>
+ *       记忆隔离：
  * Memories are organized using three levels of metadata:
+ * 记忆存储使用三个级别的元数据：
  * <ul>
  *   <li><b>agentId:</b> Identifies the agent (optional)</li>
+ *          agentId: 标识代理（可选）
  *   <li><b>userId:</b> Identifies the user/workspace (optional)</li>
+ *           userId: 标识用户/工作区（可选）
  *   <li><b>runId:</b> Identifies the session/run (optional)</li>
+ *          runId: 标识会话/运行（可选）
  *   <li><b>metadata:</b> Custom key-value pairs for additional filtering (optional)</li>
+ *          metadata: 自定义键值对，用于附加过滤（可选）
  * </ul>
  * At least one identifier is required. During retrieval, only memories with matching
  * metadata are returned.
+ * 至少需要一个标识符。在检索过程中，只返回具有匹配元数据的内存。
+ * 
  *
  * <p><b>Usage Example:</b>
+ *       使用示例：
  * <pre>{@code
  * // Create memory instance with authentication
  * Mem0LongTermMemory memory = Mem0LongTermMemory.builder()
@@ -127,16 +145,21 @@ public class Mem0LongTermMemory implements LongTermMemory {
      * </ul>
      *
      * <p>Use cases include:
+     *    使用示例：
      * <ul>
      *   <li>Tagging memories with custom labels (e.g., "category": "travel")</li>
+     *       标记记忆使用自定义标签（例如："category": "travel")
      *   <li>Filtering memories by project, tenant, or other business attributes</li>
+     *       过滤记忆 por 项目、租户或其他业务属性
      *   <li>Storing additional context that should be associated with all memories</li>
+     *       存储应与所有记忆关联的附加上下文
      * </ul>
      */
     private final Map<String, Object> metadata;
 
     /**
      * Private constructor - use Builder instead.
+     * 私有构造函数 - 请使用 Builder 代替。
      */
     private Mem0LongTermMemory(Builder builder) {
         Mem0ApiType apiType = builder.apiType != null ? builder.apiType : Mem0ApiType.PLATFORM;
@@ -155,13 +178,17 @@ public class Mem0LongTermMemory implements LongTermMemory {
 
     /**
      * Records messages to long-term memory.
+     * 存储消息到长期记忆。
      *
      * <p>This method converts each message to a Mem0Message object, preserving the
      * conversation structure (role and content). The messages are sent to Mem0 API
      * which uses LLM inference to extract memorable information.
+     * 这个方法将每个消息转换为 Mem0Message 对象，保留对话结构（角色和内容）。
+     * 这个信息会被 LLM 推理提取出来。
      *
      * <p>Null messages and messages with empty text content are filtered out before
      * processing. Empty message lists are handled gracefully without error.
+     * 空消息和文本内容为空的消息在处理前会被过滤掉。空消息列表处理得当，没有错误。
      *
      * @param msgs List of messages to record
      * @return A Mono that completes when recording is finished
@@ -205,6 +232,7 @@ public class Mem0LongTermMemory implements LongTermMemory {
 
     /**
      * Converts a Msg to a Mem0Message.
+     * 转换 Msg 为 Mem0Message。
      *
      * <p>Role mapping:
      * <ul>
@@ -226,6 +254,7 @@ public class Mem0LongTermMemory implements LongTermMemory {
 
     /**
      * Builds a search request with the given query.
+     * 构建搜索请求，并使用给定的查询。
      *
      * <p>The search request includes:
      * <ul>
@@ -255,12 +284,16 @@ public class Mem0LongTermMemory implements LongTermMemory {
 
     /**
      * Retrieves relevant memories based on the input message.
+     * 根据输入消息检索相关内存。
      *
      * <p>Uses semantic search to find memories relevant to the message content.
      * Returns memory text as a newline-separated string, or empty string if no
      * relevant memories are found.
+     * 使用语义搜索来查找与消息内容相关的记忆。
+     * 以换行符分隔的字符串返回内存文本，如果找不到相关内存，则返回空字符串。
      *
      * <p>Only memories with matching metadata (agentId, userId, runId) are returned.
+     *    仅仅返回具有匹配元数据的记忆。
      *
      * @param msg The message to use as a search query
      * @return A Mono emitting the retrieved memory text (may be empty)
@@ -293,6 +326,7 @@ public class Mem0LongTermMemory implements LongTermMemory {
 
     /**
      * Creates a new builder for Mem0LongTermMemory.
+     * 创建 Mem0LongTermMemory 的新构建器。
      *
      * @return A new builder instance
      */
@@ -302,6 +336,7 @@ public class Mem0LongTermMemory implements LongTermMemory {
 
     /**
      * Builder for Mem0LongTermMemory.
+     * Mem0LongTermMemory 的构建器。
      */
     public static class Builder {
         private String agentName;
@@ -315,6 +350,7 @@ public class Mem0LongTermMemory implements LongTermMemory {
 
         /**
          * Sets the agent name identifier.
+         * 设置agent名标识符。
          *
          * @param agentName The agent's name
          * @return This builder
@@ -326,6 +362,7 @@ public class Mem0LongTermMemory implements LongTermMemory {
 
         /**
          * Sets the user id identifier.
+         * 设置用户id标识符。
          *
          * @param userId The user's ID
          * @return This builder

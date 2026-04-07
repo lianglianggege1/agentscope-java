@@ -745,10 +745,10 @@ public class ReActAgent extends StructuredOutputCapableAgent {
                             GenerateOptions effectiveOptions =
                                     preSummaryEvent.getEffectiveGenerateOptions();
 
-                            return streamAndAccumulateSummary(effectiveMessages, effectiveOptions)
+                            return streamAndAccumulateSummary(effectiveMessages, effectiveOptions) // 流和积累摘要
                                     .flatMap(
                                             msg ->
-                                                    notifyPostSummaryHook(msg, effectiveOptions)
+                                                    notifyPostSummaryHook(msg, effectiveOptions)// 摘要之后进行消息通知
                                                             .map(
                                                                     postEvent -> {
                                                                         Msg finalMsg =
@@ -764,6 +764,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
                 .onErrorResume(this::handleSummaryError);
     }
 
+    // 流式积累摘要
     private Mono<Msg> streamAndAccumulateSummary(
             List<Msg> messages, GenerateOptions generateOptions) {
         return model.stream(messages, null, generateOptions)
@@ -778,11 +779,13 @@ public class ReActAgent extends StructuredOutputCapableAgent {
                             }
                             return ctx;
                         })
-                .map(ReasoningContext::buildFinalMessage);
+                .map(ReasoningContext::buildFinalMessage); // 构建最终消息
     }
 
+    // 准备总结的信息
     private List<Msg> prepareSummaryMessages() {
-        List<Msg> messageList = prepareMessages();
+        // 准备信息
+        List<Msg> messageList = prepareMessages(); 
         messageList.add(
                 Msg.builder()
                         .name("user")
@@ -798,6 +801,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
         return messageList;
     }
 
+    // 错误处理
     private Mono<Msg> handleSummaryError(Throwable error) {
         if (error instanceof InterruptedException) {
             return Mono.error(error);
@@ -824,6 +828,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     /**
      * Prepare messages for model input.
+     * 为模型输入准备信息
      */
     private List<Msg> prepareMessages() {
         List<Msg> messages = new ArrayList<>();
@@ -841,11 +846,13 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     /**
      * Check if the ReAct loop should terminate.
+     * 检查ReAct循环是否应终止。
      *
      * <p>Note: Structured output retry is now handled by StructuredOutputHook via gotoReasoning().
+     *    注意：结构化输出重试现在由StructuredOutputHook通过gotoReasoning（）处理。
      *
-     * @param msg The reasoning message
-     * @return true if should finish, false if should continue to acting
+     * @param msg The reasoning message  推理信息
+     * @return true if should finish, false if should continue to acting 如果应该完成，则为true，如果应该继续执行，则为false
      */
     private boolean isFinished(Msg msg) {
         if (msg == null) {
@@ -854,14 +861,16 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         List<ToolUseBlock> toolCalls = msg.getContentBlocks(ToolUseBlock.class);
 
-        // No tool calls - finished
+        // No tool calls - finished 没有函数调用则结束
         // If there are tool calls (even non-existent ones), continue to acting phase
         // where ToolExecutor will return "Tool not found" error for the model to see
+        // 如果有工具调用（甚至不存在），继续执行阶段，ToolExecutor将返回“未找到工具”错误，供模型查看
         return toolCalls.isEmpty();
     }
 
     /**
      * Extract tool calls from the most recent assistant message.
+     * 从最近的助手消息中提取工具调用。
      */
     private List<ToolUseBlock> extractRecentToolCalls() {
         return MessageUtils.extractRecentToolCalls(memory.getMessages(), getName());
@@ -870,12 +879,15 @@ public class ReActAgent extends StructuredOutputCapableAgent {
     /**
      * Extract only pending tool calls (those without results in memory) from the most recent
      * assistant message.
+     * 从最近的助手消息中仅提取挂起的工具调用（内存中没有结果的调用）。
      *
      * <p>This method filters out tool calls that already have corresponding results in memory,
      * preventing duplicate execution when resuming from HITL or partial tool result scenarios.
+     * 此方法过滤掉内存中已经有相应结果的工具调用，防止从HITL或部分工具结果场景恢复时重复执行。
      *
      * @return List of tool use blocks that don't have results yet, or empty list if all tools
      *     have been executed
+     *        尚未有结果的工具使用块列表，或者如果所有工具都已执行，则为空列表
      */
     private List<ToolUseBlock> extractPendingToolCalls() {
         List<ToolUseBlock> allToolCalls = extractRecentToolCalls();
@@ -1075,8 +1087,10 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     /**
      * Gets the configured generation options for this agent.
+     * 获取此代理的配置生成选项。
      *
      * @return The generation options, or null if not configured
+     *         生成选项，如果未配置，则为null
      */
     public GenerateOptions getGenerateOptions() {
         return generateOptions;

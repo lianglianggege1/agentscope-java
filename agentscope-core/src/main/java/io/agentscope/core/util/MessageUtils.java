@@ -35,9 +35,11 @@ public final class MessageUtils {
 
     /**
      * Extract tool calls from the most recent assistant message in the message list.
+     * 从消息列表中的最新助手消息中提取工具调用。
      *
      * <p>This method scans the message list from the end to find the most recent assistant message
      * matching the specified agent name, then extracts any tool use blocks from that message.
+     * 此方法从末尾扫描消息列表，查找与指定代理名称匹配的最新助手消息，然后从该消息中提取任何工具使用块。
      *
      * @param messages The list of messages to search
      * @param agentName The name of the agent to match (must match the message sender's name)

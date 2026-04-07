@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"path": "../../../../../../../../../../.."
+		},
+		{
+			"path": "../../../../../../../../../../../../java-sdk"
+		}
+	],
+	"settings": {
+		"java.compile.nullAnalysis.mode": "automatic",
+		"claudeCode.useTerminal": true,
+		"java.configuration.updateBuildConfiguration": "disabled"
+	}
+}

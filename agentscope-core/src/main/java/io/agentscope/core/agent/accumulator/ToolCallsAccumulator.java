@@ -26,26 +26,34 @@ import java.util.stream.Collectors;
 
 /**
  * Tool calls accumulator for accumulating streaming tool call chunks.
+ * 用于累积流工具调用块的工具调用累加器。
  *
  * <p>This accumulator supports multiple parallel tool calls and handles:
+ *    此累加器支持多个并行工具调用和句柄：
  *
  * <ul>
  *   <li>Tool name and ID accumulation
+ *       工具名称和ID累积
  *   <li>Incremental parameter merging
+ *       增量参数合并
  *   <li>Raw JSON content accumulation and parsing
+ *       累积原始JSON内容并解析
  *   <li>Placeholder name handling (e.g., "__fragment__")
+ *       名称处理（例如，"__fragment__"）
  * </ul>
  * @hidden
  */
 public class ToolCallsAccumulator implements ContentAccumulator<ToolUseBlock> {
 
-    // Map to support multiple parallel tool calls
-    // Key: tool identifier (ID, name, or index)
+    // Map to support multiple parallel tool calls 映射以支持多个并行工具调用
+    // Key: tool identifier (ID, name, or index)   关键字：工具标识符（ID、名称或索引）
     private final Map<String, ToolCallBuilder> builders = new LinkedHashMap<>();
     private int nextIndex = 0;
 
     // Track the last tool call key for streaming chunks without ID
+    // 跟踪没有ID的流式数据块的最后一个工具调用键
     // This is needed when models return fragments with placeholder names and empty IDs
+    // 当模型返回带有占位符名称和空ID的片段时，需要这样做
     private String lastToolCallKey = null;
 
     /** Builder for a single tool call. */
@@ -67,17 +75,19 @@ public class ToolCallsAccumulator implements ContentAccumulator<ToolUseBlock> {
                 this.name = block.getName();
             }
 
-            // Merge parameters
+            // Merge parameters  合并参数
             if (block.getInput() != null) {
                 this.args.putAll(block.getInput());
             }
 
             // Accumulate raw content (for parsing complete JSON)
+            // 累积原始内容（用于解析完整的JSON）
             if (block.getContent() != null) {
                 this.rawContent.append(block.getContent());
             }
 
             // Merge metadata (e.g., thoughtSignature for Gemini 3 Pro)
+            // 合并元数据（例如，Gemini 3 Pro的thoughtSignature）
             if (block.getMetadata() != null && !block.getMetadata().isEmpty()) {
                 this.metadata.putAll(block.getMetadata());
             }
@@ -143,6 +153,7 @@ public class ToolCallsAccumulator implements ContentAccumulator<ToolUseBlock> {
 
     /**
      * Determine the key for a tool call (to distinguish multiple parallel calls).
+     * 确定工具调用的键（以区分多个并行调用）。
      *
      * <p>Priority:
      *
