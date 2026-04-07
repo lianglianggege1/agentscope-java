@@ -738,7 +738,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
         // 3.agent runtime过程中如何与其他模块进行调度和信息传播
         GenerateOptions generateOptions = buildGenerateOptions();
 
-        return notifyPreSummaryHook(messageList, generateOptions)
+        return notifyPreSummaryHook(messageList, generateOptions) // 摘要之前进行汇总
                 .flatMap(
                         preSummaryEvent -> {
                             List<Msg> effectiveMessages = preSummaryEvent.getInputMessages();
