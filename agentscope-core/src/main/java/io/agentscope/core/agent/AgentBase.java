@@ -23,6 +23,8 @@ import io.agentscope.core.hook.PreCallEvent;
 import io.agentscope.core.interruption.InterruptContext;
 import io.agentscope.core.interruption.InterruptSource;
 import io.agentscope.core.message.Msg;
+import io.agentscope.core.shutdown.GracefulShutdownHook;
+import io.agentscope.core.shutdown.GracefulShutdownManager;
 import io.agentscope.core.state.StateModule;
 import io.agentscope.core.tracing.TracerRegistry;
 import java.util.ArrayList;
@@ -113,7 +115,9 @@ public abstract class AgentBase implements StateModule, Agent {
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final boolean checkRunning;
     private final List<Hook> hooks;
-    private static final List<Hook> systemHooks = new CopyOnWriteArrayList<>();
+    private static final List<Hook> systemHooks =
+            new CopyOnWriteArrayList<>(
+                    List.of(new GracefulShutdownHook(GracefulShutdownManager.getInstance())));
     private final Map<String, List<AgentBase>> hubSubscribers = new ConcurrentHashMap<>();
 
     // Interrupt state management (available to all agents)
@@ -121,6 +125,8 @@ public abstract class AgentBase implements StateModule, Agent {
     private final AtomicReference<Msg> userInterruptMessage = new AtomicReference<>(null);
     // Hook non-null
     private static final Comparator<Hook> HOOK_COMPARATOR = Comparator.comparingInt(Hook::priority);
+    private final AtomicReference<InterruptSource> interruptSource =
+            new AtomicReference<>(InterruptSource.USER);
 
     /**
      * Constructor for AgentBase.
@@ -189,9 +195,7 @@ public abstract class AgentBase implements StateModule, Agent {
     @Override
     public final Mono<Msg> call(List<Msg> msgs) {
         return Mono.using(
-                // 判断是否可以继续执行
                 () -> {
-                    // running.compareAndSet 原子级别的锁竞争，保证同一时间只有一个线程能成功将running从false设置为true
                     if (checkRunning && !running.compareAndSet(false, true)) {
                         throw new IllegalStateException(
                                 "Agent is still running, please wait for it to finish");
@@ -216,7 +220,6 @@ public abstract class AgentBase implements StateModule, Agent {
                                                         .onErrorResume(
                                                                 createErrorHandler(
                                                                         msgs.toArray(new Msg[0])))),
-                //执行完毕后重置状态为false                                                        
                 resource -> running.set(false),
                 true);
     }
@@ -238,8 +241,6 @@ public abstract class AgentBase implements StateModule, Agent {
     @Override
     public final Mono<Msg> call(List<Msg> msgs, Class<?> structuredOutputClass) {
         return Mono.using(
-                // 判断是否可以继续执行
-                // 返回 Agent 实例本身，传递给下一个 lambda 使用
                 () -> {
                     if (checkRunning && !running.compareAndSet(false, true)) {
                         throw new IllegalStateException(
@@ -267,7 +268,6 @@ public abstract class AgentBase implements StateModule, Agent {
                                                         .onErrorResume(
                                                                 createErrorHandler(
                                                                         msgs.toArray(new Msg[0])))),
-                // 释放锁，允许下次调用
                 resource -> running.set(false),
                 true);
     }
@@ -289,14 +289,7 @@ public abstract class AgentBase implements StateModule, Agent {
     @Override
     public final Mono<Msg> call(List<Msg> msgs, JsonNode schema) {
         return Mono.using(
-                () -> {
-                    if (checkRunning && !running.compareAndSet(false, true)) {
-                        throw new IllegalStateException(
-                                "Agent is still running, please wait for it to finish");
-                    }
-                    resetInterruptFlag();
-                    return this;
-                },
+                this::acquireExecution,
                 resource ->
                         TracerRegistry.get()
                                 .callAgent(
@@ -309,7 +302,7 @@ public abstract class AgentBase implements StateModule, Agent {
                                                         .onErrorResume(
                                                                 createErrorHandler(
                                                                         msgs.toArray(new Msg[0])))),
-                resource -> running.set(false),
+                this::releaseExecution,
                 true);
     }
 
@@ -375,6 +368,7 @@ public abstract class AgentBase implements StateModule, Agent {
      */
     @Override
     public void interrupt() {
+        interruptSource.set(InterruptSource.USER);
         interruptFlag.set(true);
     }
 
@@ -389,10 +383,21 @@ public abstract class AgentBase implements StateModule, Agent {
      */
     @Override
     public void interrupt(Msg msg) {
+        interruptSource.set(InterruptSource.USER);
         interruptFlag.set(true);
         if (msg != null) {
             userInterruptMessage.set(msg);
         }
+    }
+
+    /**
+     * Interrupt execution with explicit source.
+     *
+     * @param source interruption source
+     */
+    public void interrupt(InterruptSource source) {
+        interruptSource.set(source != null ? source : InterruptSource.SYSTEM);
+        interruptFlag.set(true);
     }
 
     /**
@@ -446,6 +451,7 @@ public abstract class AgentBase implements StateModule, Agent {
     protected void resetInterruptFlag() {
         interruptFlag.set(false);
         userInterruptMessage.set(null);
+        interruptSource.set(InterruptSource.USER);
     }
 
     /**
@@ -458,9 +464,45 @@ public abstract class AgentBase implements StateModule, Agent {
      */
     private InterruptContext createInterruptContext() {
         return InterruptContext.builder()
-                .source(InterruptSource.USER)
+                .source(interruptSource.get())
                 .userMessage(userInterruptMessage.get())
                 .build();
+    }
+
+    /**
+     * Acquire execution resources for a {@code call()} invocation.
+     * Used as the {@code resourceSupplier} in {@link Mono#using} to guarantee that
+     * {@link #releaseExecution} is always called on completion, error, or cancellation.
+     *
+     * @return this agent instance
+     */
+    private AgentBase acquireExecution() {
+        if (checkRunning && !running.compareAndSet(false, true)) {
+            throw new IllegalStateException("Agent is still running, please wait for it to finish");
+        }
+        try {
+            resetInterruptFlag();
+            GracefulShutdownManager.getInstance().ensureAcceptingRequests();
+            GracefulShutdownManager.getInstance().registerRequest(this);
+        } catch (RuntimeException ex) {
+            if (checkRunning) {
+                running.set(false);
+            }
+            throw ex;
+        }
+        return this;
+    }
+
+    /**
+     * Release execution resources after a {@code call()} invocation.
+     * Used as the {@code resourceCleanup} in {@link Mono#using} — guaranteed to run
+     * regardless of how the reactive chain terminates (success, error, or cancel).
+     *
+     * @param resource the agent instance (ignored, uses {@code this})
+     */
+    private void releaseExecution(AgentBase resource) {
+        running.set(false);
+        GracefulShutdownManager.getInstance().unregisterRequest(this);
     }
 
     /**
@@ -494,6 +536,15 @@ public abstract class AgentBase implements StateModule, Agent {
      */
     protected AtomicBoolean getInterruptFlag() {
         return interruptFlag;
+    }
+
+    /**
+     * Get current interruption source.
+     *
+     * @return interruption source
+     */
+    protected InterruptSource getInterruptSource() {
+        return interruptSource.get();
     }
 
     /**

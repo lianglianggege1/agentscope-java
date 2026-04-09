@@ -20,6 +20,7 @@ import io.agentscope.core.agent.accumulator.ReasoningContext;
 import io.agentscope.core.hook.ActingChunkEvent;
 import io.agentscope.core.hook.Hook;
 import io.agentscope.core.hook.HookEvent;
+import io.agentscope.core.hook.PendingToolRecoveryHook;
 import io.agentscope.core.hook.PostActingEvent;
 import io.agentscope.core.hook.PostReasoningEvent;
 import io.agentscope.core.hook.PostSummaryEvent;
@@ -29,6 +30,7 @@ import io.agentscope.core.hook.PreSummaryEvent;
 import io.agentscope.core.hook.ReasoningChunkEvent;
 import io.agentscope.core.hook.SummaryChunkEvent;
 import io.agentscope.core.interruption.InterruptContext;
+import io.agentscope.core.interruption.InterruptSource;
 import io.agentscope.core.memory.InMemoryMemory;
 import io.agentscope.core.memory.LongTermMemory;
 import io.agentscope.core.memory.LongTermMemoryMode;
@@ -37,6 +39,7 @@ import io.agentscope.core.memory.Memory;
 import io.agentscope.core.memory.StaticLongTermMemoryHook;
 import io.agentscope.core.message.ContentBlock;
 import io.agentscope.core.message.GenerateReason;
+import io.agentscope.core.message.MessageMetadataKeys;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.TextBlock;
@@ -55,6 +58,9 @@ import io.agentscope.core.rag.RAGMode;
 import io.agentscope.core.rag.model.Document;
 import io.agentscope.core.rag.model.RetrieveConfig;
 import io.agentscope.core.session.Session;
+import io.agentscope.core.shutdown.AgentShuttingDownException;
+import io.agentscope.core.shutdown.GracefulShutdownManager;
+import io.agentscope.core.shutdown.PartialReasoningPolicy;
 import io.agentscope.core.skill.SkillBox;
 import io.agentscope.core.skill.SkillHook;
 import io.agentscope.core.state.AgentMetaState;
@@ -64,6 +70,7 @@ import io.agentscope.core.state.ToolkitState;
 import io.agentscope.core.tool.ToolExecutionContext;
 import io.agentscope.core.tool.ToolResultMessageBuilder;
 import io.agentscope.core.tool.Toolkit;
+import io.agentscope.core.util.ExceptionUtils;
 import io.agentscope.core.util.MessageUtils;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -138,6 +145,8 @@ import reactor.core.publisher.Mono;
 public class ReActAgent extends StructuredOutputCapableAgent {
 
     private static final Logger log = LoggerFactory.getLogger(ReActAgent.class);
+    private static final GracefulShutdownManager shutdownManager =
+            GracefulShutdownManager.getInstance();
 
     // ==================== Core Dependencies ====================
     // 核心依赖
@@ -255,7 +264,14 @@ public class ReActAgent extends StructuredOutputCapableAgent {
      * @param sessionKey the session identifier
      */
     @Override
+    public boolean loadIfExists(Session session, SessionKey sessionKey) {
+        shutdownManager.bindSession(this, session, sessionKey);
+        return super.loadIfExists(session, sessionKey);
+    }
+
+    @Override
     public void loadFrom(Session session, SessionKey sessionKey) {
+        shutdownManager.bindSession(this, session, sessionKey);
         // Load memory if managed
         // 如果管理从记忆中加载
         if (statePersistence.memoryManaged()) {
@@ -290,7 +306,6 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         // Has pending tools -> validate and add tool results
         validateAndAddToolResults(msgs, pendingIds);
-        // 有待处理的工具？执行工具 ： 继续迭代执行
         return hasPendingToolUse() ? acting(0) : executeIteration(0);
     }
 
@@ -501,10 +516,19 @@ public class ReActAgent extends StructuredOutputCapableAgent {
                         InterruptedException.class,
                         error -> {
                             // Save accumulated message before propagating interrupt
-                            // 在传播中断之前保存累积的消息
                             Msg msg = context.buildFinalMessage();
                             if (msg != null) {
-                                memory.addMessage(msg);
+                                boolean discard =
+                                        getInterruptSource() == InterruptSource.SYSTEM
+                                                && shutdownManager
+                                                                .getConfig()
+                                                                .partialReasoningPolicy()
+                                                        == PartialReasoningPolicy.DISCARD;
+                                // Manually interruption will save the msg, while system
+                                // interruption will discard on specific config
+                                if (!discard) {
+                                    memory.addMessage(msg);
+                                }
                             }
                             return Mono.error(error);
                         })
@@ -679,7 +703,6 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     /**
      * Execute tool calls and return paired results.
-     * 执行工具调用并返回配对结果。
      *
      * @param toolCalls The list of tool calls (potentially modified by PreActingEvent hooks)
      *                  工具调用列表（可能被PreActingEvent挂钩修改）
@@ -693,7 +716,37 @@ public class ReActAgent extends StructuredOutputCapableAgent {
                         results ->
                                 IntStream.range(0, toolCalls.size())
                                         .mapToObj(i -> Map.entry(toolCalls.get(i), results.get(i)))
-                                        .toList());
+                                        .toList())
+                .onErrorResume(
+                        Exception.class,
+                        error -> {
+                            // Preserve interruption signal for agent stop policy
+                            if (error instanceof InterruptedException) {
+                                return Mono.error(error);
+                            }
+                            // Generate error tool results for all pending tool calls.
+                            // Only catch Exception subclasses; critical JVM errors
+                            // (e.g. OutOfMemoryError) are left to propagate.
+                            String errorMsg = ExceptionUtils.getErrorMessage(error);
+                            log.error(
+                                    "Tool execution failed, generating error results for {} tool"
+                                            + " calls",
+                                    toolCalls.size(),
+                                    error);
+                            List<Map.Entry<ToolUseBlock, ToolResultBlock>> errorResults =
+                                    toolCalls.stream()
+                                            .map(
+                                                    toolCall -> {
+                                                        ToolResultBlock errorResult =
+                                                                buildErrorToolResult(
+                                                                        toolCall.getId(),
+                                                                        "Tool execution failed: "
+                                                                                + errorMsg);
+                                                        return Map.entry(toolCall, errorResult);
+                                                    })
+                                            .toList();
+                            return Mono.just(errorResults);
+                        });
     }
 
     /**
@@ -982,6 +1035,11 @@ public class ReActAgent extends StructuredOutputCapableAgent {
                             .role(chunkMsg.getRole())
                             .content(accumulatedContent)
                             .build();
+            if (context.getChatUsage() != null) {
+                accumulated
+                        .getMetadata()
+                        .put(MessageMetadataKeys.CHAT_USAGE, context.getChatUsage());
+            }
             ReasoningChunkEvent event =
                     new ReasoningChunkEvent(
                             this, model.getModelName(), null, chunkMsg, accumulated);
@@ -1024,6 +1082,11 @@ public class ReActAgent extends StructuredOutputCapableAgent {
                             .role(chunkMsg.getRole())
                             .content(accumulatedContent)
                             .build();
+            if (context.getChatUsage() != null) {
+                accumulated
+                        .getMetadata()
+                        .put(MessageMetadataKeys.CHAT_USAGE, context.getChatUsage());
+            }
             SummaryChunkEvent event =
                     new SummaryChunkEvent(
                             this, model.getModelName(), generateOptions, chunkMsg, accumulated);
@@ -1035,6 +1098,11 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     @Override
     protected Mono<Msg> handleInterrupt(InterruptContext context, Msg... originalArgs) {
+        if (context.getSource() == InterruptSource.SYSTEM) {
+            shutdownManager.saveOnInterruptObserved(this);
+            return Mono.error(new AgentShuttingDownException());
+        }
+
         String recoveryText = "I noticed that you have interrupted me. What can I do for you?";
 
         Msg recoveryMsg =
@@ -1121,6 +1189,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
         private PlanNotebook planNotebook;
         private SkillBox skillBox;
         private ToolExecutionContext toolExecutionContext;
+        private boolean enablePendingToolRecovery = false;
 
         // Long-term memory configuration
         private LongTermMemory longTermMemory;
@@ -1257,6 +1326,26 @@ public class ReActAgent extends StructuredOutputCapableAgent {
          */
         public Builder enableMetaTool(boolean enableMetaTool) {
             this.enableMetaTool = enableMetaTool;
+            return this;
+        }
+
+        /**
+         * Enables or disables automatic recovery from orphaned pending tool calls.
+         *
+         * <p>When enabled , a {@link PendingToolRecoveryHook} is automatically
+         * registered to detect and patch orphaned pending tool calls with synthetic error
+         * results before agent processing begins. This prevents {@link IllegalStateException}
+         * when tool execution fails, times out, or is interrupted.
+         *
+         * <p>Disable this if you prefer to handle pending tool calls manually, for example
+         * through HITL (Human-in-the-loop) mechanisms or custom error handling strategies.
+         *
+         * @param enable true to enable auto-recovery, false to disable
+         * @return This builder instance for method chaining
+         * @see PendingToolRecoveryHook
+         */
+        public Builder enablePendingToolRecovery(boolean enable) {
+            this.enablePendingToolRecovery = enable;
             return this;
         }
 
@@ -1562,6 +1651,11 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
             if (enableMetaTool) {
                 agentToolkit.registerMetaTool();
+            }
+
+            // Register PendingToolRecoveryHook if enabled
+            if (enablePendingToolRecovery) {
+                hooks.add(new PendingToolRecoveryHook());
             }
 
             // Configure long-term memory if provided

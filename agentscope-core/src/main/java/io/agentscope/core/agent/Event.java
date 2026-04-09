@@ -135,6 +135,7 @@ public class Event {
      *
      * @return true if this is the last chunk, false if more chunks will follow
      */
+    @JsonProperty("isLast")
     public boolean isLast() {
         return isLast;
     }
