@@ -304,9 +304,45 @@ public class ReActAgent extends StructuredOutputCapableAgent {
             return executeIteration(0);
         }
 
-        // Has pending tools -> validate and add tool results
-        validateAndAddToolResults(msgs, pendingIds);
-        return hasPendingToolUse() ? acting(0) : executeIteration(0);
+        // Has pending tools but no input -> resume (execute pending tools directly)
+        if (msgs == null || msgs.isEmpty()) {
+            return hasPendingToolUse() ? acting(0) : executeIteration(0);
+        }
+
+        // Has pending tools + input -> check if user provided tool results
+        List<ToolResultBlock> providedResults =
+                msgs.stream()
+                        .flatMap(m -> m.getContentBlocks(ToolResultBlock.class).stream())
+                        .toList();
+
+        if (!providedResults.isEmpty()) {
+            // User provided tool results -> validate and add
+            validateAndAddToolResults(msgs, pendingIds);
+            return hasPendingToolUse() ? acting(0) : executeIteration(0);
+        }
+
+        // If PendingToolRecoveryHook is enabled, pending state should have been
+        // patched during PreCallEvent. If we still reach here, the hook was disabled
+        // and the user did not provide tool results — this is an unrecoverable state.
+        throw new IllegalStateException(
+                "Pending tool calls exist without results. "
+                        + "Enable PendingToolRecoveryHook or provide tool results. "
+                        + "Pending IDs: "
+                        + pendingIds);
+    }
+
+    /**
+     * Build a {@link ToolResultBlock} representing a tool execution error.
+     *
+     * @param toolId the id of the tool call that failed
+     * @param errorMessage the human-readable error description
+     * @return a {@link ToolResultBlock} containing the formatted error message
+     */
+    private static ToolResultBlock buildErrorToolResult(String toolId, String errorMessage) {
+        return ToolResultBlock.builder()
+                .id(toolId)
+                .output(List.of(TextBlock.builder().text("[ERROR] " + errorMessage).build()))
+                .build();
     }
 
     /**
@@ -704,6 +740,10 @@ public class ReActAgent extends StructuredOutputCapableAgent {
     /**
      * Execute tool calls and return paired results.
      *
+     * <p>If tool execution fails (timeout, error, etc.), this method generates error tool results
+     * for all pending tool calls instead of propagating the error. This ensures the agent can
+     * continue processing and the model receives proper error feedback.
+     *
      * @param toolCalls The list of tool calls (potentially modified by PreActingEvent hooks)
      *                  工具调用列表（可能被PreActingEvent挂钩修改）
      * @return Mono containing list of (ToolUseBlock, ToolResultBlock) pairs
@@ -847,8 +887,8 @@ public class ReActAgent extends StructuredOutputCapableAgent {
                                 TextBlock.builder()
                                         .text(
                                                 "You have failed to generate response within the"
-                                                    + " maximum iterations. Now respond directly by"
-                                                    + " summarizing the current situation.")
+                                                        + " maximum iterations. Now respond directly by"
+                                                        + " summarizing the current situation.")
                                         .build())
                         .build());
         return messageList;
