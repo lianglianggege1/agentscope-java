@@ -20,18 +20,23 @@ package io.agentscope.core.plan.model;
  * 计划的状态
  *
  * <p>Represents the overall status of a plan during its lifecycle.
+ *    表示计划全生命周期的状态。
  */
 public enum PlanState {
     /** Plan is created but not yet started. */
+    /** 计划已创建但尚未开始 */
     TODO("todo"),
 
     /** Plan execution is in progress. */
+    /** 计划执行正在进行中 */
     IN_PROGRESS("in_progress"),
 
     /** Plan has been completed successfully. */
+    /** 计划已成功完成 */
     DONE("done"),
 
     /** Plan has been abandoned and will not be executed. */
+    /** 计划已被放弃，将不会被执行 */
     ABANDONED("abandoned");
 
     private final String value;

@@ -74,10 +74,10 @@ public class Plan {
      * Create a new plan.
      * 创造一个计划
      *
-     * @param name The plan name (should be concise, not exceed 10 words) 
-     * @param description The plan description including constraints and targets
-     * @param expectedOutcome The expected outcome, specific and measurable
-     * @param subtasks The list of subtasks that make up the plan
+     * @param name The plan name (should be concise, not exceed 10 words)   计划名称（应该简洁，不超过10个字）
+     * @param description The plan description including constraints and targets 计划描述包含约束和目标
+     * @param expectedOutcome The expected outcome, specific and measurable 期望输出需要是具体且可测量的
+     * @param subtasks The list of subtasks that make up the plan   计划子任务列表
      */
     public Plan(String name, String description, String expectedOutcome, List<SubTask> subtasks) {
         this();
@@ -89,9 +89,12 @@ public class Plan {
 
     /**
      * Mark the plan as finished.
+     * 标记计划为完成
      *
-     * @param state The final state (DONE or ABANDONED)
+     * @param state The final state (DONE or ABANDONED) 
+     *              最终的状态（完成或放弃）
      * @param outcome The actual outcome or reason for abandoning
+     *                放弃的实际结果或原因
      */
     public void finish(PlanState state, String outcome) {
         this.state = state;
@@ -101,9 +104,12 @@ public class Plan {
 
     /**
      * Convert to markdown representation.
+     * 转换为Markdown表示
      *
      * @param detailed Whether to include detailed information for subtasks
+     *                 是否包括子任务的详细信息
      * @return Markdown string representation
+     *         Markdown字符串表示
      */
     public String toMarkdown(boolean detailed) {
         StringBuilder sb = new StringBuilder();

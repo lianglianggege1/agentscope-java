@@ -20,18 +20,23 @@ package io.agentscope.core.plan.model;
  * 在一个计划里面的子任务状态
  *
  * <p>Represents the current status of a subtask during plan execution.
+ *    表示计划执行期间子任务的当前状态。
  */
 public enum SubTaskState {
     /** Subtask is planned but not yet started. */
+    /** 子任务已计划，但尚未开始。 */
     TODO("todo"),
 
     /** Subtask is currently being executed. */
+    /** 子任务当前正在执行中。 */
     IN_PROGRESS("in_progress"),
 
     /** Subtask has been completed successfully. */
+    /** 子任务已成功完成。 */
     DONE("done"),
 
     /** Subtask has been abandoned and will not be executed. */
+    /** 子任务已被放弃，将不会执行。 */
     ABANDONED("abandoned");
 
     private final String value;

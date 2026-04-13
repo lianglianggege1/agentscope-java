@@ -71,9 +71,12 @@ public class SubTask {
      *
      * @param name            The subtask name (should be concise, not exceed 10
      *                        words)
+     *                        子任务的名称（应该短，不超过10个单词）
      * @param description     The detailed description including constraints and
      *                        targets
+     *                        包括约束和目标在内的详细描述
      * @param expectedOutcome The expected outcome, specific and measurable
+     *                        具体和可衡量的预期成果
      */
     public SubTask(String name, String description, String expectedOutcome) {
         this();
@@ -84,8 +87,10 @@ public class SubTask {
 
     /**
      * Mark the subtask as finished with the actual outcome.
+     * 使用实际结果将子任务标记为已完成。
      *
      * @param outcome The actual outcome achieved
+     *                实际取得的成果
      */
     public void finish(String outcome) {
         finish(SubTaskState.DONE, outcome);
@@ -93,9 +98,12 @@ public class SubTask {
 
     /**
      * Mark the subtask as finished with a specific state and outcome.
+     * 使用特定状态和结果将子任务标记为已完成。
      *
      * @param state   The final state (e.g., DONE or ABANDONED)
+     *                这个最终的状态（例如： DONE 或 ABANDONED）
      * @param outcome The actual outcome or reason for abandoning
+     *                 放弃的实际结果或原因
      * @throws IllegalArgumentException if the state is not a terminal state (DONE
      *                                  or ABANDONED)
      */
@@ -111,6 +119,7 @@ public class SubTask {
 
     /**
      * Convert to one-line markdown representation.
+     * 转换为单行Markdown表示。
      *
      * @return One-line markdown string
      */
@@ -129,9 +138,12 @@ public class SubTask {
 
     /**
      * Convert to markdown representation.
+     * 转换为Markdown表示。
      *
      * @param detailed Whether to include detailed information
+     *                 是否包含详细信息
      * @return Markdown string representation
+     *         Markdown字符串表示
      */
     public String toMarkdown(boolean detailed) {
         if (!detailed) {

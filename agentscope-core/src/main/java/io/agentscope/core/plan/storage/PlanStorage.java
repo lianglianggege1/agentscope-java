@@ -24,6 +24,7 @@ import reactor.core.publisher.Mono;
  * 为保存和检查存储计划
  *
  * <p>Implementations can store plans in memory, database, or any other persistent storage.
+ *    实现可以将计划存储在内存、数据库或任何其他持久存储中。
  */
 public interface PlanStorage {
 

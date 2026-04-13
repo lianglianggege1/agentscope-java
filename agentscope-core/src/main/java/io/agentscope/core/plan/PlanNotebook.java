@@ -97,15 +97,23 @@ import reactor.core.publisher.Mono;
  * <p><b>Tool Functions:</b> PlanNotebook provides 10 tool functions:
  *
  * <ul>
- *   <li>{@link #createPlan} - Create a new plan
+ *   <li>{@link #createPlan} - Create a new plan 创建一个新计划
  *   <li>{@link #updatePlanInfo} - Update current plan's name, description, or expected outcome
+ *                                 更新当前计划的名字，描述，或者期望的期望结果
  *   <li>{@link #reviseCurrentPlan} - Add, revise, or delete subtasks
+ *                                    添加、修改或删除子任务
  *   <li>{@link #updateSubtaskState} - Update subtask state
+ *                                     更新子任务状态
  *   <li>{@link #finishSubtask} - Mark subtask as done
+ *                                标记子任务已完成
  *   <li>{@link #viewSubtasks} - View subtask details
+ *                               看子任务详情
  *   <li>{@link #getSubtaskCount} - Get the number of subtasks in current plan
+ *                                  获取当前计划中的子任务数
  *   <li>{@link #finishPlan} - Finish or abandon plan
+ *                             结束或放弃计划
  *   <li>{@link #viewHistoricalPlans} - View historical plans
+ *                                      看历史计划
  *   <li>{@link #recoverHistoricalPlan} - Recover a historical plan
  * </ul>
  */
@@ -121,11 +129,17 @@ public class PlanNotebook implements StateModule {
                     + "current task, you need to confirm with the user and call the "
                     + "'finish_plan' function.";
 
+    // 当前计划
     private Plan currentPlan;
+    // 计划的提示
     private final PlanToHint planToHint;
+    // 计划的存储
     private final PlanStorage storage;
+    // 最大的子任务数
     private final Integer maxSubtasks;
+    // 是否需要用户确认
     private final boolean needUserConfirm;
+    // 改变钩子
     private final Map<String, BiConsumer<PlanNotebook, Plan>> changeHooks;
 
     /** Key prefix for storage, allows multiple instances to coexist in the same session. */
