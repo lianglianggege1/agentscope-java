@@ -37,6 +37,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,21 +63,7 @@ public class SkillBox implements StateModule {
     // 自动上传技能
     private boolean autoUploadSkill = true;
 
-    /**
-     * Creates a SkillBox without a toolkit.
-     * 创建一个没有工具包的技能箱。
-     *
-     * <p>This constructor will be removed in the next release. A SkillBox must hold a
-     * {@link Toolkit} to operate correctly. Relying on automatic toolkit assignment makes
-     * behavior less explicit and harder to reason about.
-     * 此构造函数将在下一个版本中移除。
-     * SkillBox 必须包含 Toolkit 才能正常运行。
-     * 依赖自动分配 Toolkit 会使行为变得不明确，也更难理解。
-     */
-    @Deprecated
-    public SkillBox() {
-        this(null, null, null);
-    }
+    private static final ConcurrentHashMap<String, Object> FILE_LOCKS = new ConcurrentHashMap<>();
 
     public SkillBox(Toolkit toolkit) {
         this(toolkit, null, null);
@@ -437,11 +424,9 @@ public class SkillBox implements StateModule {
 
         /**
          * Register a sub-agent as a tool with default configuration.
-         * 将子代理注册为具有默认配置的工具。
          *
          * <p>The tool name and description are derived from the agent's properties. Uses a single
          * "task" string parameter by default.
-         * 工具名称和描述源自代理的属性。默认情况下使用单个“任务”字符串参数。
          *
          * <p>Example:
          *
@@ -463,16 +448,12 @@ public class SkillBox implements StateModule {
 
         /**
          * Register a sub-agent as a tool with custom configuration.
-         * 将子代理注册为具有自定义配置的工具。
          *
          * <p>Sub-agents support multi-turn conversation with session-based state management. The
          * tool exposes two parameters: {@code message} (required) and {@code session_id} (optional,
          * for continuing existing conversations).
-         * 子代理支持基于会话的状态管理的多轮对话。
-         * 该工具公开两个参数：message（必需）和 session_id（可选，用于继续现有对话）。
          *
          * <p>Example with custom tool name and description:
-         *    自定义工具名称和描述的示例：
          *
          * <pre>{@code
          * toolkit.registration()
@@ -499,10 +480,8 @@ public class SkillBox implements StateModule {
          * }</pre>
          *
          * @param provider Factory for creating agent instances (called for each session)
-         *                 用于创建代理实例的工厂（每次会话都会调用）
          * @param config Configuration for the sub-agent tool, or null to use defaults (tool name
          *     derived from agent name, InMemorySession for state, events forwarded)
-         *               子代理工具的配置，或使用 null 以使用默认值（工具名称源自代理名称，状态为 InMemorySession，事件转发）。
          * @return This builder for chaining
          * @see SubAgentConfig
          * @see SubAgentConfig#defaults()
@@ -522,10 +501,8 @@ public class SkillBox implements StateModule {
 
         /**
          * Set the list of tools to enable from the MCP client.
-         * 设置要从 MCP 客户端启用的工具列表。
          *
          * <p>Only applicable when using mcpClient(). If not specified, all tools are enabled.
-         *    仅在使用 mcpClient() 时适用。如果未指定，则启用所有工具。
          *
          * @param enableTools List of tool names to enable
          * @return This builder for chaining
@@ -537,10 +514,8 @@ public class SkillBox implements StateModule {
 
         /**
          * Set the list of tools to disable from the MCP client.
-         * 设置要从 MCP 客户端禁用的工具列表。
          *
          * <p>Only applicable when using mcpClient().
-         *    仅在使用 mcpClient() 时适用。
          *
          * @param disableTools List of tool names to disable
          * @return This builder for chaining
@@ -552,13 +527,10 @@ public class SkillBox implements StateModule {
 
         /**
          * Set preset parameters that will be automatically injected during tool execution.
-         * 设置预设参数，这些参数将在工具执行期间自动注入。
          *
          * <p>These parameters are not exposed in the JSON schema.
-         *    这些参数未在 JSON 模式中公开。
          *
          * <p>The map should have tool names as keys and parameter maps as values:
-         *    该映射表应以工具名称作为键，以参数映射表作为值：
          * <pre>{@code
          * Map.of(
          *     "toolName1", Map.of("param1", "value1", "param2", "value2"),
@@ -577,7 +549,6 @@ public class SkillBox implements StateModule {
 
         /**
          * Set the extended model for dynamic schema extension.
-         * 设置动态模式扩展的扩展模型。
          *
          * @param extendedModel The extended model
          * @return This builder for chaining
@@ -589,7 +560,6 @@ public class SkillBox implements StateModule {
 
         /**
          * Apply the registration with all configured options.
-         * 使用所有已配置的选项进行注册。
          *
          * @throws IllegalStateException if none of skill() was set, or toolkit() is required but not set
          */
@@ -630,16 +600,12 @@ public class SkillBox implements StateModule {
 
     /**
      * Registers skill access tools to the provided toolkit.
-     * 将技能访问工具注册到提供的工具包中。
      *
      * <p>This method registers the following tool:
-     *    此方法注册以下工具：
      * <ul>
      *   <li>load_skill_through_path - Load skill resources or SKILL.md content. When a resource
      *       is not found, it automatically returns a list of available resources with SKILL.md
      *       as the first item.</li>
-     *       加载技能资源或 SKILL.md 内容。
-     *       如果找不到资源，则会自动返回可用资源列表，其中 SKILL.md 为第一项。
      * </ul>
      *
      * @throws IllegalArgumentException if toolkit is null
@@ -667,18 +633,13 @@ public class SkillBox implements StateModule {
 
     /**
      * Create a fluent builder for configuring code execution with custom options.
-     *  创建一个流畅的构建器，用于配置带有自定义选项的代码执行。
      *
      * <p>This is the recommended way to enable code execution capabilities for skills.
      * The builder allows selective enabling of tools and customization of ShellCommandTool.
-     * 这是启用技能代码执行功能的推荐方法。
-     * 该构建器允许选择性地启用工具并自定义 ShellCommandTool。
      *
      * <p>Example usage:
-     *    使用示例：
      * <pre>{@code
      * // Simple - enable all tools with default configuration
-     * 启用所有工具的默认配置
      * skillBox.codeExecution()
      *     .withShell()
      *     .withRead()
@@ -714,7 +675,6 @@ public class SkillBox implements StateModule {
 
     /**
      * Sets whether skill files are automatically uploaded.
-     * 设置是否自动上传技能文件。
      *
      * @param autoUploadSkill true to automatically upload skill files
      */
@@ -724,7 +684,6 @@ public class SkillBox implements StateModule {
 
     /**
      * Checks whether skill files are automatically uploaded.
-     * 检查技能文件是否自动上传。
      *
      * @return true if skill files are automatically uploaded
      */
@@ -734,7 +693,6 @@ public class SkillBox implements StateModule {
 
     /**
      * Gets the working directory for code execution.
-     * 获取代码执行的工作目录。
      *
      * @return The working directory path, or null if using temporary directory
      */
@@ -744,7 +702,6 @@ public class SkillBox implements StateModule {
 
     /**
      * Gets the upload directory for skill files.
-     * 获取技能文件的上传目录。
      *
      * @return The upload directory path, or null if not configured
      */
@@ -754,7 +711,6 @@ public class SkillBox implements StateModule {
 
     /**
      * Ensures the working directory exists, creating it if necessary.
-     * 确保工作目录存在，必要时创建它。
      *
      * @return The working directory path
      * @throws RuntimeException if failed to create the directory
@@ -788,7 +744,6 @@ public class SkillBox implements StateModule {
 
     /**
      * Ensures the upload directory exists, creating it if necessary.
-     * 确保上传目录存在，必要时创建该目录。
      *
      * @return The upload directory path
      */
@@ -813,19 +768,14 @@ public class SkillBox implements StateModule {
 
     /**
      * Uploads skill files to the upload directory with the configured filter.
-     * 使用配置的过滤器将技能文件上传到上传目录。
      *
      * <p>Upload directory resolution:
-     * 上传目录解决：
      * <ul>
      *   <li>If uploadDir is configured, use it.</li>
-     *       如果已配置 uploadDir，使用它。
      *   <li>Otherwise, use workDir/skills (workDir may be a temporary directory).</li>
-     *       否则，请使用 workDir/skills（workDir 可能是一个临时目录）。
      * </ul>
      *
      * <p>If a file already exists, it will be overwritten.
-     *    如果文件已存在，则会被覆盖。
      *
      */
     public void uploadSkillFiles() {
@@ -866,13 +816,19 @@ public class SkillBox implements StateModule {
                     if (targetPath.getParent() != null) {
                         Files.createDirectories(targetPath.getParent());
                     }
-                    if (content.startsWith(BASE64_PREFIX)) {
-                        String encoded = content.substring(BASE64_PREFIX.length());
-                        byte[] decoded = Base64.getDecoder().decode(encoded);
-                        Files.write(targetPath, decoded);
-                    } else {
-                        Files.writeString(targetPath, content, StandardCharsets.UTF_8);
+
+                    Object lock =
+                            FILE_LOCKS.computeIfAbsent(targetPath.toString(), k -> new Object());
+                    synchronized (lock) {
+                        if (content.startsWith(BASE64_PREFIX)) {
+                            String encoded = content.substring(BASE64_PREFIX.length());
+                            byte[] decoded = Base64.getDecoder().decode(encoded);
+                            Files.write(targetPath, decoded);
+                        } else {
+                            Files.writeString(targetPath, content, StandardCharsets.UTF_8);
+                        }
                     }
+
                     logger.debug("Uploaded file: {}", targetPath);
                     fileCount++;
                 } catch (IOException | IllegalArgumentException e) {

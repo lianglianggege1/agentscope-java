@@ -403,6 +403,7 @@ public class AgentScopeA2aServer {
                         TransportProperties.builder(TransportProtocol.JSONRPC.asString())
                                 .host(deploymentProperties.host())
                                 .port(deploymentProperties.port())
+                                .path(deploymentProperties.path())
                                 .build());
             }
             Map<String, TransportWrapperBuilder> allBuilders = loadTransportBuilders();

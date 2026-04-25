@@ -131,16 +131,16 @@ public interface Hook {
      * changes will affect agent execution:
      * <ul>
      *   <li>{@link PreReasoningEvent} - Modify messages before LLM reasoning在LLM推理之前修改消息</li>
-     *   <li>{@link PostReasoningEvent} - Modify reasoning results 修改推理结果</li>
+     *   <li>{@link PostReasoningEvent} - Modify reasoning results修改推理结果</li>
      *   <li>{@link PreActingEvent} - Modify tool parameters before execution 执行前修改tool参数</li>
-     *   <li>{@link PostActingEvent} - Modify tool results 修改工具执行结果</li>
-     *   <li>{@link PostCallEvent} - Modify final agent response 修改最终的智能体响应</li>
+     *   <li>{@link PostActingEvent} - Modify tool results修改工具执行结果</li>
+     *   <li>{@link PreCallEvent} - Modify messages before agent starts 在工具调用之前修改信息</li>
+     *   <li>{@link PostCallEvent} - Modify final agent response修改最终的智能体响应</li>
      * </ul>
      *
      * <p><b>Notification Events:</b> Events without setters are read-only:
      *       通知事件：事件没有setter是只读的：
      * <ul>
-     *   <li>{@link PreCallEvent} - Notified when agent starts 当agent开始时通知</li>
      *   <li>{@link ReasoningChunkEvent} - Streaming reasoning chunks 流式推理块</li>
      *   <li>{@link ActingChunkEvent} - Streaming tool execution chunks 流式工具执行块</li>
      *   <li>{@link ErrorEvent} - Errors during execution 执行过程中出现错误</li>
