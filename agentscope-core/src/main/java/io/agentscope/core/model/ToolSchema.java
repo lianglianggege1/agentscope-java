@@ -30,6 +30,7 @@ public class ToolSchema {
     private final String name;
     private final String description;
     private final Map<String, Object> parameters;
+    private final Map<String, Object> outputSchema;
     private final Boolean strict;
 
     /**
@@ -44,6 +45,10 @@ public class ToolSchema {
                 builder.parameters != null
                         ? Collections.unmodifiableMap(new HashMap<>(builder.parameters))
                         : Collections.emptyMap();
+        this.outputSchema =
+                builder.outputSchema != null
+                        ? Collections.unmodifiableMap(new HashMap<>(builder.outputSchema))
+                        : null;
         this.strict = builder.strict;
     }
 
@@ -75,6 +80,15 @@ public class ToolSchema {
     }
 
     /**
+     * Gets the optional tool output schema as a JSON Schema.
+     *
+     * @return an unmodifiable map containing the output schema, or null if unspecified
+     */
+    public Map<String, Object> getOutputSchema() {
+        return outputSchema;
+    }
+
+    /**
      * Gets the strict mode flag for schema validation.
      * 严格模式，参数必须与定义的JSON模式匹配
      *
@@ -100,6 +114,7 @@ public class ToolSchema {
         private String name;
         private String description;
         private Map<String, Object> parameters;
+        private Map<String, Object> outputSchema;
         private Boolean strict;
 
         /**
@@ -132,6 +147,17 @@ public class ToolSchema {
          */
         public Builder parameters(Map<String, Object> parameters) {
             this.parameters = parameters;
+            return this;
+        }
+
+        /**
+         * Sets the optional tool output schema as a JSON Schema.
+         *
+         * @param outputSchema the output schema
+         * @return this builder instance
+         */
+        public Builder outputSchema(Map<String, Object> outputSchema) {
+            this.outputSchema = outputSchema;
             return this;
         }
 

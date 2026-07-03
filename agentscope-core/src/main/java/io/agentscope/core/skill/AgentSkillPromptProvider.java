@@ -16,14 +16,16 @@
 package io.agentscope.core.skill;
 
 import java.nio.file.Path;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Generates skill system prompts for agents to understand available skills.
- * 生成技能系统提示，帮助智能体了解可用技能。
  *
  * <p>This provider creates system prompts containing information about available skills
  * that the LLM can dynamically load and use.
- * 该提供商创建系统提示，其中包含有关可用技能的信息，LLM 可以动态加载和使用这些技能。
  *
  * <p><b>Usage example:</b>
  * <pre>{@code
@@ -32,55 +34,22 @@ import java.nio.file.Path;
  * }</pre>
  */
 public class AgentSkillPromptProvider {
+    private static final String INDENT = "  ";
+    private static final Pattern XML_TAG_NAME_PATTERN = Pattern.compile("[A-Za-z_][A-Za-z0-9_.-]*");
+
     private final SkillRegistry skillRegistry;
     private final String instruction;
-    private final String template;
+    private boolean exposeAllMetadata = true;
     private boolean codeExecutionEnabled;
     private String uploadDir;
     private String codeExecutionInstruction;
 
-    // ## 可用技能
-    //
-    // <usage>
-    //
-    // 技能提供专业能力和领域知识。当技能与当前任务匹配时，请使用它们。
-    //
-    // 如何使用技能：
-    //
-    // - 加载技能：load_skill_through_path(skillId="<skill-id>", path="SKILL.md")
-    //
-    // - 技能将被激活，并加载包含详细说明的文档
-    //
-    // - 可以使用同一工具加载其他资源（脚本、资产、参考资料），但路径不同
-    //
-    // 路径信息：
-    //
-    // 加载技能时，响应将包含：
-    //
-    // - 所有技能资源的精确路径
-    //
-    // - 访问技能文件的代码示例
-    //
-    // - 该技能的特定使用说明
-    //
-    // 模板字段说明：
-    //
-    // - <name>：技能的显示名称
-    //
-    // - <description>：何时以及如何使用此技能
-    //
-    // - <skill-id>：load_skill_through_path 工具的唯一标识符
-    //
-    // </usage>
-    //
-    // <available_skills>
     public static final String DEFAULT_AGENT_SKILL_INSTRUCTION =
             """
             ## Available Skills
 
             <usage>
             Skills provide specialized capabilities and domain knowledge. Use them when they match your current task.
-            
 
             How to use skills:
             - Load skill: load_skill_through_path(skillId="<skill-id>", path="SKILL.md")
@@ -92,10 +61,11 @@ public class AgentSkillPromptProvider {
             2. Load it: load_skill_through_path(skillId="data-analysis_builtin", path="SKILL.md")
             3. Follow the instructions returned by the skill
 
-            Template fields explanation:
-            - <name>: The skill's display name
-            - <description>: When and how to use this skill
-            - <skill-id>: Unique identifier for load_skill_through_path tool
+            Metadata is rendered as XML under each <skill> element:
+            - scalar metadata becomes a simple child element
+            - nested maps become nested XML elements
+            - lists become repeated <item> elements
+            - <skill-id> is always appended for tool loading
             </usage>
 
             <available_skills>
@@ -137,81 +107,51 @@ public class AgentSkillPromptProvider {
             </code_execution>
             """;
 
-    // skillName, skillDescription, skillId
-    public static final String DEFAULT_AGENT_SKILL_TEMPLATE =
-            """
-            <skill>
-            <name>%s</name>
-            <description>%s</description>
-            <skill-id>%s</skill-id>
-            </skill>
-
-            """;
-
     /**
      * Creates a skill prompt provider.
-     * 创建技能提示提供程序。
      *
      * @param registry The skill registry containing registered skills
      */
     public AgentSkillPromptProvider(SkillRegistry registry) {
-        this(registry, null, null);
+        this(registry, null);
     }
 
     /**
-     * Creates a skill prompt provider with custom instruction and template.
-     * 创建带有自定义指令和模板的技能提示提供程序。
+     * Creates a skill prompt provider with custom instruction.
      *
      * @param registry The skill registry containing registered skills
-     *                 包含已注册技能的技能注册表
      * @param instruction Custom instruction header (null or blank uses default)
-     *                    自定义指令头（空或空白使用默认值）
-     * @param template Custom skill template (null or blank uses default)
-     *                 自定义技能模板（空或留空使用默认值）
      */
-    public AgentSkillPromptProvider(SkillRegistry registry, String instruction, String template) {
+    public AgentSkillPromptProvider(SkillRegistry registry, String instruction) {
         this.skillRegistry = registry;
         this.instruction =
                 instruction == null || instruction.isBlank()
                         ? DEFAULT_AGENT_SKILL_INSTRUCTION
                         : instruction;
-        this.template =
-                template == null || template.isBlank() ? DEFAULT_AGENT_SKILL_TEMPLATE : template;
     }
 
     /**
      * Gets the skill system prompt for the agent.
-     * 获取智能体的技能系统提示。
      *
      * <p>Generates a system prompt containing all registered skills.
-     * 生成包含所有已注册技能的系统提示。
      *
      * @return The skill system prompt, or empty string if no skills exist
-     *         技能系统提示，如果没有技能则为空字符串。
      */
     public String getSkillSystemPrompt() {
-        StringBuilder sb = new StringBuilder();
-
-        // Check if there are any skills
         if (skillRegistry.getAllRegisteredSkills().isEmpty()) {
             return "";
         }
 
-        // Add instruction header
+        StringBuilder sb = new StringBuilder();
         sb.append(instruction);
 
-        // Add each skill
         for (RegisteredSkill registered : skillRegistry.getAllRegisteredSkills().values()) {
             AgentSkill skill = skillRegistry.getSkill(registered.getSkillId());
-            sb.append(
-                    String.format(
-                            template, skill.getName(), skill.getDescription(), skill.getSkillId()));
+            appendSkill(sb, skill);
         }
 
-        // Close available_skills tag
         sb.append("</available_skills>");
 
-        // Conditionally append code execution instructions
         if (codeExecutionEnabled && uploadDir != null) {
             String template =
                     codeExecutionInstruction != null
@@ -220,7 +160,6 @@ public class AgentSkillPromptProvider {
             sb.append(template.replace("%s", uploadDir));
         }
 
-        // 按照默认的能生成完整的skills列表的系统提示词
         return sb.toString();
     }
 
@@ -257,5 +196,97 @@ public class AgentSkillPromptProvider {
                 codeExecutionInstruction == null || codeExecutionInstruction.isBlank()
                         ? null
                         : codeExecutionInstruction;
+    }
+
+    /**
+     * Sets whether all metadata fields are exposed to the LLM.
+     *
+     * <p>When disabled, only {@code name}, {@code description}, and {@code skill-id}
+     * are rendered into the skill prompt.
+     *
+     * @param exposeAllMetadata {@code true} to expose all metadata, {@code false} to expose only
+     *                          the core fields
+     */
+    public void setExposeAllMetadata(boolean exposeAllMetadata) {
+        this.exposeAllMetadata = exposeAllMetadata;
+    }
+
+    private void appendSkill(StringBuilder sb, AgentSkill skill) {
+        sb.append("<skill>\n");
+        for (Map.Entry<String, Object> entry : getPromptMetadata(skill).entrySet()) {
+            if (entry.getValue() == null) {
+                continue;
+            }
+            appendXmlNode(sb, entry.getKey(), entry.getValue(), 1);
+        }
+        appendXmlNode(sb, "skill-id", skill.getSkillId(), 1);
+        sb.append("</skill>\n\n");
+    }
+
+    private Map<String, Object> getPromptMetadata(AgentSkill skill) {
+        if (exposeAllMetadata) {
+            return skill.getMetadata();
+        }
+
+        LinkedHashMap<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("name", skill.getName());
+        metadata.put("description", skill.getDescription());
+        return metadata;
+    }
+
+    private void appendXmlNode(StringBuilder sb, String key, Object value, int indentLevel) {
+        if (value == null) {
+            return;
+        }
+
+        String indent = INDENT.repeat(indentLevel);
+        boolean validTagName = isValidXmlTagName(key);
+        String openTag = validTagName ? "<" + key + ">" : "<entry key=\"" + escapeXml(key) + "\">";
+        String closeTag = validTagName ? "</" + key + ">" : "</entry>";
+
+        if (isScalarValue(value)) {
+            sb.append(indent)
+                    .append(openTag)
+                    .append(escapeXml(String.valueOf(value)))
+                    .append(closeTag)
+                    .append("\n");
+            return;
+        }
+
+        sb.append(indent).append(openTag).append("\n");
+        if (value instanceof Map<?, ?> mapValue) {
+            for (Map.Entry<?, ?> entry : mapValue.entrySet()) {
+                appendXmlNode(
+                        sb, String.valueOf(entry.getKey()), entry.getValue(), indentLevel + 1);
+            }
+        } else if (value instanceof Collection<?> collectionValue) {
+            for (Object item : collectionValue) {
+                appendXmlNode(sb, "item", item, indentLevel + 1);
+            }
+        } else {
+            sb.append(INDENT.repeat(indentLevel + 1))
+                    .append(escapeXml(String.valueOf(value)))
+                    .append("\n");
+        }
+        sb.append(indent).append(closeTag).append("\n");
+    }
+
+    private boolean isScalarValue(Object value) {
+        return !(value instanceof Map<?, ?>) && !(value instanceof Collection<?>);
+    }
+
+    private boolean isValidXmlTagName(String value) {
+        return value != null && XML_TAG_NAME_PATTERN.matcher(value).matches();
+    }
+
+    private String escapeXml(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&apos;");
     }
 }

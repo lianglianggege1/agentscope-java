@@ -36,6 +36,8 @@ import io.agentscope.core.state.State;
  *   <li>{@link VideoBlock} - Video content (URL or Base64)
  *   <li>{@link ToolUseBlock} - Tool execution requests
  *   <li>{@link ToolResultBlock} - Tool execution results
+ *   <li>{@link HintBlock} - Hints for LLM reasoning (e.g., from RAG)
+ *   <li>{@link DataBlock} - Generic binary data block unifying image/audio/video
  * </ul>
  *
  * <p>Uses Jackson annotations for polymorphic JSON serialization with the "type" discriminator
@@ -50,7 +52,9 @@ import io.agentscope.core.state.State;
     @JsonSubTypes.Type(value = AudioBlock.class, name = "audio"),
     @JsonSubTypes.Type(value = VideoBlock.class, name = "video"),
     @JsonSubTypes.Type(value = ToolUseBlock.class, name = "tool_use"),
-    @JsonSubTypes.Type(value = ToolResultBlock.class, name = "tool_result")
+    @JsonSubTypes.Type(value = ToolResultBlock.class, name = "tool_result"),
+    @JsonSubTypes.Type(value = HintBlock.class, name = "hint"),
+    @JsonSubTypes.Type(value = DataBlock.class, name = "data")
 })
 // 只有指定的子类才能继承，编译时穷尽检查
 public sealed class ContentBlock implements State
@@ -60,4 +64,6 @@ public sealed class ContentBlock implements State
                 VideoBlock,
                 ThinkingBlock,
                 ToolUseBlock,
-                ToolResultBlock {}
+                ToolResultBlock,
+                HintBlock,
+                DataBlock {}

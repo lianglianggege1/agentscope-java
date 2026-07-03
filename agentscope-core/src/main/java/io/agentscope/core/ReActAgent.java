@@ -15,8 +15,31 @@
  */
 package io.agentscope.core;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import io.agentscope.core.agent.Event;
+import io.agentscope.core.agent.RuntimeContext;
+import io.agentscope.core.agent.StreamOptions;
 import io.agentscope.core.agent.StructuredOutputCapableAgent;
 import io.agentscope.core.agent.accumulator.ReasoningContext;
+import io.agentscope.core.event.AgentEvent;
+import io.agentscope.core.event.ExceedMaxItersEvent;
+import io.agentscope.core.event.ModelCallEndEvent;
+import io.agentscope.core.event.ModelCallStartEvent;
+import io.agentscope.core.event.ReplyEndEvent;
+import io.agentscope.core.event.ReplyStartEvent;
+import io.agentscope.core.event.TextBlockDeltaEvent;
+import io.agentscope.core.event.TextBlockEndEvent;
+import io.agentscope.core.event.TextBlockStartEvent;
+import io.agentscope.core.event.ThinkingBlockDeltaEvent;
+import io.agentscope.core.event.ThinkingBlockEndEvent;
+import io.agentscope.core.event.ThinkingBlockStartEvent;
+import io.agentscope.core.event.ToolCallDeltaEvent;
+import io.agentscope.core.event.ToolCallEndEvent;
+import io.agentscope.core.event.ToolCallStartEvent;
+import io.agentscope.core.event.ToolResultDataDeltaEvent;
+import io.agentscope.core.event.ToolResultEndEvent;
+import io.agentscope.core.event.ToolResultStartEvent;
+import io.agentscope.core.event.ToolResultTextDeltaEvent;
 import io.agentscope.core.hook.ActingChunkEvent;
 import io.agentscope.core.hook.Hook;
 import io.agentscope.core.hook.HookEvent;
@@ -45,11 +68,20 @@ import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.TextBlock;
 import io.agentscope.core.message.ThinkingBlock;
 import io.agentscope.core.message.ToolResultBlock;
+import io.agentscope.core.message.ToolResultState;
 import io.agentscope.core.message.ToolUseBlock;
+import io.agentscope.core.middleware.ActingInput;
+import io.agentscope.core.middleware.Middleware;
+import io.agentscope.core.middleware.MiddlewareBase;
+import io.agentscope.core.middleware.MiddlewareChain;
+import io.agentscope.core.middleware.ModelCallInput;
+import io.agentscope.core.middleware.ReasoningInput;
+import io.agentscope.core.middleware.ReplyInput;
 import io.agentscope.core.model.ExecutionConfig;
 import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.Model;
 import io.agentscope.core.model.StructuredOutputReminder;
+import io.agentscope.core.model.ToolSchema;
 import io.agentscope.core.plan.PlanNotebook;
 import io.agentscope.core.rag.GenericRAGHook;
 import io.agentscope.core.rag.Knowledge;
@@ -79,35 +111,32 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 
 /**
  * ReAct (Reasoning and Acting) Agent implementation.
- * ReAct (推理与行动) 智能体实现。
  *
  * <p>ReAct is an agent design pattern that combines reasoning (thinking and planning) with acting
  * (tool execution) in an iterative loop. The agent alternates between these two phases until it
  * either completes the task or reaches the maximum iteration limit.
- * ReAct 是一种智能体设计模式，
- * 将推理（思考和规划）与行动（工具执行）结合在一个迭代循环中。
- * 智能体在这两个阶段之间交替，直到完成任务或达到最大迭代限制。
  *
  * <p><b>Key Features:</b>
- * 主要特性：
  * <ul>
  *   <li><b>Reactive Streaming:</b> Uses Project Reactor for non-blocking execution
- *   响应式流：使用 Project Reactor 实现非阻塞执行
  *   <li><b>Hook System:</b> Extensible hooks for monitoring and intercepting agent execution
- *   钩子系统：可扩展的钩子，用于监控和拦截智能体执行
  *   <li><b>HITL Support:</b> Human-in-the-loop via stopAgent() in PostReasoningEvent/PostActingEvent
- *   人机协作支持：通过 PostReasoningEvent/PostActingEvent 中的 stopAgent() 实现人机协作
  *   <li><b>Structured Output:</b> StructuredOutputCapableAgent provides type-safe output generation
- *   结构化输出：StructuredOutputCapableAgent 提供类型安全的输出生成
  * </ul>
  *
  * <p><b>Usage Example:</b>
@@ -149,27 +178,31 @@ public class ReActAgent extends StructuredOutputCapableAgent {
             GracefulShutdownManager.getInstance();
 
     // ==================== Core Dependencies ====================
-    // 核心依赖
-    // 记忆
+
     private final Memory memory;
-    // 系统提示词
     private final String sysPrompt;
-    // 模型
     private final Model model;
-    // 最大迭代次数
     private final int maxIters;
-    // 模型执行配置
     private final ExecutionConfig modelExecutionConfig;
-    // 工具执行配置
     private final ExecutionConfig toolExecutionConfig;
-    // 生成选项
     private final GenerateOptions generateOptions;
-    // 笔记
     private final PlanNotebook planNotebook;
-    // 工具执行上下文
     private final ToolExecutionContext toolExecutionContext;
-    // 状态持久化
     private final StatePersistence statePersistence;
+    private final List<Middleware> middlewares;
+    private RuntimeContext pendingRuntimeContext;
+
+    /**
+     * Per-call system message, propagated across PreCallEvent → PreReasoningEvent /
+     * PreSummaryEvent. It is safe to use an {@link java.util.concurrent.atomic.AtomicReference}
+     * here because {@code AgentBase.acquireExecution()} guarantees that only one {@code call()}
+     * runs concurrently per agent instance, so this reference is effectively owned by a single
+     * logical execution at any time.
+     */
+    private final java.util.concurrent.atomic.AtomicReference<Msg> currentSystemMsg =
+            new java.util.concurrent.atomic.AtomicReference<>();
+
+    private final AtomicReference<FluxSink<AgentEvent>> activeEventSink = new AtomicReference<>();
 
     // ==================== Constructor ====================
 
@@ -195,27 +228,159 @@ public class ReActAgent extends StructuredOutputCapableAgent {
                 builder.statePersistence != null
                         ? builder.statePersistence
                         : StatePersistence.all();
+        this.middlewares = List.copyOf(builder.middlewares);
+    }
+
+    // ==================== RuntimeContext ====================
+
+    @Override
+    protected void beforeAgentExecution(List<Msg> msgs) {
+        RuntimeContext ctx = this.pendingRuntimeContext;
+        this.pendingRuntimeContext = null;
+        if (ctx == null) {
+            ctx = RuntimeContext.empty();
+        }
+        bindRuntimeContextToHooks(ctx);
+        // Reset per-call system message; will be initialised by consumeSystemMsgAfterPreCall
+        currentSystemMsg.set(null);
+    }
+
+    @Override
+    protected Msg seedSystemMsg() {
+        if (sysPrompt == null || sysPrompt.trim().isEmpty()) {
+            return null;
+        }
+        String prompt = applySystemPromptMiddlewares(sysPrompt);
+        return Msg.builder()
+                .name("system")
+                .role(MsgRole.SYSTEM)
+                .content(TextBlock.builder().text(prompt).build())
+                .build();
+    }
+
+    private String applySystemPromptMiddlewares(String prompt) {
+        if (middlewares.isEmpty()) {
+            return prompt;
+        }
+        Mono<String> result = Mono.just(prompt);
+        for (Middleware mw : middlewares) {
+            result = result.flatMap(p -> mw.onSystemPrompt(this, p));
+        }
+        return result.block();
+    }
+
+    @Override
+    protected void consumeSystemMsgAfterPreCall(Msg systemMsg) {
+        currentSystemMsg.set(systemMsg);
+    }
+
+    @Override
+    protected void afterAgentExecution() {
+        unbindRuntimeContextFromHooks();
+    }
+
+    private ToolExecutionContext buildMergedToolContext() {
+        RuntimeContext run = getRuntimeContext();
+        if (run == null) {
+            return toolExecutionContext != null
+                    ? toolExecutionContext
+                    : ToolExecutionContext.empty();
+        }
+        return ToolExecutionContext.merge(run.asToolExecutionContext(), toolExecutionContext);
+    }
+
+    /**
+     * Calls the agent with a per-call {@link RuntimeContext} (metadata for hooks and tools, not
+     * persisted).
+     */
+    public Mono<Msg> call(List<Msg> msgs, RuntimeContext context) {
+        this.pendingRuntimeContext = context;
+        return call(msgs);
+    }
+
+    public Mono<Msg> call(List<Msg> msgs, Class<?> structuredOutputClass, RuntimeContext context) {
+        this.pendingRuntimeContext = context;
+        return call(msgs, structuredOutputClass);
+    }
+
+    public Mono<Msg> call(List<Msg> msgs, JsonNode outputSchema, RuntimeContext context) {
+        this.pendingRuntimeContext = context;
+        return call(msgs, outputSchema);
+    }
+
+    public Flux<Event> stream(List<Msg> msgs, StreamOptions options, RuntimeContext context) {
+        this.pendingRuntimeContext = context;
+        return stream(msgs, options);
+    }
+
+    public Flux<Event> stream(
+            List<Msg> msgs,
+            StreamOptions options,
+            Class<?> structuredModel,
+            RuntimeContext context) {
+        this.pendingRuntimeContext = context;
+        return stream(msgs, options, structuredModel);
+    }
+
+    public Flux<Event> stream(
+            List<Msg> msgs, StreamOptions options, JsonNode schema, RuntimeContext context) {
+        this.pendingRuntimeContext = context;
+        return stream(msgs, options, schema);
+    }
+
+    /**
+     * Stream fine-grained {@link AgentEvent}s from the full agent lifecycle.
+     *
+     * <p>This method goes through the same lifecycle as {@code call()} (acquire execution,
+     * hooks, pre/post call notification) but exposes the internal event stream. The lifecycle
+     * is driven by {@code call()} internally; events are captured via the shared
+     * {@code activeEventSink}.
+     *
+     * @param msgs input messages
+     * @return event stream covering the full reply lifecycle
+     */
+    public Flux<AgentEvent> streamEvents(List<Msg> msgs) {
+        String replyId = UUID.randomUUID().toString().replace("-", "");
+        return Flux.<AgentEvent>create(
+                        sink -> {
+                            activeEventSink.set(sink);
+                            sink.next(new ReplyStartEvent(null, replyId, getName()));
+                            call(msgs)
+                                    .doFinally(
+                                            signal -> {
+                                                sink.next(new ReplyEndEvent(replyId));
+                                                activeEventSink.set(null);
+                                                sink.complete();
+                                            })
+                                    .subscribe(finalMsg -> {}, sink::error);
+                        },
+                        FluxSink.OverflowStrategy.BUFFER)
+                .doOnError(e -> activeEventSink.set(null));
+    }
+
+    /**
+     * Stream fine-grained {@link AgentEvent}s for a single input message.
+     *
+     * @param msg input message
+     * @return event stream covering the full reply lifecycle
+     */
+    public Flux<AgentEvent> streamEvents(Msg msg) {
+        return streamEvents(List.of(msg));
     }
 
     // ==================== New StateModule API ====================
 
     /**
      * Save agent state to the session using the new API.
-     * 使用一个新API保存智能体状态到会话中
      *
      * <p>This method saves the state of all managed components according to the StatePersistence
      * configuration:
-     * 此方法根据StatePersistence配置保存所有受管组件的状态
      *
      * <ul>
      *   <li>Agent metadata (always saved)
-     *       智能体元数据（总是保存）
      *   <li>Memory messages (if memoryManaged is true)
-     *       内存消息（如果memoryManaged为true）
      *   <li>Toolkit activeGroups (if toolkitManaged is true)
-     *       工具包活动组（如果toolkitManaged为true）
      *   <li>PlanNotebook state (if planNotebookManaged is true)
-     *       笔记状态（如果planNotebookManaged为true）
      * </ul>
      *
      * @param session the session to save state to
@@ -224,20 +389,17 @@ public class ReActAgent extends StructuredOutputCapableAgent {
     @Override
     public void saveTo(Session session, SessionKey sessionKey) {
         // Save agent metadata
-        // 保存智能体元数据
         session.save(
                 sessionKey,
                 "agent_meta",
                 new AgentMetaState(getAgentId(), getName(), getDescription(), sysPrompt));
 
         // Save memory if managed
-        // 如果管理保存到记忆中
         if (statePersistence.memoryManaged()) {
             memory.saveTo(session, sessionKey);
         }
 
         // Save toolkit activeGroups if managed
-        // 如果管理保存到工具包活动组中
         if (statePersistence.toolkitManaged() && toolkit != null) {
             session.save(
                     sessionKey,
@@ -246,7 +408,6 @@ public class ReActAgent extends StructuredOutputCapableAgent {
         }
 
         // Save PlanNotebook if managed
-        // 如果管理保存到笔记中
         if (statePersistence.planNotebookManaged() && planNotebook != null) {
             planNotebook.saveTo(session, sessionKey);
         }
@@ -254,11 +415,9 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     /**
      * Load agent state from the session using the new API.
-     * 使用新API从会话中加载智能体状态
      *
      * <p>This method loads the state of all managed components according to the StatePersistence
      * configuration.
-     * 此方法根据 StatePersistence 配置加载所有受管组件的状态。
      *
      * @param session the session to load state from
      * @param sessionKey the session identifier
@@ -273,20 +432,17 @@ public class ReActAgent extends StructuredOutputCapableAgent {
     public void loadFrom(Session session, SessionKey sessionKey) {
         shutdownManager.bindSession(this, session, sessionKey);
         // Load memory if managed
-        // 如果管理从记忆中加载
         if (statePersistence.memoryManaged()) {
             memory.loadFrom(session, sessionKey);
         }
 
         // Load toolkit activeGroups if managed
-        // 如果管理从工具包活动组中加载
         if (statePersistence.toolkitManaged() && toolkit != null) {
             session.get(sessionKey, "toolkit_activeGroups", ToolkitState.class)
                     .ifPresent(state -> toolkit.setActiveGroups(state.activeGroups()));
         }
 
         // Load PlanNotebook if managed
-        // 如果管理从笔记中加载
         if (statePersistence.planNotebookManaged() && planNotebook != null) {
             planNotebook.loadFrom(session, sessionKey);
         }
@@ -332,6 +488,52 @@ public class ReActAgent extends StructuredOutputCapableAgent {
     }
 
     /**
+     * Execute the full reply as a {@link Flux} of fine-grained {@link AgentEvent}s.
+     *
+     * <p>This method wraps the existing {@code doCall()} logic and captures all events emitted
+     * by the internal stream methods ({@code reasoningStream}, {@code actingStream},
+     * {@code summaryStream}). The stream is bookended by {@link ReplyStartEvent} and
+     * {@link ReplyEndEvent}.
+     *
+     * @param msgs the input messages
+     * @return event stream covering the full reply lifecycle
+     */
+    Flux<AgentEvent> replyImpl(List<Msg> msgs) {
+        String replyId = UUID.randomUUID().toString().replace("-", "");
+
+        Function<ReplyInput, Flux<AgentEvent>> core =
+                input ->
+                        Flux.<AgentEvent>create(
+                                        sink -> {
+                                            activeEventSink.set(sink);
+                                            sink.next(
+                                                    new ReplyStartEvent(null, replyId, getName()));
+
+                                            doCall(input.msgs())
+                                                    .doFinally(
+                                                            signal -> {
+                                                                sink.next(
+                                                                        new ReplyEndEvent(replyId));
+                                                                activeEventSink.set(null);
+                                                                sink.complete();
+                                                            })
+                                                    .subscribe(finalMsg -> {}, sink::error);
+                                        },
+                                        FluxSink.OverflowStrategy.BUFFER)
+                                .doOnError(e -> activeEventSink.set(null));
+
+        return MiddlewareChain.build(middlewares, this, MiddlewareBase::onReply, core)
+                .apply(new ReplyInput(msgs));
+    }
+
+    private void publishEvent(AgentEvent event) {
+        FluxSink<AgentEvent> sink = activeEventSink.get();
+        if (sink != null) {
+            sink.next(event);
+        }
+    }
+
+    /**
      * Build a {@link ToolResultBlock} representing a tool execution error.
      *
      * @param toolId the id of the tool call that failed
@@ -347,10 +549,8 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     /**
      * Find the last assistant message in memory.
-     * 寻找记忆中最后一个助手消息。
      *
      * @return The last assistant message, or null if not found
-     *         最后的助手消息，如果没有找到则为null
      */
     private Msg findLastAssistantMsg() {
         List<Msg> memoryMsgs = memory.getMessages();
@@ -365,7 +565,6 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     /**
      * Check if there are pending tool calls without corresponding results.
-     * 检查是否有未处理的工具调用，没有对应的结果。
      *
      * @return true if there are pending tool calls
      */
@@ -375,7 +574,6 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     /**
      * Get the set of pending tool use IDs from the last assistant message.
-     * 从最后一个助手消息中获取待处理的工具调用ID集合。
      *
      * @return Set of tool use IDs that have no corresponding results in memory
      */
@@ -399,20 +597,14 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     /**
      * Validate input messages when there are pending tool calls, then add to memory.
-     * 当有待处理的工具调用时，验证输入消息，然后将其添加到内存中。
      *
      * <p>Validation rules:
-     *    验证规则：
      * <ul>
      *   <li>Empty input: no-op (will proceed to acting)</li>
-     *       空输入：无操作（将继续执行）
      *   <li>No tool results: throw error</li>
-     *       没有工具结果：抛出错误
      *   <li>Has tool results: validate IDs match pending, no duplicates</li>
-     *       存在工具结果：验证ID匹配待处理，没有重复
      *   <li>Partial results + text content: throw error (text only allowed when all tools
      *       completed)</li>
-     *       部分结果 + 文本内容：抛出错误（仅在所有工具完成时允许文本））
      * </ul>
      *
      * @param msgs The input messages to validate
@@ -437,7 +629,6 @@ public class ReActAgent extends StructuredOutputCapableAgent {
         }
 
         // Check for duplicate IDs
-        // 检查是否有重复的ID
         Set<String> providedIds = new HashSet<>();
         for (ToolResultBlock r : results) {
             if (!providedIds.add(r.getId())) {
@@ -446,7 +637,6 @@ public class ReActAgent extends StructuredOutputCapableAgent {
         }
 
         // Check all provided IDs match pending IDs
-        // 检查所有提供的ID是否与待处理的ID匹配
         Set<String> invalidIds =
                 providedIds.stream()
                         .filter(id -> !pendingIds.contains(id))
@@ -457,14 +647,12 @@ public class ReActAgent extends StructuredOutputCapableAgent {
         }
 
         // Check for non-ToolResultBlock content
-        // 检查是否有非ToolResultBlock的内容
         boolean hasTextContent =
                 msgs.stream()
                         .flatMap(m -> m.getContent().stream())
                         .anyMatch(block -> !(block instanceof ToolResultBlock));
 
         // If only partial results provided, text content is not allowed
-        // 仅提供部分结果时，不允许包含文本内容
         boolean isPartialResults = !providedIds.containsAll(pendingIds);
         if (isPartialResults && hasTextContent) {
             throw new IllegalStateException(
@@ -480,7 +668,6 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     /**
      * Add messages to memory if not null.
-     * 如果不为null，则将消息添加到内存中。
      *
      * @param msgs The messages to add
      */
@@ -491,67 +678,62 @@ public class ReActAgent extends StructuredOutputCapableAgent {
     }
 
     // ==================== Core ReAct Loop ====================
-    // 推理-行动循环核心
 
-    // 没有工具时的执行
     private Mono<Msg> executeIteration(int iter) {
-        // 推理
         return reasoning(iter, false);
     }
 
     /**
      * Execute the reasoning phase.
-     * 执行推理阶段。
-     * 有太多不清楚的地方了
      *
      * <p>This method streams from the model, accumulates chunks, notifies hooks, and
      * decides whether to continue to acting or return early (HITL stop, gotoReasoning, or finished).
-     * 此方法从模型流式传输数据，累积数据块，通知钩子，并决定是继续执行还是提前返回（HITL 停止、gotoReasoning 或完成）。
      *
-     * @param iter Current iteration number 当前迭代数
-     * @param ignoreMaxIters If true, skip maxIters check (for gotoReasoning) 如果为true，则跳过maxIters检查（用于gotoReasoning）
-     * @return Mono containing the final result message 含最终结果消息的Mono
+     * @param iter Current iteration number
+     * @param ignoreMaxIters If true, skip maxIters check (for gotoReasoning)
+     * @return Mono containing the final result message
      */
     private Mono<Msg> reasoning(int iter, boolean ignoreMaxIters) {
         // Check maxIters unless ignoreMaxIters is set
-        // 检查maxIters，除非ignoreMaxIters设置为true
         if (!ignoreMaxIters && iter >= maxIters) {
-            // 到了最大迭代次数，执行
-            return summarizing(); //当达到最大迭代次数时生成总结。
+            return summarizing();
         }
 
-        // TODO 暂时还不知道这里是什么意思  待分析 思考上下文
         ReasoningContext context = new ReasoningContext(getName());
 
-        return checkInterruptedAsync() // 检查是否被中断
-                .then(notifyPreReasoningEvent(prepareMessages())) // 通知预推理事件
-                .flatMapMany(
+        return checkInterruptedAsync()
+                .then(notifyPreReasoningEvent(memory.getMessages()))
+                .flatMap(
                         event -> {
                             GenerateOptions options =
                                     event.getEffectiveGenerateOptions() != null
-                                            ? event.getEffectiveGenerateOptions() // 使用事件中的生成选项
-                                            : buildGenerateOptions(); // 使用默认的生成选项
-                            return model.stream(
-                                            event.getInputMessages(), // 输入消息
-                                            toolkit.getToolSchemas(), // 工具模式
-                                            options) 
-                                    .concatMap(chunk -> checkInterruptedAsync().thenReturn(chunk));
+                                            ? event.getEffectiveGenerateOptions()
+                                            : buildGenerateOptions();
+                            List<Msg> modelInput =
+                                    prependSystemMsg(
+                                            event.getInputMessages(), event.getSystemMessage());
+                            List<ToolSchema> tools = toolkit.getToolSchemas();
+                            Function<ReasoningInput, Flux<AgentEvent>> reasoningCore =
+                                    ri ->
+                                            reasoningStream(
+                                                    context,
+                                                    ri.messages(),
+                                                    ri.tools(),
+                                                    ri.options());
+                            Flux<AgentEvent> stream =
+                                    MiddlewareChain.build(
+                                                    middlewares,
+                                                    ReActAgent.this,
+                                                    MiddlewareBase::onReasoning,
+                                                    reasoningCore)
+                                            .apply(new ReasoningInput(modelInput, tools, options));
+                            return stream.then(
+                                    Mono.defer(
+                                            () -> Mono.justOrEmpty(context.buildFinalMessage())));
                         })
-                .doOnNext(
-                        chunk -> {
-                            List<Msg> chunkMsgs = context.processChunk(chunk); // 处理数据块
-                            // Notify streaming hooks for each chunk message
-                            // 从每一个块消息通知流式钩子
-                            for (Msg msg : chunkMsgs) {
-                                // 通知推理块消息
-                                notifyReasoningChunk(msg, context).subscribe();
-                            }
-                        })
-                .then(Mono.defer(() -> Mono.justOrEmpty(context.buildFinalMessage()))) // 构建最终消息
                 .onErrorResume(
                         InterruptedException.class,
                         error -> {
-                            // Save accumulated message before propagating interrupt
                             Msg msg = context.buildFinalMessage();
                             if (msg != null) {
                                 boolean discard =
@@ -560,15 +742,13 @@ public class ReActAgent extends StructuredOutputCapableAgent {
                                                                 .getConfig()
                                                                 .partialReasoningPolicy()
                                                         == PartialReasoningPolicy.DISCARD;
-                                // Manually interruption will save the msg, while system
-                                // interruption will discard on specific config
                                 if (!discard) {
                                     memory.addMessage(msg);
                                 }
                             }
                             return Mono.error(error);
                         })
-                .flatMap(this::notifyPostReasoning) // 通知后推理事件
+                .flatMap(this::notifyPostReasoning)
                 .flatMap(
                         event -> {
                             Msg msg = event.getReasoningMessage();
@@ -585,82 +765,201 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
                             // gotoReasoning requested (e.g., by StructuredOutputHook)
                             if (event.isGotoReasoningRequested()) {
-                                // Validation already done in PostReasoningEvent.gotoReasoning()
                                 List<Msg> gotoMsgs = event.getGotoReasoningMsgs();
                                 if (gotoMsgs != null) {
                                     gotoMsgs.forEach(memory::addMessage);
                                 }
-                                // Continue to next iteration, ignoring maxIters for this entry
-                                // 继续进行下一次迭代，忽略此条目的 maxIters 值
                                 return reasoning(iter + 1, true);
                             }
 
                             // Check finish conditions
-                            // 检查完成条件
                             if (isFinished(msg)) {
                                 return Mono.just(msg);
                             }
 
                             // Continue to acting
-                            // 继续进行执行
                             return checkInterruptedAsync().then(acting(iter));
                         })
                 .switchIfEmpty(
                         Mono.defer(
                                 () -> {
                                     // No message was produced
-                                    // 没有生成任何消息
                                     return Mono.justOrEmpty((Msg) null);
                                 }));
     }
 
     /**
+     * Stream fine-grained {@link AgentEvent}s from a model call during reasoning.
+     *
+     * <p>Emits: {@link ModelCallStartEvent} → block start/delta/end events → {@link
+     * ModelCallEndEvent}. The provided {@link ReasoningContext} is used to accumulate chunks
+     * (for building the final {@link Msg}) and to notify legacy {@link Hook}s.
+     *
+     * @param context   reasoning context for chunk accumulation
+     * @param messages  the messages to send to the model
+     * @param tools     the tool schemas available
+     * @param options   generation options
+     * @return event stream from a single model call
+     */
+    Flux<AgentEvent> reasoningStream(
+            ReasoningContext context,
+            List<Msg> messages,
+            List<ToolSchema> tools,
+            GenerateOptions options) {
+
+        Function<ModelCallInput, Flux<AgentEvent>> modelCallCore =
+                mci -> modelCallStream(context, mci, true);
+
+        return MiddlewareChain.build(middlewares, this, MiddlewareBase::onModelCall, modelCallCore)
+                .apply(new ModelCallInput(messages, tools, options, model))
+                .doOnNext(this::publishEvent);
+    }
+
+    private Flux<AgentEvent> modelCallStream(
+            ReasoningContext context, ModelCallInput mci, boolean withToolEvents) {
+
+        String replyId = UUID.randomUUID().toString().replace("-", "");
+        AtomicBoolean textStarted = new AtomicBoolean(false);
+        AtomicBoolean thinkingStarted = new AtomicBoolean(false);
+        Set<String> startedToolCalls = ConcurrentHashMap.newKeySet();
+
+        Flux<AgentEvent> modelEvents =
+                mci.model().stream(mci.messages(), mci.tools(), mci.options())
+                        .concatMap(chunk -> checkInterruptedAsync().thenReturn(chunk))
+                        .concatMap(
+                                chunk -> {
+                                    List<Msg> chunkMsgs = context.processChunk(chunk);
+                                    for (Msg msg : chunkMsgs) {
+                                        notifyReasoningChunk(msg, context).subscribe();
+                                    }
+
+                                    List<AgentEvent> events = new ArrayList<>();
+                                    for (ContentBlock block : chunk.getContent()) {
+                                        emitBlockEvents(
+                                                block,
+                                                replyId,
+                                                context,
+                                                textStarted,
+                                                thinkingStarted,
+                                                withToolEvents
+                                                        ? startedToolCalls
+                                                        : ConcurrentHashMap.newKeySet(),
+                                                events);
+                                    }
+                                    return Flux.fromIterable(events);
+                                });
+
+        Flux<AgentEvent> endEvents =
+                Flux.defer(
+                        () -> {
+                            List<AgentEvent> events = new ArrayList<>();
+                            if (textStarted.get()) {
+                                events.add(new TextBlockEndEvent(replyId, "text"));
+                            }
+                            if (thinkingStarted.get()) {
+                                events.add(new ThinkingBlockEndEvent(replyId, "thinking"));
+                            }
+                            for (String toolId : startedToolCalls) {
+                                events.add(new ToolCallEndEvent(replyId, toolId));
+                            }
+                            events.add(new ModelCallEndEvent(replyId, context.getChatUsage()));
+                            return Flux.fromIterable(events);
+                        });
+
+        return Flux.concat(Flux.just(new ModelCallStartEvent(replyId)), modelEvents, endEvents);
+    }
+
+    private void emitBlockEvents(
+            ContentBlock block,
+            String replyId,
+            ReasoningContext context,
+            AtomicBoolean textStarted,
+            AtomicBoolean thinkingStarted,
+            Set<String> startedToolCalls,
+            List<AgentEvent> events) {
+
+        if (block instanceof TextBlock tb) {
+            if (textStarted.compareAndSet(false, true)) {
+                events.add(new TextBlockStartEvent(replyId, "text"));
+            }
+            if (tb.getText() != null && !tb.getText().isEmpty()) {
+                events.add(new TextBlockDeltaEvent(replyId, "text", tb.getText()));
+            }
+        } else if (block instanceof ThinkingBlock tb) {
+            if (thinkingStarted.compareAndSet(false, true)) {
+                events.add(new ThinkingBlockStartEvent(replyId, "thinking"));
+            }
+            if (tb.getThinking() != null && !tb.getThinking().isEmpty()) {
+                events.add(new ThinkingBlockDeltaEvent(replyId, "thinking", tb.getThinking()));
+            }
+        } else if (block instanceof ToolUseBlock tub) {
+            String toolId = resolveToolCallId(tub, context);
+            if (toolId != null && startedToolCalls.add(toolId)) {
+                String toolName = tub.getName();
+                if (toolName != null && !toolName.startsWith("__")) {
+                    events.add(new ToolCallStartEvent(replyId, toolId, toolName));
+                }
+            }
+            if (tub.getContent() != null && !tub.getContent().isEmpty()) {
+                events.add(
+                        new ToolCallDeltaEvent(
+                                replyId, toolId != null ? toolId : "", tub.getContent()));
+            }
+        }
+    }
+
+    private String resolveToolCallId(ToolUseBlock tub, ReasoningContext context) {
+        if (tub.getId() != null && !tub.getId().isEmpty()) {
+            return tub.getId();
+        }
+        ToolUseBlock accumulated = context.getAccumulatedToolCall(null);
+        return accumulated != null ? accumulated.getId() : null;
+    }
+
+    /**
      * Execute the acting phase.
-     * 执行执行阶段
      *
      * <p>This method executes only pending tools (those without results in memory),
      * notifies hooks for successful tool results, and decides whether to continue iteration
      * or return (HITL stop, suspended tools, or structured output).
-     * 此方法仅执行待处理工具（内存中没有结果的工具），通知Hook工具成功的结果，并决定是继续迭代还是返回（HITL停止、暂停工具或结构化输出）。
      *
      * <p>For tools that throw {@link io.agentscope.core.tool.ToolSuspendException}:
-     *    对于抛出{@link io.agentscope.core.tool.ToolSuspendException}的工具：
      * <ul>
      *   <li>The exception is caught by Toolkit and converted to a pending ToolResultBlock</li>
-     *       Toolkit 捕获到异常并将其转换为待处理的 ToolResultBlock
      *   <li>Successful results are stored in memory, pending results are not</li>
-     *       成功的结果存储在内存中，未决的结果则不存储
      *   <li>Returns Msg with {@link GenerateReason#TOOL_SUSPENDED} containing suspended ToolUseBlocks</li>
-     *       返回包含已暂停ToolUseBlocks的{@link GenerateReason#TOOL_SUSPENDED}消息
      * </ul>
      *
      * @param iter Current iteration number
      * @return Mono containing the final result message
      */
     private Mono<Msg> acting(int iter) {
-        // Extract only pending tool calls (those without results in memory)
-        // 仅提取待处理的工具调用（即内存中尚未有结果的调用）
         List<ToolUseBlock> pendingToolCalls = extractPendingToolCalls();
 
         if (pendingToolCalls.isEmpty()) {
-            // No pending tools have been executed, continue to next iteration
-            // 没有执行任何待处理工具，继续进行下一次迭代
             return executeIteration(iter + 1);
         }
 
-        // Forward tool chunks into ActingChunkEvent hooks without overwriting user callbacks.
-        // 将工具块转发到ActingChunkEvent挂钩中，同时不覆盖用户回调。
-        toolkit.setInternalChunkCallback(
-                (toolUse, chunk) -> notifyActingChunk(toolUse, chunk).subscribe());
+        String replyId = UUID.randomUUID().toString().replace("-", "");
+        AtomicReference<List<Map.Entry<ToolUseBlock, ToolResultBlock>>> resultHolder =
+                new AtomicReference<>();
 
-        // Execute only pending tools (those without results in memory)
-        // 仅执行待处理的工具（即内存中尚未有结果的调用）
         return notifyPreActingHooks(pendingToolCalls)
-                .flatMap(this::executeToolCalls) // 执行工具调用并返回配对结果。
+                .flatMap(
+                        toolCalls -> {
+                            Function<ActingInput, Flux<AgentEvent>> actingCore =
+                                    ai -> actingStream(ai.toolCalls(), replyId, resultHolder);
+                            Flux<AgentEvent> stream =
+                                    MiddlewareChain.build(
+                                                    middlewares,
+                                                    this,
+                                                    MiddlewareBase::onActing,
+                                                    actingCore)
+                                            .apply(new ActingInput(toolCalls));
+                            return stream.then(Mono.defer(() -> Mono.just(resultHolder.get())));
+                        })
                 .flatMap(
                         results -> {
-                            // Separate success and pending results
-                            // 分离成功和待处理的结果
                             List<Map.Entry<ToolUseBlock, ToolResultBlock>> successPairs =
                                     results.stream()
                                             .filter(e -> !e.getValue().isSuspended())
@@ -670,26 +969,18 @@ public class ReActAgent extends StructuredOutputCapableAgent {
                                             .filter(e -> e.getValue().isSuspended())
                                             .toList();
 
-                            // If no success results to process
-                            // 如果没有要处理的成功结果
                             if (successPairs.isEmpty()) {
                                 if (!pendingPairs.isEmpty()) {
-                                    // 构建一条包含已暂停工具调用以供用户执行的消息。
                                     return Mono.just(buildSuspendedMsg(pendingPairs));
                                 }
-                                // 执行下一轮迭代
                                 return executeIteration(iter + 1);
                             }
 
-                            // Process success results through hooks and add to memory
-                            // 通过挂钩机制获取进程成功结果，并将其添加到内存中
                             return Flux.fromIterable(successPairs)
-                                    .concatMap(this::notifyPostActingHook) // 通知PostActingEvent挂钩以获取单个工具结果，构建消息并将其添加到内存中。
+                                    .concatMap(this::notifyPostActingHook)
                                     .last()
                                     .flatMap(
                                             event -> {
-                                                // HITL stop (also triggered by
-                                                // StructuredOutputHook when completed)
                                                 if (event.isStopRequested()) {
                                                     return Mono.just(
                                                             event.getToolResultMsg()
@@ -698,27 +989,109 @@ public class ReActAgent extends StructuredOutputCapableAgent {
                                                                                     .ACTING_STOP_REQUESTED));
                                                 }
 
-                                                // If there are pending results, build suspended Msg
                                                 if (!pendingPairs.isEmpty()) {
                                                     return Mono.just(
-                                                        // 构建一条包含已暂停工具调用以供用户执行的消息。
                                                             buildSuspendedMsg(pendingPairs));
                                                 }
 
-                                                // Continue next iteration
-                                                // 继续进行下一轮迭代
                                                 return executeIteration(iter + 1);
                                             });
                         });
     }
 
     /**
+     * Stream fine-grained {@link AgentEvent}s from tool execution during the acting phase.
+     *
+     * <p>Emits: {@link ToolResultStartEvent} → delta events → {@link ToolResultEndEvent}
+     * for each tool call. The provided {@code resultHolder} is populated with the execution
+     * results so the caller can process them afterward.
+     *
+     * @param toolCalls    the tool calls to execute
+     * @param replyId      the reply identifier for event correlation
+     * @param resultHolder populated with tool execution results on completion
+     * @return event stream from tool execution
+     */
+    Flux<AgentEvent> actingStream(
+            List<ToolUseBlock> toolCalls,
+            String replyId,
+            AtomicReference<List<Map.Entry<ToolUseBlock, ToolResultBlock>>> resultHolder) {
+
+        return Flux.<AgentEvent>create(
+                        sink -> {
+                            for (ToolUseBlock tool : toolCalls) {
+                                sink.next(
+                                        new ToolResultStartEvent(
+                                                replyId, tool.getId(), tool.getName()));
+                            }
+
+                            toolkit.setInternalChunkCallback(
+                                    (toolUse, chunk) -> {
+                                        if (chunk.getOutput() != null) {
+                                            for (ContentBlock block : chunk.getOutput()) {
+                                                if (block instanceof TextBlock tb) {
+                                                    sink.next(
+                                                            new ToolResultTextDeltaEvent(
+                                                                    replyId,
+                                                                    toolUse.getId(),
+                                                                    tb.getText()));
+                                                } else {
+                                                    sink.next(
+                                                            new ToolResultDataDeltaEvent(
+                                                                    replyId,
+                                                                    toolUse.getId(),
+                                                                    block));
+                                                }
+                                            }
+                                        }
+                                        notifyActingChunk(toolUse, chunk).subscribe();
+                                    });
+
+                            executeToolCalls(toolCalls)
+                                    .subscribe(
+                                            results -> {
+                                                resultHolder.set(results);
+                                                for (Map.Entry<ToolUseBlock, ToolResultBlock>
+                                                        entry : results) {
+                                                    ToolResultState state =
+                                                            determineToolResultState(
+                                                                    entry.getValue());
+                                                    sink.next(
+                                                            new ToolResultEndEvent(
+                                                                    replyId,
+                                                                    entry.getKey().getId(),
+                                                                    state));
+                                                }
+                                                sink.complete();
+                                            },
+                                            sink::error);
+                        })
+                .doOnNext(this::publishEvent);
+    }
+
+    private ToolResultState determineToolResultState(ToolResultBlock result) {
+        if (result.isSuspended()) {
+            return ToolResultState.RUNNING;
+        }
+        if (result.getState() != null && result.getState() != ToolResultState.RUNNING) {
+            return result.getState();
+        }
+        if (result.getOutput() != null
+                && result.getOutput().stream()
+                        .anyMatch(
+                                b ->
+                                        b instanceof TextBlock tb
+                                                && tb.getText() != null
+                                                && tb.getText().startsWith("[ERROR]"))) {
+            return ToolResultState.ERROR;
+        }
+        return ToolResultState.SUCCESS;
+    }
+
+    /**
      * Build a message containing suspended tool calls for user execution.
-     * 构建一条包含已暂停工具调用以供用户执行的消息。
      *
      * <p>The message contains both the ToolUseBlocks and corresponding pending ToolResultBlocks
      * for the suspended tools.
-     * 该消息既包含ToolUseBlocks，也包含已挂起工具对应的待处理ToolResultBlocks。
      *
      * @param pendingPairs List of (ToolUseBlock, pending ToolResultBlock) pairs
      * @return Msg with GenerateReason.TOOL_SUSPENDED
@@ -745,13 +1118,11 @@ public class ReActAgent extends StructuredOutputCapableAgent {
      * continue processing and the model receives proper error feedback.
      *
      * @param toolCalls The list of tool calls (potentially modified by PreActingEvent hooks)
-     *                  工具调用列表（可能被PreActingEvent挂钩修改）
      * @return Mono containing list of (ToolUseBlock, ToolResultBlock) pairs
-     *         包含(ToolUseBlock, ToolResultBlock)对列表的单例
      */
     private Mono<List<Map.Entry<ToolUseBlock, ToolResultBlock>>> executeToolCalls(
             List<ToolUseBlock> toolCalls) {
-        return toolkit.callTools(toolCalls, toolExecutionConfig, this, toolExecutionContext)
+        return toolkit.callTools(toolCalls, toolExecutionConfig, this, buildMergedToolContext())
                 .map(
                         results ->
                                 IntStream.range(0, toolCalls.size())
@@ -791,57 +1162,75 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     /**
      * Notify PostActingEvent hook for a single tool result, build message and add to memory.
-     * 通知PostActingEvent挂钩以获取单个工具结果，构建消息并将其添加到内存中。
      */
     private Mono<PostActingEvent> notifyPostActingHook(
             Map.Entry<ToolUseBlock, ToolResultBlock> entry) {
-        // 获取工具调用
         ToolUseBlock toolUse = entry.getKey();
-        // 获取工具结果
         ToolResultBlock result = entry.getValue();
 
         // Build tool result message first so hooks can access it
-        // 先构建工具结果消息，以便挂钩可以访问它
         Msg toolMsg = ToolResultMessageBuilder.buildToolResultMsg(result, toolUse, getName());
 
         // Create event with toolResultMsg already set
-        // 创建已设置toolResultMsg的事件
         PostActingEvent event = new PostActingEvent(this, toolkit, toolUse, result);
         event.setToolResultMsg(toolMsg);
 
         // Notify hooks and add to memory
-        // 通知挂钩并添加到内存中
         return notifyHooks(event).doOnNext(e -> memory.addMessage(e.getToolResultMsg()));
     }
 
     /**
      * Generate summary when max iterations reached.
-     * 当达到最大迭代次数时生成总结。
      */
     protected Mono<Msg> summarizing() {
         log.debug("Maximum iterations reached. Generating summary...");
 
-        //准备总结的信息
-        List<Msg> messageList = prepareSummaryMessages();
-        // 构建生成选项
-        // todo 总结到了一半 明天来了继续总结，
-        // 本部分收获：了解了Reasoning - acting loop 里面执行的具体细节
-        // 1.当有工具调用和无工具调用的处理流程
-        // 2.当达到最大迭代次数时的总结
-        // 3.agent runtime过程中如何与其他模块进行调度和信息传播
-        GenerateOptions generateOptions = buildGenerateOptions();
+        // Handle pending tool calls that were not completed before max iterations
+        if (hasPendingToolUse()) {
+            List<ToolUseBlock> pendingTools = extractPendingToolCalls();
+            log.warn(
+                    "Max iterations reached with {} pending tool calls. Adding error results.",
+                    pendingTools.size());
 
-        return notifyPreSummaryHook(messageList, generateOptions) // 摘要之前进行汇总
+            for (ToolUseBlock toolUse : pendingTools) {
+                ToolResultBlock errorResult =
+                        buildErrorToolResult(
+                                toolUse.getId(),
+                                "Tool execution cancelled because maximum iterations limit ("
+                                        + maxIters
+                                        + ") was reached");
+
+                Msg errorResultMsg =
+                        ToolResultMessageBuilder.buildToolResultMsg(
+                                errorResult, toolUse, getName());
+                memory.addMessage(errorResultMsg);
+            }
+        }
+
+        List<Msg> messageList = prepareSummaryMessages();
+        GenerateOptions generateOptions = buildGenerateOptions();
+        ReasoningContext context = new ReasoningContext(getName());
+        publishEvent(new ExceedMaxItersEvent("", maxIters, maxIters));
+
+        return notifyPreSummaryHook(messageList, generateOptions)
                 .flatMap(
                         preSummaryEvent -> {
-                            List<Msg> effectiveMessages = preSummaryEvent.getInputMessages();
+                            List<Msg> effectiveMessages =
+                                    prependSystemMsg(
+                                            preSummaryEvent.getInputMessages(),
+                                            preSummaryEvent.getSystemMessage());
                             GenerateOptions effectiveOptions =
                                     preSummaryEvent.getEffectiveGenerateOptions();
 
-                            return streamAndAccumulateSummary(effectiveMessages, effectiveOptions) // 流和积累摘要
+                            return summaryStream(context, effectiveMessages, effectiveOptions)
+                                    .then(
+                                            Mono.defer(
+                                                    () ->
+                                                            Mono.justOrEmpty(
+                                                                    context.buildFinalMessage())))
                                     .flatMap(
                                             msg ->
-                                                    notifyPostSummaryHook(msg, effectiveOptions)// 摘要之后进行消息通知
+                                                    notifyPostSummaryHook(msg, effectiveOptions)
                                                             .map(
                                                                     postEvent -> {
                                                                         Msg finalMsg =
@@ -857,28 +1246,96 @@ public class ReActAgent extends StructuredOutputCapableAgent {
                 .onErrorResume(this::handleSummaryError);
     }
 
-    // 流式积累摘要
-    private Mono<Msg> streamAndAccumulateSummary(
-            List<Msg> messages, GenerateOptions generateOptions) {
-        return model.stream(messages, null, generateOptions)
-                .concatMap(chunk -> checkInterruptedAsync().thenReturn(chunk))
-                .reduce(
-                        new ReasoningContext(getName()),
-                        (ctx, chunk) -> {
-                            List<Msg> streamedMessages = ctx.processChunk(chunk);
-                            for (Msg streamedMessage : streamedMessages) {
-                                notifySummaryChunk(streamedMessage, ctx, generateOptions)
-                                        .subscribe();
-                            }
-                            return ctx;
-                        })
-                .map(ReasoningContext::buildFinalMessage); // 构建最终消息
+    /**
+     * Stream fine-grained {@link AgentEvent}s from a model call during summarization.
+     *
+     * <p>Structurally identical to {@link #reasoningStream} but notifies summary-specific
+     * hooks ({@link SummaryChunkEvent}) and does not pass tool schemas to the model.
+     *
+     * @param context   reasoning context for chunk accumulation
+     * @param messages  the messages to send to the model
+     * @param options   generation options
+     * @return event stream from the summary model call
+     */
+    Flux<AgentEvent> summaryStream(
+            ReasoningContext context, List<Msg> messages, GenerateOptions options) {
+
+        Function<ModelCallInput, Flux<AgentEvent>> summaryModelCallCore =
+                mci -> summaryModelCallStream(context, mci, options);
+
+        return MiddlewareChain.build(
+                        middlewares, this, MiddlewareBase::onModelCall, summaryModelCallCore)
+                .apply(new ModelCallInput(messages, null, options, model))
+                .doOnNext(this::publishEvent);
     }
 
-    // 准备总结的信息
+    private Flux<AgentEvent> summaryModelCallStream(
+            ReasoningContext context, ModelCallInput mci, GenerateOptions hookOptions) {
+
+        String replyId = UUID.randomUUID().toString().replace("-", "");
+        AtomicBoolean textStarted = new AtomicBoolean(false);
+        AtomicBoolean thinkingStarted = new AtomicBoolean(false);
+
+        Flux<AgentEvent> modelEvents =
+                mci.model().stream(mci.messages(), mci.tools(), mci.options())
+                        .concatMap(chunk -> checkInterruptedAsync().thenReturn(chunk))
+                        .concatMap(
+                                chunk -> {
+                                    List<Msg> chunkMsgs = context.processChunk(chunk);
+                                    for (Msg msg : chunkMsgs) {
+                                        notifySummaryChunk(msg, context, hookOptions).subscribe();
+                                    }
+
+                                    List<AgentEvent> events = new ArrayList<>();
+                                    for (ContentBlock block : chunk.getContent()) {
+                                        if (block instanceof TextBlock tb) {
+                                            if (textStarted.compareAndSet(false, true)) {
+                                                events.add(
+                                                        new TextBlockStartEvent(replyId, "text"));
+                                            }
+                                            if (tb.getText() != null && !tb.getText().isEmpty()) {
+                                                events.add(
+                                                        new TextBlockDeltaEvent(
+                                                                replyId, "text", tb.getText()));
+                                            }
+                                        } else if (block instanceof ThinkingBlock tb) {
+                                            if (thinkingStarted.compareAndSet(false, true)) {
+                                                events.add(
+                                                        new ThinkingBlockStartEvent(
+                                                                replyId, "thinking"));
+                                            }
+                                            if (tb.getThinking() != null
+                                                    && !tb.getThinking().isEmpty()) {
+                                                events.add(
+                                                        new ThinkingBlockDeltaEvent(
+                                                                replyId,
+                                                                "thinking",
+                                                                tb.getThinking()));
+                                            }
+                                        }
+                                    }
+                                    return Flux.fromIterable(events);
+                                });
+
+        Flux<AgentEvent> endEvents =
+                Flux.defer(
+                        () -> {
+                            List<AgentEvent> events = new ArrayList<>();
+                            if (textStarted.get()) {
+                                events.add(new TextBlockEndEvent(replyId, "text"));
+                            }
+                            if (thinkingStarted.get()) {
+                                events.add(new ThinkingBlockEndEvent(replyId, "thinking"));
+                            }
+                            events.add(new ModelCallEndEvent(replyId, context.getChatUsage()));
+                            return Flux.fromIterable(events);
+                        });
+
+        return Flux.concat(Flux.just(new ModelCallStartEvent(replyId)), modelEvents, endEvents);
+    }
+
     private List<Msg> prepareSummaryMessages() {
-        // 准备信息
-        List<Msg> messageList = prepareMessages(); 
+        List<Msg> messageList = new ArrayList<>(memory.getMessages());
         messageList.add(
                 Msg.builder()
                         .name("user")
@@ -887,14 +1344,13 @@ public class ReActAgent extends StructuredOutputCapableAgent {
                                 TextBlock.builder()
                                         .text(
                                                 "You have failed to generate response within the"
-                                                        + " maximum iterations. Now respond directly by"
-                                                        + " summarizing the current situation.")
+                                                    + " maximum iterations. Now respond directly by"
+                                                    + " summarizing the current situation.")
                                         .build())
                         .build());
         return messageList;
     }
 
-    // 错误处理
     private Mono<Msg> handleSummaryError(Throwable error) {
         if (error instanceof InterruptedException) {
             return Mono.error(error);
@@ -920,32 +1376,30 @@ public class ReActAgent extends StructuredOutputCapableAgent {
     // ==================== Helper Methods ====================
 
     /**
-     * Prepare messages for model input.
-     * 为模型输入准备信息
+     * Prepends the system message to {@code msgs} if non-null.
+     *
+     * <p>Called immediately before each {@code model.stream()} invocation to build the final
+     * LLM input without contaminating the in-memory message list.
      */
-    private List<Msg> prepareMessages() {
-        List<Msg> messages = new ArrayList<>();
-        if (sysPrompt != null && !sysPrompt.trim().isEmpty()) {
-            messages.add(
-                    Msg.builder()
-                            .name("system")
-                            .role(MsgRole.SYSTEM)
-                            .content(TextBlock.builder().text(sysPrompt).build())
-                            .build());
+    private static List<Msg> prependSystemMsg(List<Msg> msgs, Msg systemMsg) {
+        if (systemMsg == null) {
+            return msgs != null ? msgs : List.of();
         }
-        messages.addAll(memory.getMessages());
-        return messages;
+        List<Msg> result = new ArrayList<>();
+        result.add(systemMsg);
+        if (msgs != null) {
+            result.addAll(msgs);
+        }
+        return result;
     }
 
     /**
      * Check if the ReAct loop should terminate.
-     * 检查ReAct循环是否应终止。
      *
      * <p>Note: Structured output retry is now handled by StructuredOutputHook via gotoReasoning().
-     *    注意：结构化输出重试现在由StructuredOutputHook通过gotoReasoning（）处理。
      *
-     * @param msg The reasoning message  推理信息
-     * @return true if should finish, false if should continue to acting 如果应该完成，则为true，如果应该继续执行，则为false
+     * @param msg The reasoning message
+     * @return true if should finish, false if should continue to acting
      */
     private boolean isFinished(Msg msg) {
         if (msg == null) {
@@ -954,16 +1408,14 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         List<ToolUseBlock> toolCalls = msg.getContentBlocks(ToolUseBlock.class);
 
-        // No tool calls - finished 没有函数调用则结束
+        // No tool calls - finished
         // If there are tool calls (even non-existent ones), continue to acting phase
         // where ToolExecutor will return "Tool not found" error for the model to see
-        // 如果有工具调用（甚至不存在），继续执行阶段，ToolExecutor将返回“未找到工具”错误，供模型查看
         return toolCalls.isEmpty();
     }
 
     /**
      * Extract tool calls from the most recent assistant message.
-     * 从最近的助手消息中提取工具调用。
      */
     private List<ToolUseBlock> extractRecentToolCalls() {
         return MessageUtils.extractRecentToolCalls(memory.getMessages(), getName());
@@ -972,15 +1424,12 @@ public class ReActAgent extends StructuredOutputCapableAgent {
     /**
      * Extract only pending tool calls (those without results in memory) from the most recent
      * assistant message.
-     * 从最近的助手消息中仅提取挂起的工具调用（内存中没有结果的调用）。
      *
      * <p>This method filters out tool calls that already have corresponding results in memory,
      * preventing duplicate execution when resuming from HITL or partial tool result scenarios.
-     * 此方法过滤掉内存中已经有相应结果的工具调用，防止从HITL或部分工具结果场景恢复时重复执行。
      *
      * @return List of tool use blocks that don't have results yet, or empty list if all tools
      *     have been executed
-     *        尚未有结果的工具使用块列表，或者如果所有工具都已执行，则为空列表
      */
     private List<ToolUseBlock> extractPendingToolCalls() {
         List<ToolUseBlock> allToolCalls = extractRecentToolCalls();
@@ -1023,7 +1472,9 @@ public class ReActAgent extends StructuredOutputCapableAgent {
     }
 
     private Mono<PreReasoningEvent> notifyPreReasoningEvent(List<Msg> msgs) {
-        return notifyHooks(new PreReasoningEvent(this, model.getModelName(), null, msgs));
+        PreReasoningEvent event = new PreReasoningEvent(this, model.getModelName(), null, msgs);
+        event.setSystemMessage(currentSystemMsg.get());
+        return notifyHooks(event);
     }
 
     private Mono<PostReasoningEvent> notifyPostReasoning(Msg msg) {
@@ -1093,9 +1544,11 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     private Mono<PreSummaryEvent> notifyPreSummaryHook(
             List<Msg> msgs, GenerateOptions generateOptions) {
-        return notifyHooks(
+        PreSummaryEvent event =
                 new PreSummaryEvent(
-                        this, model.getModelName(), generateOptions, msgs, maxIters, maxIters));
+                        this, model.getModelName(), generateOptions, msgs, maxIters, maxIters);
+        event.setSystemMessage(currentSystemMsg.get());
+        return notifyHooks(event);
     }
 
     private Mono<PostSummaryEvent> notifyPostSummaryHook(Msg msg, GenerateOptions generateOptions) {
@@ -1195,10 +1648,8 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
     /**
      * Gets the configured generation options for this agent.
-     * 获取此代理的配置生成选项。
      *
      * @return The generation options, or null if not configured
-     *         生成选项，如果未配置，则为null
      */
     public GenerateOptions getGenerateOptions() {
         return generateOptions;
@@ -1223,6 +1674,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
         private ExecutionConfig toolExecutionConfig;
         private GenerateOptions generateOptions;
         private final Set<Hook> hooks = new LinkedHashSet<>();
+        private final List<Middleware> middlewares = new ArrayList<>();
         private boolean enableMetaTool = false;
         private StructuredOutputReminder structuredOutputReminder =
                 StructuredOutputReminder.TOOL_CHOICE;
@@ -1234,6 +1686,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
         // Long-term memory configuration
         private LongTermMemory longTermMemory;
         private LongTermMemoryMode longTermMemoryMode = LongTermMemoryMode.BOTH;
+        private boolean longTermMemoryAsyncRecord = false;
 
         // State persistence configuration
         private StatePersistence statePersistence;
@@ -1332,6 +1785,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
          * @param hook The hook to add, must not be null
          * @return This builder instance for method chaining
          * @see Hook
+         * @see Hook#tools()
          */
         public Builder hook(Hook hook) {
             this.hooks.add(hook);
@@ -1347,6 +1801,7 @@ public class ReActAgent extends StructuredOutputCapableAgent {
          * @param hooks The list of hooks to add, must not be null
          * @return This builder instance for method chaining
          * @see Hook
+         * @see Hook#tools()
          */
         public Builder hooks(List<Hook> hooks) {
             this.hooks.addAll(hooks);
@@ -1354,8 +1809,29 @@ public class ReActAgent extends StructuredOutputCapableAgent {
         }
 
         /**
+         * Adds a middleware for intercepting agent execution.
+         *
+         * @param middleware the middleware to add
+         * @return this builder instance for method chaining
+         */
+        public Builder middleware(Middleware middleware) {
+            this.middlewares.add(middleware);
+            return this;
+        }
+
+        /**
+         * Adds multiple middlewares for intercepting agent execution.
+         *
+         * @param middlewares the list of middlewares to add
+         * @return this builder instance for method chaining
+         */
+        public Builder middlewares(List<Middleware> middlewares) {
+            this.middlewares.addAll(middlewares);
+            return this;
+        }
+
+        /**
          * Enables or disables the meta-tool functionality.
-         * 启用或禁用元工具功能。
          *
          * <p>When enabled, the toolkit will automatically register a meta-tool that provides
          * information about available tools to the agent. This can help the agent understand
@@ -1391,12 +1867,10 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Sets the execution configuration for model API calls.
-         * 设置模型 API 调用的执行配置。
          *
          * <p>This configuration controls timeout, retry behavior, and backoff strategy for
          * model requests during the reasoning phase. If not set, the agent will use the
          * model's default execution configuration.
-         * 这个配置控制了推理阶段模型请求的超时、重试行为和退避策略。如果未设置，智能体将使用模型的默认执行配置。
          *
          * @param modelExecutionConfig The execution configuration for model calls, can be null
          * @return This builder instance for method chaining
@@ -1409,12 +1883,10 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Sets the execution configuration for tool executions.
-         * 设置工具执行的执行配置。
          *
          * <p>This configuration controls timeout, retry behavior, and backoff strategy for
          * tool calls during the acting phase. If not set, the toolkit will use its default
          * execution configuration.
-         * 这个配置控制了行动阶段工具调用的超时、重试行为和退避策略。如果未设置，工具包将使用其默认执行配置。
          *
          * @param toolExecutionConfig The execution configuration for tool calls, can be null
          * @return This builder instance for method chaining
@@ -1460,7 +1932,6 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Sets the structured output enforcement mode.
-         * 设置结构化输出强制模式。
          *
          * @param reminder The structured output reminder mode, must not be null
          * @return This builder instance for method chaining
@@ -1472,15 +1943,11 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Sets the PlanNotebook for plan-based task execution.
-         * 设置计划笔记本以支持基于计划的任务执行。
          *
          * <p>When provided, the PlanNotebook will be integrated into the agent:
-         * 当提供时，计划笔记本将被集成到智能体中：
          * <ul>
          *   <li>Plan management tools will be automatically registered to the toolkit
-         *   计划管理工具将被自动注册到工具包中
          *   <li>A hook will be added to inject plan hints before each reasoning step
-         *    在每次推理步骤之前将添加一个钩子来注入计划提示
          * </ul>
          *
          * @param planNotebook The configured PlanNotebook instance, can be null
@@ -1493,15 +1960,12 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Sets the skill box for this agent.
-         * 设置此智能体的技能箱。
          *
          * <p>The skill box is used to manage the skills for this agent. It will be used to register the skills to the toolkit.
-         * 技能箱用于管理此智能体的技能。它将被用来将技能注册到工具包中。
          * <ul>
          *   <li>Skill loader tools will be automatically registered to the toolkit</li>
-         *   技能加载器工具将被自动注册到工具包中
-         *   <li>A skill hook will be added to inject skill prompts and manage skill activation</li>
-         *   技能钩子将被添加以注入技能提示并管理技能激活
+         *   <li>A skill hook will be added to inject skill prompts on {@link io.agentscope.core.hook.PreCallEvent}
+         *       and manage skill activation</li>
          * </ul>
          * @param skillBox The skill box to use for this agent
          * @return This builder instance for method chaining
@@ -1513,14 +1977,10 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Sets the long-term memory for this agent.
-         * 设置此智能体的长期记忆。
          *
          * <p>Long-term memory enables the agent to remember information across sessions.
          * It can be used in combination with {@link #longTermMemoryMode(LongTermMemoryMode)}
          * to control whether memory management is automatic, agent-controlled, or both.
-         * 长期记忆使智能体能够跨会话记住信息。
-         * 它可以与 {@link #longTermMemoryMode(LongTermMemoryMode)} 结合使用，
-         * 以控制记忆管理是自动的、由智能体控制的还是两者兼有。
          *
          * @param longTermMemory The long-term memory implementation
          * @return This builder instance for method chaining
@@ -1533,17 +1993,12 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Sets the long-term memory mode.
-         * 设置长期记忆模式。
          *
          * <p>This determines how long-term memory is integrated with the agent:
-         * 翻译：这决定了长期记忆如何与智能体集成：
          * <ul>
          *   <li><b>AGENT_CONTROL:</b> Memory tools are registered for agent to call</li>
-         *   <li><b>AGENT_CONTROL:</b> 注册内存工具供智能体调用</li>
          *   <li><b>STATIC_CONTROL:</b> Framework automatically retrieves/records memory</li>
-         *   <li><b>STATIC_CONTROL:</b> 框架自动检索/记录记忆</li>
          *   <li><b>BOTH:</b> Combines both approaches (default)</li>
-         *   <li><b>BOTH:</b> 结合两种方法（默认）</li>
          * </ul>
          *
          * @param mode The long-term memory mode
@@ -1556,13 +2011,33 @@ public class ReActAgent extends StructuredOutputCapableAgent {
         }
 
         /**
+         * Sets whether long-term memory recording should be performed asynchronously.
+         *
+         * <p>When enabled, the framework will record memories to long-term storage
+         * in a fire-and-forget manner, without blocking the agent's main execution flow.
+         * This improves response latency but means memory persistence is not guaranteed
+         * before the agent returns its response.
+         *
+         * <p>When disabled (default), the framework waits for the recording operation
+         * to complete before returning the agent's response. This ensures memory
+         * persistence is finalized but may increase response latency.
+         *
+         * <p>Note: This setting only affects the static control mode (STATIC_CONTROL, BOTH).
+         * Agent-controlled recording through tools is always synchronous.
+         *
+         * @param asyncRecord Whether to record memories asynchronously
+         * @return This builder instance for method chaining
+         */
+        public Builder longTermMemoryAsyncRecord(boolean asyncRecord) {
+            this.longTermMemoryAsyncRecord = asyncRecord;
+            return this;
+        }
+
+        /**
          * Sets the state persistence configuration.
-         * 设置状态持久化配置。
          *
          * <p>Use this to control which components' state is managed by the agent during
          * saveTo/loadFrom operations. By default, all components are managed.
-         * 使用此选项来控制在 saveTo/loadFrom 操作期间由智能体管理哪些组件的状态。
-         * 默认情况下，所有组件都由智能体管理。
          *
          * <p>Example usage:
          *
@@ -1587,7 +2062,6 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Enables plan functionality with default configuration.
-         * 启用具有默认配置的计划功能。
          *
          * <p>This is a convenience method equivalent to:
          * <pre>{@code
@@ -1603,7 +2077,6 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Adds a knowledge base for RAG (Retrieval-Augmented Generation).
-         * 为 RAG（检索增强生成）添加知识库。
          *
          * @param knowledge The knowledge base to add
          * @return This builder instance for method chaining
@@ -1617,7 +2090,6 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Adds multiple knowledge bases for RAG.
-         * 为 RAG 添加多个知识库。
          *
          * @param knowledges The list of knowledge bases to add
          * @return This builder instance for method chaining
@@ -1631,7 +2103,6 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Sets the RAG mode.
-         * 设置 RAG 模式。
          *
          * @param mode The RAG mode (GENERIC, AGENTIC, or NONE)
          * @return This builder instance for method chaining
@@ -1645,7 +2116,6 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Sets the retrieve configuration for RAG.
-         * 设置 RAG 的检索配置。
          *
          * @param config The retrieve configuration
          * @return This builder instance for method chaining
@@ -1659,16 +2129,11 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Sets the tool execution context for this agent.
-         * 设置此智能体的工具执行上下文。
          *
          * <p>This context will be passed to all tools invoked by this agent and can include
          * user identity, session information, permissions, and other metadata. The context
          * from this agent level will override toolkit-level context but can be overridden by
          * call-level context.
-         * 这个上下文将被传递给此智能体调用的所有工具，
-         * 并且可以包含用户身份、会话信息、权限和其他元数据。
-         * 这个智能体级别的上下文将覆盖工具包级别的上下文，
-         * 但可以被调用级别的上下文覆盖。
          *
          * @param toolExecutionContext The tool execution context
          * @return This builder instance for method chaining
@@ -1680,7 +2145,6 @@ public class ReActAgent extends StructuredOutputCapableAgent {
 
         /**
          * Builds and returns a new ReActAgent instance with the configured settings.
-         * 构建并返回一个具有配置设置的新 ReActAgent 实例。
          *
          * @return A new ReActAgent instance
          * @throws IllegalArgumentException if required parameters are missing or invalid
@@ -1688,6 +2152,8 @@ public class ReActAgent extends StructuredOutputCapableAgent {
         public ReActAgent build() {
             // Deep copy toolkit to avoid state interference between agents
             Toolkit agentToolkit = this.toolkit.copy();
+
+            registerToolsFromHooks(agentToolkit);
 
             if (enableMetaTool) {
                 agentToolkit.registerMetaTool();
@@ -1722,18 +2188,33 @@ public class ReActAgent extends StructuredOutputCapableAgent {
         }
 
         /**
+         * Registers tool objects declared by hooks ({@link Hook#tools()}) on the agent toolkit.
+         *
+         * <p>Runs after {@link Toolkit#copy()} so hook-supplied tools are scoped to this agent
+         * instance without modifying the builder's original toolkit.
+         */
+        private void registerToolsFromHooks(Toolkit agentToolkit) {
+            for (Hook hook : hooks) {
+                List<Object> toolObjects = hook.tools();
+                if (toolObjects == null || toolObjects.isEmpty()) {
+                    continue;
+                }
+                for (Object toolObject : toolObjects) {
+                    if (toolObject != null) {
+                        agentToolkit.registerTool(toolObject);
+                    }
+                }
+            }
+        }
+
+        /**
          * Configures long-term memory based on the selected mode.
-         * 根据选择的模式配置长期记忆。
          *
          * <p>This method sets up long-term memory integration:
-         * 这个方法设置长期记忆集成：
          * <ul>
          *   <li>AGENT_CONTROL: Registers memory tools for agent to call</li>
-         *  <li>AGENT_CONTROL: 注册内存工具供智能体调用</li>
          *   <li>STATIC_CONTROL: Registers StaticLongTermMemoryHook for automatic retrieval/recording</li>
-         *   <li>STATIC_CONTROL: 注册 StaticLongTermMemoryHook 以实现自动检索/记录</li>
-         * <li>BOTH: Combines both approaches (registers tools + hook)</li>
-         *  <li>BOTH: 结合两种方法（注册工具 + 钩子）</li>
+         *   <li>BOTH: Combines both approaches (registers tools + hook)</li>
          * </ul>
          */
         private void configureLongTermMemory(Toolkit agentToolkit) {
@@ -1747,7 +2228,8 @@ public class ReActAgent extends StructuredOutputCapableAgent {
             if (longTermMemoryMode == LongTermMemoryMode.STATIC_CONTROL
                     || longTermMemoryMode == LongTermMemoryMode.BOTH) {
                 StaticLongTermMemoryHook hook =
-                        new StaticLongTermMemoryHook(longTermMemory, memory);
+                        new StaticLongTermMemoryHook(
+                                longTermMemory, memory, longTermMemoryAsyncRecord);
                 hooks.add(hook);
             }
         }
@@ -1879,7 +2361,9 @@ public class ReActAgent extends StructuredOutputCapableAgent {
          * <p>This method automatically:
          * <ul>
          *   <li>Registers skill load tool to the toolkit
-         *   <li>Adds the skill hook to inject skill prompts and manage skill activation
+         *   <li>Adds the skill hook to inject skill prompts on {@link io.agentscope.core.hook.PreCallEvent}
+         *       (priority {@link io.agentscope.core.skill.SkillHook#SKILL_HOOK_PRIORITY}) and manage skill
+         *       activation
          *   <li>Uploads skill files to the upload directory if auto upload is enabled
          * </ul>
          */

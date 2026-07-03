@@ -38,15 +38,21 @@ build/
 .flattened-pom.xml
 **/dependency-reduced-pom.xml
 
+### Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+
 ### Docs
 docs/_build
 
 
 # vibe coding
-# .claude
-# openspec
-# AGENTS.md
-# CLAUDE.md
+.claude
+openspec
+AGENTS.md
+CLAUDE.md
 
 ##Log
 logs/
@@ -58,3 +64,9 @@ logs/
 
 ## .env
 .env*
+
+##agentscope
+.agentscope/
+
+## harness db
+**/*.db

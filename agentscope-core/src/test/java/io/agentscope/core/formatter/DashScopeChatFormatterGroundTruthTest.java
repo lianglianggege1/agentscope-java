@@ -48,8 +48,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Ground truth tests for DashScopeChatFormatter.
- * This test validates that the formatter output matches the expected DashScope API format
- * exactly as defined in the Python version.
+ * This test validates that the formatter output matches the expected DashScope API format.
  */
 class DashScopeChatFormatterGroundTruthTest {
 
@@ -69,13 +68,13 @@ class DashScopeChatFormatterGroundTruthTest {
     static void setUp() throws IOException {
         formatter = new DashScopeChatFormatter();
 
-        // Create a temporary image file (matching Python test setup)
+        // Create a temporary image file.
         // Use unique filename to avoid conflicts with other test classes
         imagePath = "./image_chat_formatter.png";
         File imageFile = new File(imagePath);
         Files.write(imageFile.toPath(), "fake image content".getBytes());
 
-        // Mock audio path (matching Python test)
+        // Mock audio path
         mockAudioPath = "/var/folders/gf/krg8x_ws409cpw_46b2s6rjc0000gn/T/tmpfymnv2w9.wav";
 
         // Build test messages
@@ -341,13 +340,8 @@ class DashScopeChatFormatterGroundTruthTest {
                         .build());
 
         // Message 8: Tool result
-        String toolResultContent =
-                "- The capital of Japan is Tokyo.\n"
-                        + "- The returned image can be found at: "
-                        + imagePath
-                        + "\n"
-                        + "- The returned audio can be found at: "
-                        + mockAudioPath;
+        File imageFile2 = new File(imagePath);
+        String absoluteImagePath2 = "file://" + imageFile2.getAbsolutePath();
         groundTruthChat.add(
                 DashScopeMessage.builder()
                         .role("tool")
@@ -356,7 +350,15 @@ class DashScopeChatFormatterGroundTruthTest {
                         .content(
                                 List.of(
                                         DashScopeContentPart.builder()
-                                                .text(toolResultContent)
+                                                .text("The capital of Japan is Tokyo.")
+                                                .build(),
+                                        DashScopeContentPart.builder()
+                                                .image(absoluteImagePath2)
+                                                .build(),
+                                        DashScopeContentPart.builder()
+                                                .audio(
+                                                        "data:audio/wav;base64,"
+                                                                + "ZmFrZSBhdWRpbyBjb250ZW50")
                                                 .build()))
                         .build());
 
