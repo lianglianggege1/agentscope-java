@@ -107,6 +107,44 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
+ * HarnessAgent 面向用户开放的API，内部封装 ReActAgent，并提供标准化增强工程能力：
+ *
+ * <ul>
+ *   <li>基于工作目录加载上下文（AGENTS.md、KNOWLEDGE.md）
+ *   <li>技能加载：优先使用自定义 AgentSkillRepository，无自定义实现则默认读取 workspace/skills/ 目录的 FileSystemSkillRepository
+ *   <li>子智能体编排：通过 task、task_output 工具实现同步/后台任务调度
+ *   <li>上下文压缩前自动刷新记忆、卸载冗余消息
+ *   <li>会话环境初始化：操作系统、日期、工作目录基础信息注入
+ *   <li>可插拔文件存储后端：本地文件、沙箱、复合存储模式
+ *   <li>记忆检索/读取工具内置支持
+ * </ul>
+ *
+ * <p>高级用法：可通过 Builder 提供的方法按需关闭内置工具与钩子，再向 Toolkit、Hook 列表注册自定义实现：
+ * {@link HarnessAgent.Builder#disableFilesystemTools()}、
+ * {@link HarnessAgent.Builder#disableShellTool()}、
+ * {@link HarnessAgent.Builder#disableMemoryTools()}、
+ * {@link HarnessAgent.Builder#disableMemoryHooks()}、
+ * {@link HarnessAgent.Builder#disableSessionPersistence()}、
+ * {@link HarnessAgent.Builder#disableWorkspaceContext()}、
+ * {@link HarnessAgent.Builder#disableSubagents()}
+ *
+ * <p>使用示例：
+ *
+ * <pre>{@code
+ * HarnessAgent agent = HarnessAgent.builder()
+ *     .name("MyAgent")
+ *     .model(model) // 也可传入字符串标识，由 ModelRegistry 自动解析，如 .model("openai:gpt-5.5")
+ *     .sysPrompt("You are a helpful assistant.")
+ *     .workspace("/path/to/workspace")
+ *     .build();
+ *
+ * Msg response = agent.call(
+ *     Msg.userMsg("Hello!"),
+ *     RuntimeContext.builder().sessionId("sess-1").build()
+ * ).block();
+ * }</pre>
+ */
+/**
  * HarnessAgent is the user-facing API that wraps {@link ReActAgent} with enhanced harness practices:
  *
  * <ul>
