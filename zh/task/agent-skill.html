@@ -4,7 +4,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <meta property="article:modified_time" content="2026-04-25T08:24:51+00:00" /><link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="RAG (检索增强生成)" href="rag.html"><link rel="prev" title="Agent as Tool（子智能体工具）" href="agent-as-tool.html">
+    <meta property="article:modified_time" content="2026-07-03T07:50:31+00:00" /><link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="RAG (检索增强生成)" href="rag.html"><link rel="prev" title="Agent as Tool（子智能体工具）" href="agent-as-tool.html">
         <link rel="canonical" href="https://java.agentscope.io/zh/task/agent-skill.html">
         <link rel="prefetch" href="../../_static/logo.svg" as="image">
 
@@ -18,7 +18,8 @@
     <link rel="stylesheet" type="text/css" href="../../_static/sphinx-thebe.css?v=4fa983c6" />
     <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=95c83b7e" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
-    <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=acb90eab" />
+    <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=0bcf34c1" />
+    <link rel="stylesheet" type="text/css" href="../../_static/homepage.css?v=8a098e07" />
     
     
 
@@ -53,6 +54,244 @@
 </style></head>
   <body>
     
+  
+
+  <!--
+  ~ Copyright 2024-2026 the original author or authors.
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+-->
+
+
+<div class="docs-site-header" role="banner">
+  <div class="docs-site-header__inner">
+    <div class="docs-site-header__start">
+      <a class="docs-site-header__brand" href="../../en/intro.html">
+        <img class="docs-site-header__logo" src="../../_static/logo.svg" alt="" width="44" height="44" />
+        <span class="docs-site-header__title"><span style='font-weight: 700; color: #2196f3;'>AgentScope</span> <br><span style='font-weight: 900; color: #ff5722;'>Java</span></span>
+      </a>
+      <div class="docs-site-header__nav-shell">
+        
+  
+  <nav
+    class="docs-top-tabs"
+    aria-label="Documentation sections"
+    data-current-page="zh/task/agent-skill"
+    data-current-lang="zh"
+  >
+    <div class="docs-top-tabs__list">
+      
+        
+        
+          
+          
+          
+            <a
+              class="docs-top-tabs__link"
+              href="../intro.html"
+              data-tab-id="home"
+              data-mirror-paths="true"
+              data-href-en="en/intro"
+              data-href-zh="zh/intro"
+              data-url-en="../../en/intro.html"
+              data-url-zh="../intro.html"
+              data-prefixes-en="en/intro"
+              data-prefixes-zh="zh/intro"
+              data-sections-en=""
+              data-sections-zh=""
+            >
+              首页
+            </a>
+          
+        
+      
+        
+        
+          
+          
+          
+            <a
+              class="docs-top-tabs__link"
+              href="../harness/overview.html"
+              data-tab-id="harness"
+              data-mirror-paths="false"
+              data-href-en="en/harness/overview"
+              data-href-zh="zh/harness/overview"
+              data-url-en="../../en/harness/overview.html"
+              data-url-zh="../harness/overview.html"
+              data-prefixes-en="en/harness/"
+              data-prefixes-zh="zh/harness/"
+              data-sections-en="Harness (English)"
+              data-sections-zh="Harness"
+            >
+              Harness
+            </a>
+          
+        
+      
+        
+        
+          
+          
+          
+            <a
+              class="docs-top-tabs__link"
+              href="../quickstart/installation.html"
+              data-tab-id="agent"
+              data-mirror-paths="true"
+              data-href-en="en/quickstart/installation"
+              data-href-zh="zh/quickstart/installation"
+              data-url-en="../../en/quickstart/installation.html"
+              data-url-zh="../quickstart/installation.html"
+              data-prefixes-en="en/quickstart/|en/task/|en/multi-agent/"
+              data-prefixes-zh="zh/quickstart/|zh/task/|zh/multi-agent/"
+              data-sections-en="Quick Start|Features|Multi Agent"
+              data-sections-zh="快速开始|功能指南|多智能体"
+            >
+              Agent
+            </a>
+          
+        
+      
+        
+        
+          
+          
+          
+            <a
+              class="docs-top-tabs__link"
+              href="../integration/overview.html"
+              data-tab-id="integration"
+              data-mirror-paths="true"
+              data-href-en="en/integration/overview"
+              data-href-zh="zh/integration/overview"
+              data-url-en="../../en/integration/overview.html"
+              data-url-zh="../integration/overview.html"
+              data-prefixes-en="en/integration/"
+              data-prefixes-zh="zh/integration/"
+              data-sections-en="Integration"
+              data-sections-zh="集成"
+            >
+              集成
+            </a>
+          
+        
+      
+        
+        
+          
+          
+          
+            <a
+              class="docs-top-tabs__link"
+              href="../blogs/index.html"
+              data-tab-id="blogs"
+              data-mirror-paths="true"
+              data-href-en="en/blogs/index"
+              data-href-zh="zh/blogs/index"
+              data-url-en="../../en/blogs/index.html"
+              data-url-zh="../blogs/index.html"
+              data-prefixes-en="en/blogs/"
+              data-prefixes-zh="zh/blogs/"
+              data-sections-en="Blogs"
+              data-sections-zh="博客"
+            >
+              博客
+            </a>
+          
+        
+      
+        
+        
+          
+          
+          
+            <a
+              class="docs-top-tabs__link"
+              href="../community/overview.html"
+              data-tab-id="community"
+              data-mirror-paths="true"
+              data-href-en="en/community/overview"
+              data-href-zh="zh/community/overview"
+              data-url-en="../../en/community/overview.html"
+              data-url-zh="../community/overview.html"
+              data-prefixes-en="en/community/"
+              data-prefixes-zh="zh/community/"
+              data-sections-en="Community"
+              data-sections-zh="社区"
+            >
+              社区
+            </a>
+          
+        
+      
+    </div>
+  </nav>
+
+      </div>
+    </div>
+    <div class="docs-site-header__actions" aria-label="Site actions">
+      <form class="docs-header-search" method="get" action="../../search.html" role="search">
+        <input class="docs-header-search__input" type="search" name="q" placeholder="Search" aria-label="Search" autocomplete="off" />
+        <input type="hidden" name="check_keywords" value="yes" />
+        <input type="hidden" name="area" value="default" />
+        <button class="docs-header-search__submit" type="submit" aria-label="Search">
+          <svg class="docs-header-search__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </button>
+      </form>
+      <div id="searchbox" class="docs-header-searchbox"></div>
+      <div class="docs-site-header__theme theme-toggle-container">
+        <button class="theme-toggle" type="button" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <!--
+  ~ Copyright 2024-2026 the original author or authors.
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+-->
+
+<div class="language-switch">
+    <div class="language-selector">
+        <button class="language-button" type="button" onclick="return toggleLanguageMenu()" aria-haspopup="true" aria-expanded="false">
+            <span id="current-lang">English</span>
+        </button>
+        <div class="language-menu" id="language-menu">
+            <a href="#" class="language-option" onclick="return switchLanguage('en')">English</a>
+            <a href="#" class="language-option" onclick="return switchLanguage('zh')">中文</a>
+        </div>
+    </div>
+</div>
+    </div>
+  </div>
+</div>
+  
     <script>
       document.body.dataset.theme = localStorage.getItem("theme") || "auto";
     </script>
@@ -196,128 +435,7 @@
   <aside class="sidebar-drawer">
     <div class="sidebar-container">
       
-      <div class="sidebar-sticky"><div class="sidebar-scroll"><a class="sidebar-brand" href="../../en/intro.html">
-  <div class="sidebar-logo-container">
-    <img class="sidebar-logo" src="../../_static/logo.svg" alt="Logo"/>
-  </div>
-  
-  <span class="sidebar-brand-text"><span style='font-weight: 700; color: #2196f3;'>AgentScope</span> <br><span style='font-weight: 900; color: #ff5722;'>Java</span></span>
-  
-</a><!--
-  ~ Copyright 2024-2026 the original author or authors.
-  ~
-  ~ Licensed under the Apache License, Version 2.0 (the "License");
-  ~ you may not use this file except in compliance with the License.
-  ~ You may obtain a copy of the License at
-  ~
-  ~     http://www.apache.org/licenses/LICENSE-2.0
-  ~
-  ~ Unless required by applicable law or agreed to in writing, software
-  ~ distributed under the License is distributed on an "AS IS" BASIS,
-  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  ~ See the License for the specific language governing permissions and
-  ~ limitations under the License.
--->
-
-<div class="language-switch">
-    <div class="language-selector">
-        <button class="language-button" onclick="toggleLanguageMenu()">
-            <span id="current-lang">English</span>
-            <span class="dropdown-arrow"></span>
-        </button>
-        <div class="language-menu" id="language-menu">
-            <a href="#" class="language-option" onclick="switchLanguage('en')">English</a>
-            <a href="#" class="language-option" onclick="switchLanguage('zh')">中文</a>
-        </div>
-    </div>
-</div>
-
-<script>
-    function toggleLanguageMenu() {
-        const menu = document.getElementById('language-menu');
-        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-    }
-
-    function switchLanguage(lang, skipRedirect = false) {
-        // Save language preference
-        localStorage.setItem('preferred-language', lang);
-
-        // Update displayed language const
-        currentLang = document.getElementById('current-lang');
-        currentLang.textContent = lang === 'zh' ? '中文' : 'English';
-        document.body.setAttribute('data-current-lang', lang);
-        if (!skipRedirect) {
-            const currentPath = window.location.pathname;
-            let newPath = null;
-
-            if (lang === 'zh' && currentPath.includes('/en/')) {
-                newPath = currentPath.replace('/en/', '/zh/');
-            } else if (lang === 'en' && currentPath.includes('/zh/')) {
-                newPath = currentPath.replace('/zh/', '/en/');
-            }
-            if (newPath && newPath !== currentPath) {
-                window.location.href = newPath + window.location.search + window.location.hash;
-                return;
-            }
-        }
-
-        // Apply language filtering
-        filterContentByLanguage(lang);
-
-        // Close dropdown menu
-        document.getElementById('language-menu').style.display = 'none';
-    }
-
-    function filterContentByLanguage(lang) {
-        const captions = document.querySelectorAll('.caption');
-        const toctreeItems = document.querySelectorAll('.toctree-l1');
-
-        // Define which captions should be displayed based on the selected language
-        const languageMapping = {
-            'en': ['Quick Start', 'Features', 'Multi Agent'],
-            'zh': ['快速开始', '功能指南', '多智能体']
-        };
-
-        const visibleCaptions = languageMapping[lang] || [];
-
-        // Filter captions based on the selected language
-        captions.forEach(caption => {
-            const text = caption.textContent.trim();
-            caption.style.display = visibleCaptions.includes(text) ? 'block' : 'none';
-        });
-
-        // Filter toctree items based on the selected language
-        toctreeItems.forEach(item => {
-            const link = item.querySelector('a');
-            if (link) {
-                const href = link.getAttribute('href') || '';
-                if (lang === 'zh') {
-                    const hasZh = href.includes('/zh/');
-                    const hasEn = href.includes('/en/');
-                    const isRelative = !href.startsWith('http') && !href.startsWith('/') && !hasEn;
-
-                    item.style.display = (hasZh || isRelative) ? 'block' : 'none';
-                } else {
-                    const hasZh = href.includes('/zh/');
-                    item.style.display = hasZh ? 'none' : 'block';
-                }
-            } else {
-                item.style.display = 'block';
-            }
-        });
-    }
-
-    document.addEventListener('click', function (e) {
-        if (!e.target.closest('.language-selector')) {
-            document.getElementById('language-menu').style.display = 'none';
-        }
-    });
-</script><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
-  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
-  <input type="hidden" name="check_keywords" value="yes">
-  <input type="hidden" name="area" value="default">
-</form>
-<div id="searchbox"></div><div class="sidebar-tree">
+      <div class="sidebar-sticky"><div class="sidebar-scroll"><div class="sidebar-tree">
   <p class="caption" role="heading"><span class="caption-text">Quick Start</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../en/quickstart/installation.html">Installation</a></li>
@@ -332,6 +450,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../en/task/agent-as-tool.html">Agent as Tool</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../en/task/agent-skill.html">Agent Skill</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../en/task/rag.html">RAG</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../en/task/streaming.html">Streaming</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../en/task/hook.html">Hook System</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../en/task/hitl.html">Human-in-the-Loop</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../en/task/memory.html">Memory Management</a></li>
@@ -359,9 +478,37 @@
 <li class="toctree-l1"><a class="reference internal" href="../../en/multi-agent/handoffs.html">Handoffs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../en/multi-agent/multiagent-debate.html">Multi-Agent Debate</a></li>
 </ul>
+<p class="caption" role="heading"><span class="caption-text">Harness (English)</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../en/harness/overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../en/harness/architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../en/harness/workspace.html">Workspace</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../en/harness/filesystem.html">Filesystem</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../en/harness/session.html">Session</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../en/harness/memory.html">Memory</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../en/harness/tool.html">Tooling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../en/harness/subagent.html">Subagent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../en/harness/streaming.html">Subagent Streaming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../en/harness/quickstart/index.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../en/harness/sandbox/index.html">Sandbox</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../en/harness/example/index.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Integration</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../en/integration/overview.html">Overview</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Blogs</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../en/blogs/index.html">Article index</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../en/blogs/agentscope-v1-harness.html">AgentScope Java 1.1 · Harness</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Community</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../en/community/overview.html">Community</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../en/community/contributors.html">Contributors</a></li>
+</ul>
 <p class="caption" role="heading"><span class="caption-text">快速开始</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../intro.html">简介</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../quickstart/installation.html">安装</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../quickstart/key-concepts.html">核心概念</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../quickstart/agent.html">智能体</a></li>
@@ -374,6 +521,7 @@
 <li class="toctree-l1"><a class="reference internal" href="agent-as-tool.html">Agent as Tool</a></li>
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Agent Skill</a></li>
 <li class="toctree-l1"><a class="reference internal" href="rag.html">RAG</a></li>
+<li class="toctree-l1"><a class="reference internal" href="streaming.html">流式输出</a></li>
 <li class="toctree-l1"><a class="reference internal" href="hook.html">钩子系统</a></li>
 <li class="toctree-l1"><a class="reference internal" href="hitl.html">Human-in-the-Loop</a></li>
 <li class="toctree-l1"><a class="reference internal" href="memory.html">记忆管理</a></li>
@@ -400,6 +548,35 @@
 <li class="toctree-l1"><a class="reference internal" href="../multi-agent/supervisor.html">Supervisor</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../multi-agent/handoffs.html">Handoffs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../multi-agent/multiagent-debate.html">多智能体辩论</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">集成</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../integration/overview.html">概览</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">博客</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../blogs/index.html">全部文章</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs/agentscope-v1-harness.html">AgentScope Java 1.1 · Harness</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">社区</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../community/overview.html">社区</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../community/contributors.html">核心贡献者</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Harness</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../harness/overview.html">概览</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../harness/architecture.html">架构</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../harness/workspace.html">工作区</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../harness/filesystem.html">文件系统</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../harness/session.html">会话</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../harness/memory.html">记忆</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../harness/tool.html">工具</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../harness/subagent.html">子 Agent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../harness/streaming.html">子 Agent 流式</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../harness/quickstart/index.html">快速开始</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../harness/sandbox/index.html">沙箱</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../harness/example/index.html">示例</a></li>
 </ul>
 
 </div>
@@ -493,6 +670,12 @@
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
 <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">skill-name</span><span class="w">                    </span><span class="c1"># 必需: 技能名称(小写字母、数字、下划线)</span>
 <span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">This skill should be used when...</span><span class="w">  </span><span class="c1"># 必需: 触发描述,说明何时使用</span>
+<span class="nt">homepage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.com/docs</span><span class="w">  </span><span class="c1"># 可选: 额外 metadata,会暴露到智能体提示词中</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">clawdbot</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">requires</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">env</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">API_KEY</span>
 <span class="nn">---</span>
 
 <span class="c1"># 技能名称</span>
@@ -513,6 +696,13 @@
 <li><p><code class="docutils literal notranslate"><span class="pre">name</span></code> - 技能的名字（小写字母、数字、下划线）</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">description</span></code> - 技能功能和使用场景描述，帮助 AI 判断何时使用</p></li>
 </ul>
+<p><strong>Metadata 说明:</strong></p>
+<ul class="simple">
+<li><p>YAML frontmatter 中除 <code class="docutils literal notranslate"><span class="pre">name</span></code>、<code class="docutils literal notranslate"><span class="pre">description</span></code> 外的字段都会作为 Skill metadata 保留，不再局限于固定字段</p></li>
+<li><p>支持嵌套 <code class="docutils literal notranslate"><span class="pre">Map/List</span></code>，并保留原有层级结构和插入顺序</p></li>
+<li><p>frontmatter 使用 SnakeYAML <code class="docutils literal notranslate"><span class="pre">SafeConstructor</span></code> 解析，只接受顶层为 <code class="docutils literal notranslate"><span class="pre">Map</span></code> 的 YAML 对象</p></li>
+<li><p>非法 frontmatter 或超过解析器限制的 frontmatter 会被忽略，并按空 metadata 处理</p></li>
+</ul>
 </section>
 <section id="id5">
 <h2>快速开始<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h2>
@@ -523,6 +713,7 @@
 <div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">AgentSkill</span><span class="w"> </span><span class="n">skill</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">AgentSkill</span><span class="p">.</span><span class="na">builder</span><span class="p">()</span>
 <span class="w">    </span><span class="p">.</span><span class="na">name</span><span class="p">(</span><span class="s">&quot;data_analysis&quot;</span><span class="p">)</span>
 <span class="w">    </span><span class="p">.</span><span class="na">description</span><span class="p">(</span><span class="s">&quot;Use when analyzing data...&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">putMetadata</span><span class="p">(</span><span class="s">&quot;homepage&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;https://example.com/docs&quot;</span><span class="p">)</span>
 <span class="w">    </span><span class="p">.</span><span class="na">skillContent</span><span class="p">(</span><span class="s">&quot;# Data Analysis\n...&quot;</span><span class="p">)</span>
 <span class="w">    </span><span class="p">.</span><span class="na">addResource</span><span class="p">(</span><span class="s">&quot;references/formulas.md&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;# 常用公式\n...&quot;</span><span class="p">)</span>
 <span class="w">    </span><span class="p">.</span><span class="na">source</span><span class="p">(</span><span class="s">&quot;custom&quot;</span><span class="p">)</span>
@@ -764,28 +955,28 @@
 </section>
 <section id="id14">
 <h3>功能 4: 自定义 Skill 提示词<a class="headerlink" href="#id14" title="Link to this heading">¶</a></h3>
-<p>SkillBox 在注入给 Agent 的系统提示词中,会为每个已注册的 Skill 生成描述信息,供 LLM 判断何时加载哪个 Skill。通过构造函数可自定义提示词的两个组成部分:</p>
+<p>SkillBox 在注入给 Agent 的系统提示词中,会为每个已注册的 Skill 生成一个 XML <code class="docutils literal notranslate"><span class="pre">&lt;skill&gt;</span></code> 条目,供 LLM 判断何时加载哪个 Skill。metadata 直接来自 <code class="docutils literal notranslate"><span class="pre">AgentSkill.getMetadata()</span></code>，并始终追加 <code class="docutils literal notranslate"><span class="pre">&lt;skill-id&gt;</span></code> 作为工具加载标识。</p>
 <ul class="simple">
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">instruction</span></code></strong>: 提示词头部,说明 Skill 的使用方式(如何加载、路径约定等)。默认包含 <code class="docutils literal notranslate"><span class="pre">load_skill_through_path</span></code> 的调用说明</p></li>
-<li><p><strong><code class="docutils literal notranslate"><span class="pre">template</span></code></strong>: 每个 Skill 条目的格式模板,包含三个 <code class="docutils literal notranslate"><span class="pre">%s</span></code> 占位符,依次对应 <code class="docutils literal notranslate"><span class="pre">name</span></code>、<code class="docutils literal notranslate"><span class="pre">description</span></code>、<code class="docutils literal notranslate"><span class="pre">skillId</span></code></p></li>
+<li><p><strong>XML metadata 渲染</strong>: 标量会渲染为子节点,嵌套 <code class="docutils literal notranslate"><span class="pre">Map</span></code> 会递归渲染为嵌套 XML,列表会渲染为重复的 <code class="docutils literal notranslate"><span class="pre">&lt;item&gt;</span></code> 节点</p></li>
+<li><p><strong>metadata 暴露控制</strong>: <code class="docutils literal notranslate"><span class="pre">skillBox.setExposeAllSkillMetadata(false)</span></code> 可将提示词限制为只暴露 <code class="docutils literal notranslate"><span class="pre">name</span></code>、<code class="docutils literal notranslate"><span class="pre">description</span></code> 和 <code class="docutils literal notranslate"><span class="pre">skill-id</span></code>；默认暴露全部 metadata</p></li>
 </ul>
 <p>开启代码执行后,还可通过 <code class="docutils literal notranslate"><span class="pre">.codeExecutionInstruction()</span></code> 自定义追加在 <code class="docutils literal notranslate"><span class="pre">&lt;/available_skills&gt;</span></code> 之后的代码执行说明段落:</p>
 <ul class="simple">
 <li><p><strong><code class="docutils literal notranslate"><span class="pre">codeExecutionInstruction</span></code></strong>: 代码执行说明模板,所有 <code class="docutils literal notranslate"><span class="pre">%s</span></code> 占位符都会被替换为 <code class="docutils literal notranslate"><span class="pre">uploadDir</span></code> 的绝对路径。传 <code class="docutils literal notranslate"><span class="pre">null</span></code> 或空字符串时使用内置默认值</p></li>
 </ul>
-<p>三者传 <code class="docutils literal notranslate"><span class="pre">null</span></code> 或空字符串时均使用内置默认值。</p>
+<p><code class="docutils literal notranslate"><span class="pre">instruction</span></code> 和 <code class="docutils literal notranslate"><span class="pre">codeExecutionInstruction</span></code> 传 <code class="docutils literal notranslate"><span class="pre">null</span></code> 或空字符串时均使用内置默认值。</p>
 <p><strong>示例代码</strong>:</p>
-<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// 自定义 instruction 和 template</span>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// 自定义 instruction 头部</span>
 <span class="n">String</span><span class="w"> </span><span class="n">customInstruction</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;&quot;&quot;</span>
 <span class="s">    ## 可用技能</span>
 <span class="s">    当任务匹配某个技能时,使用 load_skill_through_path 加载它。</span>
 <span class="s">    &quot;&quot;&quot;</span><span class="p">;</span>
 
-<span class="n">String</span><span class="w"> </span><span class="n">customTemplate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;&quot;&quot;</span>
-<span class="s">    - **%s**: %s (id: %s)</span>
-<span class="s">    &quot;&quot;&quot;</span><span class="p">;</span>
+<span class="n">SkillBox</span><span class="w"> </span><span class="n">skillBox</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">SkillBox</span><span class="p">(</span><span class="n">toolkit</span><span class="p">,</span><span class="w"> </span><span class="n">customInstruction</span><span class="p">);</span>
 
-<span class="n">SkillBox</span><span class="w"> </span><span class="n">skillBox</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">SkillBox</span><span class="p">(</span><span class="n">toolkit</span><span class="p">,</span><span class="w"> </span><span class="n">customInstruction</span><span class="p">,</span><span class="w"> </span><span class="n">customTemplate</span><span class="p">);</span>
+<span class="c1">// 可选: 仅向 prompt 暴露核心 metadata</span>
+<span class="n">skillBox</span><span class="p">.</span><span class="na">setExposeAllSkillMetadata</span><span class="p">(</span><span class="kc">false</span><span class="p">);</span>
 
 <span class="c1">// 自定义代码执行说明(开启代码执行后生效)</span>
 <span class="n">skillBox</span><span class="p">.</span><span class="na">codeExecution</span><span class="p">()</span>
@@ -873,7 +1064,7 @@
             Made with 
             <a href="https://github.com/pradyunsg/furo">Furo</a>
             <div class="last-updated">
-              Last updated on 2026-04-25</div>
+              Last updated on 2026-07-03</div>
           </div>
           <div class="right-details">
             <div class="icons">
@@ -959,7 +1150,8 @@
       
     </aside>
   </div>
-</div><script src="../../_static/documentation_options.js?v=9eb32ce0"></script>
+</div>
+<script src="../../_static/documentation_options.js?v=9eb32ce0"></script>
     <script src="../../_static/doctools.js?v=9a2dae69"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
@@ -976,6 +1168,9 @@
     <script async="async" src="../../_static/sphinx-thebe.js?v=c100c467"></script>
     <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
     <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script src="../../_static/tabs.js?v=7ce5a780"></script>
     <script src="../../_static/language.js?v=26e4e812"></script>
+    <script src="../../_static/notice-bar.js?v=6a544133"></script>
+    <script src="../../_static/mermaid-zoom.js?v=b287901b"></script>
     </body>
 </html>
