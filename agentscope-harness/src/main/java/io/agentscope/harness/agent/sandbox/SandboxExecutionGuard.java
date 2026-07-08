@@ -55,6 +55,37 @@ import io.agentscope.harness.agent.IsolationScope;
  * {@link SandboxLease} after {@link SandboxManager#release} completes, so the guard covers the
  * full call window: {@code acquire → start → (call) → stop → release → lease.close()}.
  */
+/**
+ * 可插拔的沙箱执行槽并发隔离器。
+ *
+ * <p>隔离器用于控制同一 {@link SandboxIsolationKey} 允许的并发执行数量。默认无实现 {@link #noop()} 不做任何并发限制，保持原有执行逻辑。
+ *
+ * <p>该扩展点主要适用于 {@link IsolationScope#USER}、{@link IsolationScope#AGENT}、{@link IsolationScope#GLOBAL} 隔离维度；
+ * 这类场景下多并发调用会争抢同一份持久化状态（存在后写入覆盖先写入的问题）。接入隔离器即可串行化并发请求，无需改动上层基础设施。
+ *
+ * <p>实现层可选用任意存储后端：JVM信号量、Redis {@code SET NX} 租约、ZooKeeper、数据库排它锁等，且必须保证线程安全。
+ *
+ * <h2>使用示例</h2>
+ *
+ * <pre>{@code
+ * SandboxExecutionGuard guard = key -> {
+ *     redisClient.set(key.toString(), token, SetArgs.Builder.nx().px(30_000));
+ *     return () -> redisClient.eval(LUA_RELEASE_SCRIPT, key.toString(), token);
+ * };
+ *
+ * HarnessAgent.builder()
+ *     .filesystem(new DockerFilesystemSpec()
+ *         .isolationScope(IsolationScope.AGENT)
+ *         .executionGuard(guard))
+ *     ...
+ *     .build();
+ * }</pre>
+ *
+ * <h2>生命周期流程</h2>
+ *
+ * <p>执行器在获取/恢复沙箱前调用 {@link #tryEnter}；在 {@link SandboxManager#release} 执行完成后关闭返回的 {@link SandboxLease}。
+ * 隔离锁完整覆盖整个调用生命周期：{@code acquire → start → (业务调用) → stop → release → lease.close()}。
+ */
 @FunctionalInterface
 public interface SandboxExecutionGuard {
 

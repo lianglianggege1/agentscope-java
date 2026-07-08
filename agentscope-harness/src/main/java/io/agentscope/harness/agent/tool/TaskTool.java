@@ -39,6 +39,19 @@ import java.util.Collection;
  * {@link TaskRepository} handles fallback to workspace-persisted records when no local future
  * exists (cross-node or post-restart scenarios).
  */
+/**
+ * 统一后台任务生命周期管理工具，将任务结果查询、任务取消、任务列表查询整合至同一工具类。
+ *
+ * <ul>
+ *   <li>task_output — 获取任务执行结果（支持阻塞/非阻塞两种模式）
+ *   <li>task_cancel — 终止正在运行的任务
+ *   <li>task_list — 查询所有托管任务，可按状态筛选
+ * </ul>
+ *
+ * <p>所有操作均以当前运行上下文 {@link RuntimeContext} 的父会话ID作为隔离作用域。
+ * 若本地不存在任务执行句柄，{@link TaskRepository} 会从持久化到工作区的任务记录中兜底读取，
+ * 适配跨节点部署、服务重启后的任务恢复场景。
+ */
 public class TaskTool {
 
     private static final DateTimeFormatter ISO_FORMATTER =
@@ -50,6 +63,11 @@ public class TaskTool {
         this.taskRepository = taskRepository;
     }
 
+    /*
+    "获取后台子智能体任务的执行输出。当 agent_spawn / agent_send 设置 timeout_seconds=0 时使用本工具。"
+            + "推荐设置 block=false 仅查询状态、不阻塞等待；仅当你准备好等待结果时再使用默认 block=true。"
+            + "禁止在任务刚发起后立刻调用该工具——对话历史里的任务状态存在延迟，必须通过 task_output 或 task_list 获取实时状态。"
+     */
     @Tool(
             name = "task_output",
             description =
@@ -63,12 +81,14 @@ public class TaskTool {
             RuntimeContext runtimeContext,
             @ToolParam(
                             name = "task_id",
+//                            调用 agent_spawn 或 agent_send 并传入 timeout_seconds=0 时返回的任务ID
                             description =
                                     "The task_id returned by agent_spawn or agent_send when"
                                             + " timeout_seconds was 0")
                     String taskId,
             @ToolParam(
                             name = "block",
+//                            是否阻塞等待任务完成（默认true）。查询状态建议设为false，避免阻塞
                             description =
                                     "Whether to wait for completion (default: true). Prefer"
                                             + " false for status checks to avoid blocking.",
@@ -76,6 +96,7 @@ public class TaskTool {
                     Boolean block,
             @ToolParam(
                             name = "timeout",
+//                            最大等待毫秒数（默认30000，上限600000）
                             description =
                                     "Max wait time in milliseconds (default: 30000, max: 600000)",
                             required = false)
@@ -125,6 +146,7 @@ public class TaskTool {
 
     @Tool(
             name = "task_cancel",
+//            取消正在运行的后台任务。用于终止不再需要执行的任务；对已完成的任务无任何作用。
             description =
                     "Cancel a running background task. Use to stop a task that is no longer"
                             + " needed. Has no effect on already-completed tasks.")
@@ -137,6 +159,7 @@ public class TaskTool {
         }
 
         String sessionId = runtimeContext != null ? runtimeContext.getSessionId() : null;
+        // 根据会话与任务ID查询任务
         BackgroundTask bgTask = taskRepository.getTask(sessionId, taskId);
         if (bgTask == null) {
             return "Error: No background task found with ID: " + taskId;
@@ -155,6 +178,11 @@ public class TaskTool {
         return "task_id: " + taskId + "\nstatus: cancelled\nCancellation requested successfully.";
     }
 
+    /*
+    "列出当前会话下所有后台任务及其实时状态。数据读取自持久化工作区存储，"
+    + "对话压缩、节点迁移后数据依旧准确；可按需按状态筛选（运行中、已完成、失败、已取消）。"
+    + "对话压缩丢失任务记录后，可通过本工具恢复任务ID与任务状态。"
+     */
     @Tool(
             name = "task_list",
             description =

@@ -40,6 +40,24 @@ import java.util.Map;
  * spec.getEnvironment().put("DEBUG", "true");
  * }</pre>
  */
+/**
+ * 描述沙箱工作区期望的初始状态：根路径、预生成文件/目录条目、每次执行生效的环境变量。
+ *
+ * <p>字段说明：
+ * <ul>
+ *   <li>{@code root} — 沙箱内部工作区路径（默认值：{@code /workspace}）
+ *   <li>{@code entries} — 启动时加载的文件、目录及可选绑定挂载项；绑定挂载由Docker/K8s后端实现，不会复制为普通文件
+ *   <li>{@code environment} — 每条执行命令都会注入的环境变量
+ * </ul>
+ *
+ * <p>使用示例：
+ * <pre>{@code
+ * WorkspaceSpec spec = new WorkspaceSpec();
+ * spec.setRoot("/workspace");
+ * spec.getEntries().put("README.md", new io.agentscope.harness.agent.sandbox.layout.FileEntry("# My Project"));
+ * spec.getEnvironment().put("DEBUG", "true");
+ * }</pre>
+ */
 public class WorkspaceSpec {
 
     private String root = "/workspace";

@@ -24,6 +24,12 @@ import java.util.function.Supplier;
  * <p>{@link LocalTaskRunSpec} runs the supplier on a local executor. {@link RemoteTaskRunSpec}
  * delegates to an AgentScope task HTTP API (see {@code agentscope-extensions-agent-protocol}).
  */
+/**
+ * 区分联合类型，用于描述后台子智能体任务的执行方式。
+ *
+ * <p>{@link LocalTaskRunSpec}：在本地线程池执行任务工厂；
+ * {@link RemoteTaskRunSpec}：将任务转发至 AgentScope 任务HTTP接口执行（依赖 agentscope-extensions-agent-protocol 扩展包）。
+ */
 public sealed interface TaskRunSpec {
 
     /** In-process execution via {@link Supplier}. */

@@ -24,6 +24,14 @@ package io.agentscope.harness.agent.sandbox;
  *
  * <p>Implementations must be idempotent: calling {@link #close()} more than once must be safe.
  */
+/**
+ * 代表持有沙箱隔离槽执行权限的租约句柄。
+ *
+ * <p>由 {@link SandboxExecutionGuard#tryEnter} 方法返回。无论调用成功或失败，执行器都会在 {@link SandboxManager#release} 执行完毕后自动关闭租约，
+ * 实现方无需关心资源释放的执行顺序。
+ *
+ * <p>实现必须支持幂等：多次调用 {@link #close()} 不会产生异常。
+ */
 public interface SandboxLease extends AutoCloseable {
 
     /**

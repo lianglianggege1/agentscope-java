@@ -24,6 +24,11 @@ import io.agentscope.harness.agent.sandbox.snapshot.SandboxSnapshotSpec;
  * <p>Built with the agent and attached to {@link io.agentscope.core.agent.RuntimeContext} for
  * each call.
  */
+/**
+ * 沙箱行为不可变配置类。
+ *
+ * <p>随智能体构建生成，每次调用时挂载至 {@link io.agentscope.core.agent.RuntimeContext}。
+ */
 public final class SandboxContext {
 
     private final SandboxClient<?> client;

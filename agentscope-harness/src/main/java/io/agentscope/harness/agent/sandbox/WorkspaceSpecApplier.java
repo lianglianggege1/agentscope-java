@@ -47,6 +47,16 @@ import org.slf4j.LoggerFactory;
  *   </li>
  * </ul>
  */
+/**
+ * 将 {@link WorkspaceSpec} 配置落地到目标目录，生成配置声明的文件、目录与本地副本条目。
+ *
+ * <p>支持两种资源落地模式：
+ * <ul>
+ *   <li>{@code onlyEphemeral=false}：加载全部条目（对应沙箱启动逻辑分支C、D）</li>
+ *   <li>{@code onlyEphemeral=true}：仅加载 {@link WorkspaceEntry#isEphemeral()} 为 true 的临时条目（对应沙箱启动逻辑分支A、B）
+ *   </li>
+ * </ul>
+ */
 public class WorkspaceSpecApplier {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceSpecApplier.class);

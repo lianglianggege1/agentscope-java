@@ -30,11 +30,13 @@ import io.agentscope.harness.agent.subagent.task.BackgroundTask;
 import io.agentscope.harness.agent.subagent.task.TaskRepository;
 import io.agentscope.harness.agent.subagent.task.TaskRunSpec;
 import io.agentscope.harness.agent.subagent.task.TaskStatus;
+
 import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
@@ -66,6 +68,29 @@ import reactor.core.publisher.Mono;
  * call()} mode), execution falls back to the non-streaming {@code invokeAgent} path with no
  * overhead.
  */
+
+/**
+ * 供智能体内部使用的轻量子智能体工具，相比 SessionsTool 轻量化很多：
+ *
+ * <ul>
+ *   <li>agent_spawn — 创建子智能体、执行任务并返回结果（支持同步/异步）
+ *   <li>agent_send — 向已创建的子智能体发送后续交互消息
+ *   <li>agent_list — 查询当前活跃的所有子智能体
+ * </ul>
+ *
+ * <p>该工具不维护独立会话、任务通道、运行注册中心与事件分发能力，仅提供「创建智能体 → 执行调用 → 返回结果」基础能力。
+ * 仅依赖 {@link DefaultAgentManager} 完成智能体的创建与调用。
+ *
+ * <p>异步任务（timeout_seconds=0）会提交至 {@link TaskRepository}，并以当前运行上下文 {@link RuntimeContext} 的会话ID作为隔离作用域。
+ * 任务状态持久化至工作区存储，支持跨节点读取，也可在上下文压缩后恢复任务。
+ *
+ * <h2>流式输出能力</h2>
+ *
+ * <p>agent_spawn 和 agent_send 返回 {@link Mono}{@code <String>}，框架响应式工具调用链路（ToolMethodInvoker）可在父智能体的流式链路中订阅返回流。
+ * 若 Reactor 上下文内存在 {@link SubagentEventBus}（由 AgentBase.createEventStream 注入），所有子智能体产生的 {@link io.agentscope.core.agent.Event} 事件会实时转发至父级事件接收器，
+ * 对外提供扁平化、完整调用链路的统一事件流。
+ * 若无事件总线（普通 call() 调用模式），执行逻辑自动降级为无流式开销的 invokeAgent 同步调用分支。
+ */
 public class AgentSpawnTool {
 
     private static final Logger log = LoggerFactory.getLogger(AgentSpawnTool.class);
@@ -76,12 +101,12 @@ public class AgentSpawnTool {
 
     private static final String BG_RESULT_TEMPLATE =
             """
-            status: accepted
-            task_id: %s
-            Use task_output(task_id='%s', block=false) to check status, \
-            task_cancel(task_id='%s') to cancel, or task_list() to see all tasks. \
-            Do NOT call task_output immediately — the task has just started.\
-            """;
+                    status: accepted
+                    task_id: %s
+                    Use task_output(task_id='%s', block=false) to check status, \
+                    task_cancel(task_id='%s') to cancel, or task_list() to see all tasks. \
+                    Do NOT call task_output immediately — the task has just started.\
+                    """;
 
     private final DefaultAgentManager agentManager;
     private final TaskRepository taskRepository;
@@ -89,7 +114,8 @@ public class AgentSpawnTool {
     private final Supplier<String> userIdSupplier;
 
     private record SpawnedAgent(
-            String key, String agentId, String sessionId, String label, Agent agent, int depth) {}
+            String key, String agentId, String sessionId, String label, Agent agent, int depth) {
+    }
 
     private final ConcurrentHashMap<String, SpawnedAgent> agentsByKey = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, String> labelToKey = new ConcurrentHashMap<>();
@@ -97,10 +123,10 @@ public class AgentSpawnTool {
     /**
      * Creates an {@code AgentSpawnTool} with a supplier for the parent agent's current user-id.
      *
-     * @param agentManager factory and invoker for subagents
-     * @param taskRepository background task store
+     * @param agentManager     factory and invoker for subagents
+     * @param taskRepository   background task store
      * @param parentSpawnDepth current spawn-depth of the parent (0 for top-level main agent)
-     * @param userIdSupplier provides the parent's current user-id at spawn time (may return null)
+     * @param userIdSupplier   provides the parent's current user-id at spawn time (may return null)
      */
     public AgentSpawnTool(
             DefaultAgentManager agentManager,
@@ -117,36 +143,40 @@ public class AgentSpawnTool {
             name = "agent_spawn",
             description =
                     """
-                    Spawn an isolated subagent for delegated or background work. \
-                    Every response starts with three lines: agent_key (pass this verbatim to \
-                    agent_send as agent_key), agent_id (the subagent type name), and session_id \
-                    (internal; do not use as agent_key). Sync mode returns the reply below that; \
-                    async (timeout_seconds=0) adds task_id for task_output — task_id is NOT agent_key.\
-                    """)
+                            创建隔离的子智能体，用于任务委派或后台异步执行。
+                            工具返回内容固定以三行信息开头：
+                            agent_key（原样传给 agent_send 作为标识）、
+                            agent_id（子智能体类型名称）、
+                            session_id（内部会话标识，不可当作 agent_key 使用）。
+                            同步模式下三行下方直接返回任务结果；
+                            异步模式（timeout_seconds=0）会额外返回 task_id，配合 task_output 获取结果；
+                            task_id 不能等同于 agent_key。
+                            """)
     public Mono<String> agentSpawn(
             RuntimeContext runtimeContext,
-            @ToolParam(name = "agent_id", description = "Subagent identifier to instantiate")
-                    String agentId,
+            @ToolParam(name = "agent_id", description = "待实例化的子智能体标识")
+            String agentId,
             @ToolParam(
-                            name = "task",
-                            description = "Task or prompt to send to the spawned agent",
-                            required = false)
-                    String task,
+                    name = "task",
+                    description = "下发给新建子智能体的指令/提示词，非必填",
+                    required = false)
+            String task,
             @ToolParam(
-                            name = "label",
-                            description =
-                                    "Optional human-readable label for referencing via agent_send",
-                            required = false)
-                    String label,
+                    name = "label",
+                    description =
+                            "可选、易读的自定义标签，用于 agent_send 快速寻址子智能体，非必填",
+                    required = false)
+            String label,
             @ToolParam(
-                            name = "timeout_seconds",
-                            description =
-                                    """
-                                    Max seconds to wait for the task result. 0=fire-and-forget, \
-                                    returns task_id. Default: 30. Max: 600.\
+                    name = "timeout_seconds",
+                    description =
+                            """
+                                    等待任务执行结果的最大秒数。
+                                    传0代表「发后即忘」异步模式，仅返回task_id；
+                                    默认30秒，上限600秒，非必填。
                                     """,
-                            required = false)
-                    Integer timeoutSeconds) {
+                    required = false)
+            Integer timeoutSeconds) {
 
         System.err.println(
                 "[agentSpawn] called agentId="
@@ -222,8 +252,8 @@ public class AgentSpawnTool {
                                     } catch (RuntimeException e) {
                                         return "Error: "
                                                 + (e.getMessage() != null
-                                                        ? e.getMessage()
-                                                        : e.getClass().getSimpleName());
+                                                ? e.getMessage()
+                                                : e.getClass().getSimpleName());
                                     }
                                 });
             }
@@ -271,39 +301,35 @@ public class AgentSpawnTool {
             name = "agent_send",
             description =
                     """
-                    Send a message to an existing subagent. Use the exact string from the \
-                    agent_key line of agent_spawn output (starts with agent:), or the label \
-                    you set at spawn. Do not pass agent_id, session_id, or task_id here. \
-                    timeout_seconds=0 returns task_id for task_output.\
+                    向已创建的子智能体发送消息。传入 agent_spawn 输出首行完整 agent_key（以 agent: 开头），
+                    或创建时自定义的 label 标签。禁止传入 agent_id、session_id、task_id。
+                    timeout_seconds 设为0时返回 task_id，可通过 task_output 查询异步结果。
                     """)
     public Mono<String> agentSend(
             RuntimeContext runtimeContext,
             @ToolParam(
-                            name = "agent_key",
-                            description =
-                                    "Exact value from agent_spawn's first line after 'agent_key: '"
-                                        + " (format agent:<type>:<uuid>). Not agent_id, session_id,"
-                                        + " or task_id. Mutually exclusive with label.",
-                            required = false)
-                    String agentKey,
+                    name = "agent_key",
+                    description =
+                            "从 agent_spawn 返回第一行「agent_key:」后复制的完整标识，格式 agent:<类型>:<uuid>。" +
+                            "不可填 agent_id、session_id、task_id，与 label 二选一互斥",
+                    required = false)
+            String agentKey,
             @ToolParam(
-                            name = "label",
-                            description =
-                                    "Agent label assigned at spawn time. Mutually exclusive with"
-                                            + " agent_key.",
-                            required = false)
-                    String label,
-            @ToolParam(name = "message", description = "Message to send to the subagent")
-                    String message,
+                    name = "label",
+                    description = "创建子智能体时自定义的标签，与 agent_key 二选一互斥",
+                    required = false)
+            String label,
+            @ToolParam(name = "message", description = "发给子智能体的交互消息")
+            String message,
             @ToolParam(
-                            name = "timeout_seconds",
-                            description =
-                                    """
-                                    Max seconds to wait for a reply. 0=fire-and-forget, returns \
-                                    task_id. Default: 30. Max: 600.\
-                                    """,
-                            required = false)
-                    Integer timeoutSeconds) {
+                    name = "timeout_seconds",
+                    description =
+                            """
+                            等待子智能体回复的最大秒数。0=发后即忘异步模式，返回task_id。
+                            默认30秒，最大600秒，非必填。
+                            """,
+                    required = false)
+            Integer timeoutSeconds) {
 
         boolean hasKey = agentKey != null && !agentKey.isBlank();
         boolean hasLabel = label != null && !label.isBlank();
@@ -364,8 +390,8 @@ public class AgentSpawnTool {
                                     } catch (RuntimeException e) {
                                         return "Error: "
                                                 + (e.getMessage() != null
-                                                        ? e.getMessage()
-                                                        : e.getClass().getSimpleName());
+                                                ? e.getMessage()
+                                                : e.getClass().getSimpleName());
                                     }
                                 });
             }
@@ -389,12 +415,12 @@ public class AgentSpawnTool {
 
         final String finalKey = key;
         return execLocalSync(
-                        spawned.agent(),
-                        spawned.sessionId(),
-                        currentUserId,
-                        message.trim(),
-                        spawned,
-                        runtimeContext)
+                spawned.agent(),
+                spawned.sessionId(),
+                currentUserId,
+                message.trim(),
+                spawned,
+                runtimeContext)
                 .timeout(Duration.ofMillis(timeoutMs))
                 .map(
                         reply -> {
@@ -412,7 +438,7 @@ public class AgentSpawnTool {
                         });
     }
 
-    @Tool(name = "agent_list", description = "List active subagents spawned by this agent.")
+    @Tool(name = "agent_list", description = "列出当前智能体已创建且存活的所有子智能体")
     public String agentList() {
         if (agentsByKey.isEmpty()) {
             return "No active subagents.";
@@ -451,6 +477,20 @@ public class AgentSpawnTool {
      * correctly inherits the Reactor Context from the parent streaming chain. Do NOT call
      * {@code .block()} on this Mono directly inside a tool method that returns {@link String},
      * because {@code block()} creates an isolated subscription that loses the Context.
+     */
+    /**
+     * 返回用于调用本地子智能体的 {@link Mono} 响应式流。
+     *
+     * <p>若父智能体以流式 stream() 模式运行，Reactor 上下文内会存在 {@link SubagentEventBus}
+     * （由 AgentBase.createEventStream 传递）。此时子智能体产生的所有事件会通过事件总线实时转发至父级接收器，
+     * 上游调用方可以获取整条调用链路扁平化、有序的完整事件流。
+     *
+     * <p>若不存在事件总线（普通 call() 非流式调用链路），逻辑自动降级为无事件开销的普通 invokeAgent 同步调用。
+     *
+     * <p><b>上下文传递注意事项：</b>该方法返回 Mono，内部 deferContextual 会由 ToolMethodInvoker 的 flatMap 订阅，
+     * 能够正确继承父级流式链路携带的 Reactor 上下文。
+     * 禁止在返回 String 类型的工具方法内部直接对该 Mono 调用 .block()；
+     * block() 会创建独立订阅，导致上下文丢失。
      */
     private Mono<Msg> execLocalSync(
             Agent agent,

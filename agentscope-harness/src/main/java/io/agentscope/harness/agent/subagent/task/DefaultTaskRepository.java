@@ -32,6 +32,12 @@ import java.util.concurrent.TimeUnit;
  * single-node local deployments and testing. For distributed durability, prefer
  * {@code WorkspaceTaskRepository}.
  */
+/**
+ * 基于缓存守护线程池实现的内存型 {@link TaskRepository}。
+ *
+ * <p>实现会忽略会话ID，所有任务共用一张平铺映射表。适用于单节点本地部署与单元测试；
+ * 若需要分布式持久化能力，推荐使用 {@code WorkspaceTaskRepository}。
+ */
 public class DefaultTaskRepository implements TaskRepository {
 
     private final Map<String, BackgroundTask> tasks = new ConcurrentHashMap<>();

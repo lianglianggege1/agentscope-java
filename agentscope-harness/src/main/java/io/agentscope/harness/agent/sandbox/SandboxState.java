@@ -31,6 +31,15 @@ import io.agentscope.harness.agent.sandbox.snapshot.SandboxSnapshot;
  * com.fasterxml.jackson.databind.ObjectMapper#registerSubtypes} for extension types), not via
  * {@code @JsonSubTypes} on this class.
  */
+/**
+ * 沙箱可序列化状态，由 {@link SandboxStateStore} 持久化，支持跨调用恢复沙箱实例。
+ *
+ * <p>{@link #workspaceRootReady} 标识控制四段式启动逻辑，用于记录上次停止时工作区是否已完整初始化。
+ *
+ * <p>子类不通过本类上的 {@code @JsonSubTypes} 注册Jackson序列化，而是通过
+ * {@link io.agentscope.harness.agent.sandbox.json.HarnessSandboxJacksonModule}
+ * 注册；扩展类型可额外调用 {@link com.fasterxml.jackson.databind.ObjectMapper#registerSubtypes} 完成注册。
+ */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
 public abstract class SandboxState {
 

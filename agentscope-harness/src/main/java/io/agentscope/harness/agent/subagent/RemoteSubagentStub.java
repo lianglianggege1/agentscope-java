@@ -28,6 +28,10 @@ import reactor.core.publisher.Mono;
  * registry bookkeeping and should not receive synchronous {@code invokeAgent} calls in normal
  * async flows.
  */
+/**
+ * 适配远程子智能体 {@link SubagentDeclaration} 的占位实现类，实现 {@link io.agentscope.core.agent.Agent}。
+ * 实际执行逻辑转发至远程任务HTTP服务；本实例仅用于注册台账管理，常规异步流程中不应直接同步调用 invokeAgent。
+ */
 public final class RemoteSubagentStub extends AgentBase {
 
     public RemoteSubagentStub(String name, String description) {

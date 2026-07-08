@@ -27,6 +27,13 @@ import java.util.Optional;
  *
  * @see WorkspaceSandboxStateStore
  */
+/**
+ * 沙箱会话状态存储抽象层，基于 {@link SandboxIsolationKey} 完成沙箱状态的持久化与加载。
+ *
+ * <p>实现类需支持多线程并发调用，但无需对同一键的并发写入提供事务或原子语义保障。
+ *
+ * @see WorkspaceSandboxStateStore
+ */
 public interface SandboxStateStore {
 
     /**

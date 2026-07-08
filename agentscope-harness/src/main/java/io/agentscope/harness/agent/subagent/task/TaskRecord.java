@@ -32,6 +32,15 @@ import java.util.Map;
  * <p>All fields use Jackson for JSON serialization. Unknown fields are silently ignored to
  * allow forward-compatible schema evolution.
  */
+/**
+ * 后台子智能体任务持久化元数据，以JSON格式存储在工作区路径：
+ * {@code agents/<parentAgentId>/tasks/<parentSessionId>.json}。
+ *
+ * <p>本类是任务状态的权威数据源。内存中的 {@link BackgroundTask} 句柄仅作为本地性能缓存；
+ * 分布式部署场景下，{@code TaskRecord} 可在JVM重启、任务跨节点迁移后保留。
+ *
+ * <p>全部字段通过Jackson完成JSON序列化；解析时会静默忽略未知字段，保障版本向前兼容、支持结构迭代扩展。
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class TaskRecord {

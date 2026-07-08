@@ -37,6 +37,19 @@ import io.agentscope.harness.agent.sandbox.snapshot.SandboxSnapshotSpec;
  * <p>Configure {@link io.agentscope.harness.agent.IsolationScope} on {@code SandboxFilesystemSpec}
  * only; it is not duplicated here.
  */
+/**
+ * 分布式沙箱高层配置，供 {@link io.agentscope.harness.agent.HarnessAgent.Builder#sandboxDistributed} 使用。
+ *
+ * <p>该类整合分布式沙箱恢复、共享所需且未定义在 {@link SandboxFilesystemSpec} 中的配置项：
+ *
+ * <ul>
+ *   <li>分布式 {@link Session}（用于状态存储槽位管理）
+ *   <li>可选覆写 {@link SandboxSnapshotSpec}（工作区归档持久化配置）
+ *   <li>{@code requireDistributed} — 分布式前置条件不满足时快速失败
+ * </ul>
+ *
+ * <p>隔离范围 {@link io.agentscope.harness.agent.IsolationScope} 仅在 {@code SandboxFilesystemSpec} 中配置，本类不再重复定义。
+ */
 public final class SandboxDistributedOptions {
 
     private final Session session;

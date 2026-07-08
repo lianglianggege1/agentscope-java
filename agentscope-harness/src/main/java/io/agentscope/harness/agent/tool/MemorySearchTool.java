@@ -31,6 +31,13 @@ import org.slf4j.LoggerFactory;
  * {@link io.agentscope.harness.agent.filesystem.AbstractFilesystem} (works across Local,
  * Sandbox, and Store backends).
  */
+/**
+ * 用于检索持久化记忆文件（MEMORY.md 以及 memory/*.md 系列文件）的工具。
+ *
+ * <p>基于关键词检索所有可访问的记忆文件，底层依赖已配置的
+ * {@link io.agentscope.harness.agent.filesystem.AbstractFilesystem} 文件抽象层，
+ * 兼容本地、沙箱、远程存储多种后端实现。
+ */
 public class MemorySearchTool {
 
     private static final Logger log = LoggerFactory.getLogger(MemorySearchTool.class);
@@ -43,6 +50,8 @@ public class MemorySearchTool {
 
     @Tool(
             name = "memory_search",
+//            检索长期记忆文件（MEMORY.md 与 memory 目录下所有 md 文件），查找相关信息。
+//            当需要回答过往工作、决策、日期、人物、偏好、待办事项相关问题时，优先调用该工具。
             description =
                     "Search through long-term memory files (MEMORY.md and memory/*.md) for"
                             + " relevant information. Use before answering questions about prior"

@@ -30,6 +30,21 @@ package io.agentscope.harness.agent.subagent;
  * (general-purpose, always SHARED)       mainWorkspace  (fully mirrors main agent)
  * </pre>
  */
+/**
+ * 控制已定义子智能体运行时工作区根目录的判定规则。
+ *
+ * <p>五分支决策对照表：
+ *
+ * <pre>
+ * 配置workspacePath  隔离模式  运行时工作区根目录
+ * ─────────────────────────────────────────────────────────────────────────────
+ * 已配置             ISOLATED  workspacePath（智能体定义目录同时作为运行根目录）
+ * 已配置             SHARED   主工作区（定义内的技能、知识库会被忽略）
+ * 未配置(null)      ISOLATED  mainWorkspace/agents/&lt;name&gt;/workspace/（自动创建目录）
+ * 未配置(null)      SHARED   主工作区
+ * 通用场景（固定SHARED）      主工作区（与主智能体共用完整文件资源）
+ * </pre>
+ */
 public enum WorkspaceMode {
 
     /**
@@ -41,6 +56,17 @@ public enum WorkspaceMode {
      *   <li>Otherwise the runtime root is auto-created at
      *       {@code mainWorkspace/agents/&lt;name&gt;/workspace/} and the inline body is used as
      *       sysPrompt.
+     * </ul>
+     */
+    /**
+     * 子智能体拥有独立隔离的工作区。
+     *
+     * <ul>
+     *   <li>若配置了 {@link SubagentDeclaration#getWorkspacePath()}，该路径即为运行根目录，
+     *       同时系统提示词（AGENTS.md）也从该目录读取。
+     *   <li>若未配置，则自动创建运行根目录：
+     *       {@code mainWorkspace/agents/&lt;name&gt;/workspace/}，
+     *       并以子智能体定义内联文本作为系统提示词。
      * </ul>
      */
     ISOLATED,
@@ -55,6 +81,16 @@ public enum WorkspaceMode {
      *       but the definition's {@code skills/}, {@code knowledge/}, and {@code MEMORY.md} are
      *       ignored.
      *   <li>If {@code workspacePath} is absent, the inline body is used as sysPrompt.
+     * </ul>
+     */
+    /**
+     * 子智能体与主智能体共用一套工作区。
+     *
+     * <ul>
+     *   <li>无论是否配置 {@link SubagentDeclaration#getWorkspacePath()}，运行根目录固定为主工作区 mainWorkspace。
+     *   <li>若配置了 workspacePath：会读取该路径下 AGENTS.md 作为系统提示词；
+     *       但该目录下的 skills/、knowledge/、MEMORY.md 资源均不会生效。
+     *   <li>若未配置 workspacePath：直接使用子智能体定义内联文本作为系统提示词。
      * </ul>
      */
     SHARED

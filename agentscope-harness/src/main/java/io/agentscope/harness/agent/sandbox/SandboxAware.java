@@ -24,6 +24,13 @@ import io.agentscope.harness.agent.filesystem.sandbox.SandboxBackedFilesystem;
  * io.agentscope.harness.agent.hook.SandboxLifecycleHook} can set the active sandbox for each
  * call and clear it afterward.
  */
+/**
+ * 标记可在运行时注入底层 {@link Sandbox} 实例的文件系统接口。
+ *
+ * <p>由 {@link SandboxBackedFilesystem} 实现，供
+ * {@link io.agentscope.harness.agent.hook.SandboxLifecycleHook}
+ * 在每次调用时绑定当前沙箱，调用结束后清空绑定。
+ */
 public interface SandboxAware {
 
     void setSandbox(Sandbox sandbox);

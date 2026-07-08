@@ -25,6 +25,14 @@ import io.agentscope.core.agent.Agent;
  * <p>This type replaces a raw {@link java.util.function.Supplier} for subagent wiring so call sites
  * and maps are self-documenting.
  */
+/**
+ * 为单次创建或会话生成全新子智能体实例。
+ * 在 {@link DefaultAgentManager} 中通过 agent_id 完成注册；
+ * 如需隔离环境，每次调用 {@link #create()} 都应返回全新智能体对象。
+ *
+ * <p>该类型替代原生 {@link java.util.function.Supplier} 用于子智能体装配逻辑，
+ * 让调用代码与映射关系更具备可读性与自解释性。
+ */
 @FunctionalInterface
 public interface SubagentFactory {
 

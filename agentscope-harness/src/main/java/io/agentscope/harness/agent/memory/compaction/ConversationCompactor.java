@@ -52,6 +52,19 @@ import reactor.core.publisher.Mono;
  * <p>The caller is responsible for updating both the agent's working memory and the LLM-facing
  * message list (see {@link CompactionHook}).
  */
+/**
+ * <h2>执行流程</h2>
+ * <ol>
+ *   <li><b>校验触发条件</b> — Token总量或消息条数超出阈值</li>
+ *   <li><b>划定截断边界</b> — 计算保留尾部消息的分割索引；保证助手工具调用消息与对应工具返回结果不被拆分</li>
+ *   <li><b>持久化记忆</b>（可选）— 通过 {@link MemoryFlushManager#flushMemories} 提取前缀对话生成长期记忆</li>
+ *   <li><b>消息落盘</b>（可选）— 通过 {@link MemoryFlushManager#offloadMessages} 将完整对话持久化至会话JSONL文件</li>
+ *   <li><b>生成摘要</b> — 调用一次大模型，将前缀对话提炼为结构化摘要</li>
+ *   <li><b>重组会话</b> — 返回「摘要用户消息 + 保留的尾部原始消息」组合列表</li>
+ * </ol>
+ *
+ * <p>调用方负责同步更新智能体工作内存与传给大模型的消息列表（参考 {@link CompactionHook}）。
+ */
 public class ConversationCompactor {
 
     private static final Logger log = LoggerFactory.getLogger(ConversationCompactor.class);

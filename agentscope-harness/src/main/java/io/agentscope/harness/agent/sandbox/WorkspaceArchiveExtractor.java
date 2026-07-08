@@ -34,6 +34,18 @@ import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
  *
  * <p>These guards defend against the "Zip Slip" class of path traversal attacks.
  */
+/**
+ * 安全解压tar归档文件至目标目录。
+ *
+ * <p>解压每个归档条目前会执行严格的路径穿越防护校验：
+ * <ol>
+ *   <li>拒绝绝对路径条目（以 {@code /} 或 {@code \} 开头）</li>
+ *   <li>拒绝包含 {@code ..} 上级目录片段的条目</li>
+ *   <li>校验解析后的目标路径必须以规范化根目录为前缀</li>
+ * </ol>
+ *
+ * <p>上述防护规则用于抵御Zip Slip类路径穿越攻击。
+ */
 public class WorkspaceArchiveExtractor {
 
     private WorkspaceArchiveExtractor() {

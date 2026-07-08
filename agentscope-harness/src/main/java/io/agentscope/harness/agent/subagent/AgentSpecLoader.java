@@ -66,6 +66,39 @@ import org.slf4j.LoggerFactory;
  *       {@link SubagentDeclaration#getInlineAgentsBody()}.
  * </ul>
  */
+/**
+ * 从工作区 subagents/ 目录下带 YAML 前置元数据的 Markdown 文件加载 {@link SubagentDeclaration} 子智能体定义。
+ *
+ * <p><strong>文件命名规则</strong>：文件名去除 .md 后缀后作为子智能体 name / agent-id；
+ * 前置元数据内禁止配置 name 字段。
+ *
+ * <p><strong>扫描策略</strong>：仅遍历目标目录一级子文件，不递归扫描子目录，
+ * 避免误加载存放在同父目录下、属于其他子智能体隔离工作区内部的文件。
+ *
+ * <p>文件格式示例：
+ *
+ * <pre>
+ * ---
+ * description: Reviews code for security and performance issues.
+ * workspace:
+ *   mode: isolated          # isolated / shared，默认 isolated
+ *   path: ./defs/reviewer   # 可选，相对主工作区路径或绝对路径
+ * model: qwen3-max          # 可选，自定义模型
+ * maxIters: 12              # 可选，默认10轮迭代
+ * tools: [read_file, grep_files, edit_file]   # 可选，工具白名单
+ * ---
+ *
+ * # 内联提示文本（仅未配置 workspace.path 时生效）
+ * You are a code reviewer...
+ * </pre>
+ *
+ * <p>约束规则：
+ * <ul>
+ *   <li>description 描述字段必填。
+ *   <li>若配置 workspace.path，当前 md 文件正文必须为空；子智能体运行时从 &lt;workspace.path&gt;/AGENTS.md 读取系统提示词。
+ *   <li>若未配置 workspace.path，当前 md 文件正文会作为内联提示文本，对应 {@link SubagentDeclaration#getInlineAgentsBody()}。
+ * </ul>
+ */
 public final class AgentSpecLoader {
 
     private static final Logger log = LoggerFactory.getLogger(AgentSpecLoader.class);

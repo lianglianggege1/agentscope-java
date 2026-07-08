@@ -40,6 +40,15 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
  *   <li>a content hash used to skip unchanged projections across calls</li>
  * </ul>
  */
+/**
+ * 为工作区映射资源构建确定性归档负载。
+ *
+ * <p>负载包含两部分：
+ * <ul>
+ *   <li>映射文件打包成的tar归档（用于沙箱初始化填充）</li>
+ *   <li>内容哈希值，用于跨调用跳过无变更的映射资源处理</li>
+ * </ul>
+ */
 public final class WorkspaceProjectionApplier {
 
     private WorkspaceProjectionApplier() {}

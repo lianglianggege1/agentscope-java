@@ -32,6 +32,21 @@ package io.agentscope.harness.agent.sandbox;
  * {@link SandboxLease} that was acquired before sandbox resume/create. The harness closes it
  * after {@link SandboxManager#release} completes to cover the full call window.
  */
+/**
+ * 从 {@link SandboxManager} 获取沙箱后的返回结果。
+ *
+ * <p>分为两种持有模式：
+ *
+ * <ul>
+ *   <li><b>自托管模式</b>（{@code selfManaged=true}）：由SDK创建沙箱，全权管理完整生命周期；
+ *       每次智能体调用结束后会依次执行 {@code stop()} 和 {@code shutdown()}。
+ *   <li><b>用户托管模式</b>（{@code selfManaged=false}）：调用方传入已预先存在的沙箱；
+ *       SDK仅执行 {@code stop()}，不会调用 {@code shutdown()}。
+ * </ul>
+ *
+ * <p>若配置了 {@link SandboxExecutionGuard}，该结果会携带创建/恢复沙箱前获取到的 {@link SandboxLease} 租约。
+ * 执行器会在 {@link SandboxManager#release} 执行完毕后释放租约，完整覆盖整个调用周期。
+ */
 public final class SandboxAcquireResult {
 
     private final Sandbox sandbox;

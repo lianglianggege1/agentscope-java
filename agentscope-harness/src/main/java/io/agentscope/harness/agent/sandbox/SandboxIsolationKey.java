@@ -30,6 +30,12 @@ import org.slf4j.LoggerFactory;
  * {@link Optional#empty()} when the required context field is absent (e.g., {@code USER} scope
  * without a {@code userId}), meaning state lookup should be skipped.
  */
+/**
+ * 不可变键对象，唯一标识指定 {@link IsolationScope} 对应的沙箱状态槽位。
+ *
+ * <p>通过 {@link #resolve} 可从 {@link RuntimeContext} 解析生成该键。
+ * 若上下文缺失对应字段（例如 USER 隔离域但无 userId），将返回 {@link Optional#empty()}，此时应跳过状态查询逻辑。
+ */
 public final class SandboxIsolationKey {
 
     private static final Logger log = LoggerFactory.getLogger(SandboxIsolationKey.class);

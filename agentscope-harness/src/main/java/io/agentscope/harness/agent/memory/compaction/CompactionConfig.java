@@ -30,6 +30,23 @@ package io.agentscope.harness.agent.memory.compaction;
  *   <li>Summarization is enabled; memory flush and offload are both enabled before summary</li>
  * </ul>
  */
+
+/**
+ * * 会话压缩（摘要）配置类。
+ * *
+ * * <ul>
+ * *   <li><b>trigger</b> — 触发压缩的条件（依据token数量或消息条数）</li>
+ * *   <li><b>keep</b> — 压缩后完整保留的最新消息条数</li>
+ * * </ul>
+ * *
+ * * <p>默认参数：
+ * * <ul>
+ * *   <li>消息达到50条 或 预估token达到80000时触发（先满足任一即执行）</li>
+ * *   <li>完整保留最近20条原始消息</li>
+ * *   <li>摘要功能默认开启；执行摘要前会先执行内存刷新与数据落盘</li>
+ * * </ul>
+ *
+ */
 public class CompactionConfig {
 
     /** Default summary prompt with structured format. */

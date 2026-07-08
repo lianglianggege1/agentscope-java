@@ -27,6 +27,12 @@ import io.agentscope.harness.agent.sandbox.impl.docker.DockerSandboxClientOption
  * This allows callers to configure only the options object and rely on
  * {@link io.agentscope.harness.agent.HarnessAgent.Builder} to derive the client automatically.
  */
+/**
+ * 沙箱客户端配置参数基类。
+ *
+ * <p>每个具体子类对应一类沙箱后端（如Docker），并可通过 {@link #createClient()} 自行实例化对应的 {@link SandboxClient}。
+ * 调用方只需配置参数对象，即可由 {@link io.agentscope.harness.agent.HarnessAgent.Builder} 自动生成客户端实例。
+ */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
 @JsonSubTypes({
     @JsonSubTypes.Type(value = DockerSandboxClientOptions.class, name = "docker"),

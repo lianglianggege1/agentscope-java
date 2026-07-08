@@ -89,6 +89,64 @@ import redis.clients.jedis.params.SetParams;
  *       path always completes.
  * </ul>
  */
+/**
+ * 基于Redis实现的 {@link SandboxExecutionGuard}，通过Redis SET NX PX 租约机制实现沙箱隔离槽并发访问串行控制。
+ *
+ * <h2>实现原理</h2>
+ *
+ * <ol>
+ *   <li>{@link #tryEnter} 利用 {@code SET NX PX <ttlMs>} 将唯一令牌写入Redis键。
+ *       若该键已被其他调用方持有，则按照 {@code retryInterval} 间隔重试，直至隔离槽释放或线程被中断。
+ *   <li>返回的 {@link SandboxLease#close()} 会执行Lua CAS脚本：仅当存储值与当前调用方令牌匹配时才删除锁键，
+ *       避免误释放其他持有者的锁。
+ * </ol>
+ *
+ * <h2>Redis键格式</h2>
+ *
+ * <pre>{@code <keyPrefix><scope_lower>:<value>}</pre>
+ *
+ * <p>示例（默认前缀为 {@code agentscope:sandbox:lock:}）：
+ *
+ * <ul>
+ *   <li>{@code agentscope:sandbox:lock:agent:code-agent}
+ *   <li>{@code agentscope:sandbox:lock:global:__global__}
+ * </ul>
+ *
+ * <h2>使用示例</h2>
+ *
+ * <pre>{@code
+ * UnifiedJedis jedis = new JedisPooled("localhost", 6379);
+ *
+ * SandboxExecutionGuard guard = RedisSandboxExecutionGuard.builder(jedis)
+ *     .leaseTtl(Duration.ofMinutes(30))   // 租期必须大于最坏场景下的单次调用耗时
+ *     .retryInterval(Duration.ofMillis(500))
+ *     .build();
+ *
+ * HarnessAgent.builder()
+ *     .filesystem(new DockerFilesystemSpec()
+ *         .isolationScope(IsolationScope.AGENT)
+ *         .executionGuard(guard))
+ *     ...
+ *     .build();
+ * }</pre>
+ *
+ * <h2>租期TTL配置建议</h2>
+ *
+ * <p>设置 {@code leaseTtl} 时需预留充足余量，覆盖智能体最坏调用时长（包含重试、大模型响应耗时）。
+ * 若调用执行时长超过租期，Redis会自动淘汰锁键，其他并发调用方可进入沙箱；该机制是防止永久死锁的安全兜底，
+ * 不代表多调用方可以安全共享沙箱状态。需监控实际调用耗时，合理配置TTL时长。
+ *
+ * <h2>扩展该隔离器的规范</h2>
+ *
+ * <p>本类是 {@link SandboxExecutionGuard} 的标准参考实现。
+ * 其他后端（ZooKeeper、etcd、数据库排它锁等）的实现必须遵守同一接口契约：
+ *
+ * <ul>
+ *   <li>{@link #tryEnter} 阻塞等待，直至获取隔离槽或线程中断。
+ *   <li>返回的 {@link SandboxLease} 在执行 {@link SandboxLease#close()} 时可幂等释放隔离槽。
+ *   <li>释放锁失败仅打印日志、不抛出异常，保证执行器调用后置流程一定走完。
+ * </ul>
+ */
 public final class RedisSandboxExecutionGuard implements SandboxExecutionGuard {
 
     private static final Logger log = LoggerFactory.getLogger(RedisSandboxExecutionGuard.class);

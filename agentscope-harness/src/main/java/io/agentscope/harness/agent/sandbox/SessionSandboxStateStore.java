@@ -31,6 +31,12 @@ import java.util.Optional;
  * state. As a result, providing a distributed {@link Session} implementation (for example Redis)
  * automatically enables distributed sandbox resume state.
  */
+/**
+ * 基于通用 AgentScope {@link Session} 抽象实现的 {@link SandboxStateStore}。
+ *
+ * <p>该存储实现将沙箱生命周期状态与 ReActAgent 运行时状态共用同一套底层存储。
+ * 因此只需接入分布式 {@link Session} 实现（如 Redis），即可自动支持分布式沙箱状态恢复能力。
+ */
 public final class SessionSandboxStateStore implements SandboxStateStore {
 
     private static final String SANDBOX_STATE_KEY = "_sandbox_state";

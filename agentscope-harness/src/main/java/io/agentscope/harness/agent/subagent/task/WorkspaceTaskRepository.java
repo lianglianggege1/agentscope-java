@@ -62,6 +62,27 @@ import org.slf4j.LoggerFactory;
  *       persist {@link TaskRecord#getRemoteBaseUrl()} for cross-node resume.
  * </ul>
  */
+/**
+ * 基于工作区实现的 {@link TaskRepository}，以 {@link WorkspaceManager} 作为任务状态权威持久化数据源，
+ * 同时在内存维护 {@link BackgroundTask} 句柄作为本地缓存层，提升当前节点运行任务的访问性能。
+ *
+ * <p>存储目录结构：{@code agents/<parentAgentId>/tasks/<sessionId>.json}，文件内容为 JSON 映射
+ * {@code taskId → TaskRecord}，存储格式与会话文件保持统一。分布式部署搭配 {@code RemoteFilesystemSpec} 时，
+ * 该路径会自动路由至共享存储，所有节点均可读取任务状态。
+ *
+ * <p>内存本地缓存 localTasks 以 {@code "<sessionId>:<taskId>"} 作为键，保证同一进程内多会话的数据隔离。
+ *
+ * <p>分布式场景行为规范：
+ *
+ * <ul>
+ *   <li>任务执行粘性绑定创建节点（即调用 {@link #putTask} 的节点）。
+ *   <li>任意节点均可通过 {@link #getTask} / {@link #listTasks} 查询任务状态；本地无运行句柄时自动读取工作区持久化记录。
+ *   <li>非创建节点执行 block=true 阻塞查询时会降级处理，仅读取最新持久化终态，不会无限阻塞等待。
+ *   <li>取消操作会在工作区存储的 {@link TaskRecord} 中标记取消请求标识；任务创建节点执行子智能体调用前会校验该标识，尽力终止任务。
+ *   <li>远程类型任务 {@link TaskRunSpec.RemoteTaskRunSpec} 通过 {@link AgentProtocolTaskClient} 执行，
+ *       持久化 {@link TaskRecord#getRemoteBaseUrl()} 用于跨节点恢复任务上下文。
+ * </ul>
+ */
 public class WorkspaceTaskRepository implements TaskRepository {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceTaskRepository.class);

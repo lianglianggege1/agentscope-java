@@ -25,6 +25,11 @@ import io.agentscope.harness.agent.sandbox.impl.docker.DockerSandboxState;
  * com.fasterxml.jackson.databind.ObjectMapper#registerSubtypes} for application-specific state
  * classes without editing {@link io.agentscope.harness.agent.sandbox.SandboxState}.
  */
+/**
+ * 为 {@link io.agentscope.harness.agent.sandbox.SandboxState} 注册Jackson多态子类型。
+ * 官方后端在此处添加对应的 {@link NamedType} 条目；业务侧自定义状态类无需修改本类，
+ * 可直接通过 {@link com.fasterxml.jackson.databind.ObjectMapper#registerSubtypes} 完成注册。
+ */
 public final class HarnessSandboxJacksonModule extends SimpleModule {
 
     public HarnessSandboxJacksonModule() {

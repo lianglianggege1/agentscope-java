@@ -42,6 +42,20 @@ import org.slf4j.LoggerFactory;
  * <p>Values that contain characters outside {@code [a-zA-Z0-9_\-.]} are Base64url-encoded
  * (no padding) to produce filesystem-safe filenames.
  */
+/**
+ * 基于本地文件系统实现的 {@link SandboxStateStore}。
+ *
+ * <p>磁盘存储目录结构（相对根目录 {@code workspaceRoot}）：
+ *
+ * <pre>
+ * SESSION 维度 → agents/&lt;agentId&gt;/context/&lt;safe(sessionId)&gt;/_sandbox.json
+ * USER 维度     → agents/&lt;agentId&gt;/sandboxes/user/&lt;safe(userId)&gt;.json
+ * AGENT 维度    → agents/&lt;agentId&gt;/sandboxes/agent.json
+ * GLOBAL 维度   → sandboxes/global.json
+ * </pre>
+ *
+ * <p>若标识值包含 {@code [a-zA-Z0-9_\-.]} 以外的字符，会采用无填充的Base64url编码，生成符合文件系统规范的文件名。
+ */
 public final class WorkspaceSandboxStateStore implements SandboxStateStore {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceSandboxStateStore.class);

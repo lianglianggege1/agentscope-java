@@ -23,6 +23,14 @@ package io.agentscope.harness.agent.sandbox;
  * @param stderr captured standard error
  * @param truncated whether output was truncated due to exceeding the maximum capture size
  */
+/**
+ * 沙箱命令执行结果。
+ *
+ * @param exitCode 进程退出码（0代表执行成功）
+ * @param stdout 捕获的标准输出内容
+ * @param stderr 捕获的标准错误内容
+ * @param truncated 输出内容是否因超出最大捕获长度被截断
+ */
 public record ExecResult(int exitCode, String stdout, String stderr, boolean truncated) {
 
     /**

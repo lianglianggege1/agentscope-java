@@ -45,6 +45,27 @@ import org.slf4j.LoggerFactory;
  *   <li>{@link #getWorkspaceRoot()} — return the workspace root path string</li>
  * </ul>
  */
+/**
+ * {@link Sandbox} 抽象基类，内置四段式工作区启动逻辑。
+ *
+ * <h2>四段式启动逻辑</h2>
+ * <pre>
+ * 分支A：workspaceRootReady=true 且工作区目录存在 → 仅加载临时资源项
+ * 分支B：workspaceRootReady=true 且工作区目录缺失 → 从快照还原 + 加载临时资源项
+ * 分支C：workspaceRootReady=false 且存在可恢复快照 → 解压快照 + 加载全部资源项
+ * 分支D：workspaceRootReady=false 且无可恢复快照 → 根据完整工作区配置全新初始化
+ * </pre>
+ *
+ * <p>子类需实现各后端底层操作：
+ * <ul>
+ *   <li>{@link #doExec(RuntimeContext, String, int)} — 在工作区执行Shell命令</li>
+ *   <li>{@link #doPersistWorkspace()} — 将工作区打包生成tar归档</li>
+ *   <li>{@link #doHydrateWorkspace(InputStream)} — 将tar归档解压至工作区</li>
+ *   <li>{@link #doSetupWorkspace()} — 创建工作区根目录</li>
+ *   <li>{@link #doDestroyWorkspace()} — 销毁工作区根目录（shutdown时调用）</li>
+ *   <li>{@link #getWorkspaceRoot()} — 返回工作区根路径字符串</li>
+ * </ul>
+ */
 public abstract class AbstractBaseSandbox implements Sandbox {
 
     private static final Logger log = LoggerFactory.getLogger(AbstractBaseSandbox.class);

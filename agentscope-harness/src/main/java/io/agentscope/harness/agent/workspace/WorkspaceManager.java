@@ -90,6 +90,34 @@ import org.slf4j.LoggerFactory;
  * └── agents/&lt;agentId&gt;/sessions/&lt;sessionId&gt;.log.jsonl
  * </pre>
  */
+/**
+ * 无状态工作区内容访问器，采用双层读取架构。
+ *
+ * <p><strong>读取流程：</strong>读取任意内容（AGENTS.md、MEMORY.md、知识库等）时，
+ * 优先查询 {@link AbstractFilesystem} 文件存储层。若该层返回有效内容，则直接使用（文件存储层优先级更高）；
+ * 若无内容，则降级读取本地磁盘工作目录作为兜底方案。文件存储层会通过 {@link NamespaceFactory} 自动处理用户/会话隔离作用域。
+ *
+ * <p><strong>写入流程：</strong>所有写入操作（记忆数据、会话记录等）均统一经过 {@link AbstractFilesystem} 文件存储层。
+ *
+ * <p><strong>文件列表查询：</strong>查询文件清单（记忆文件、知识库文件、会话日志等）时，会合并文件存储层与本地磁盘两侧结果，
+ * 并依据文件相对路径自动去重。
+ *
+ * <p>标准目录结构：
+ *
+ * <pre>
+ * workspace/
+ * ├── AGENTS.md
+ * ├── MEMORY.md
+ * ├── memory/YYYY-MM-DD.md
+ * ├── skills/&lt;skill-name&gt;/SKILL.md
+ * ├── knowledge/KNOWLEDGE.md
+ * ├── knowledge/*
+ * ├── subagents/&lt;id&gt;.md                     // 子智能体定义文件
+ * ├── agents/&lt;agentId&gt;/workspace/           // 隔离的子智能体运行根目录，自动创建
+ * ├── agents/&lt;agentId&gt;/sessions/sessions.json
+ * └── agents/&lt;agentId&gt;/sessions/&lt;sessionId&gt;.log.jsonl
+ * </pre>
+ */
 public class WorkspaceManager {
 
     private static final RuntimeContext DEFAULT_FS_RUNTIME = RuntimeContext.empty();

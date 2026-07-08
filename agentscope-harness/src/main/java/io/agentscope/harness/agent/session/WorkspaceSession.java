@@ -45,6 +45,31 @@ import java.nio.file.Path;
  * // Files written to: <workspace>/agents/my-agent/context/sess-001/
  * }</pre>
  */
+/**
+ * 绑定工作区的会话实现，会话状态持久化存储至智能体工作目录下。
+ *
+ * <p>存储目录结构：
+ *
+ * <pre>
+ * &lt;workspace&gt;/agents/&lt;agentId&gt;/context/&lt;sessionId&gt;/{key}.json
+ * &lt;workspace&gt;/agents/&lt;agentId&gt;/context/&lt;sessionId&gt;/{key}.jsonl
+ * </pre>
+ *
+ * <p>该类继承 {@link JsonSession}，基准目录固定为
+ * {@code <workspace>/agents/<agentId>/context/}。父类会自动拼接会话ID（由
+ * {@link io.agentscope.core.state.SessionKey#toIdentifier()} 生成）作为子目录，最终形成上述完整路径。
+ *
+ * <p>本会话仅用于持久化 ReActAgent 运行时状态（如对话记忆消息、智能体元数据）；
+ * 沙箱生命周期状态通过独立的 {@code SandboxStateStore} 存储。
+ *
+ * <p>使用示例：
+ *
+ * <pre>{@code
+ * WorkspaceSession session = new WorkspaceSession(workspacePath, "my-agent");
+ * agent.saveTo(session, SimpleSessionKey.of("sess-001"));
+ * // 文件将写入路径：<workspace>/agents/my-agent/context/sess-001/
+ * }</pre>
+ */
 public class WorkspaceSession extends JsonSession {
 
     /**
@@ -52,6 +77,12 @@ public class WorkspaceSession extends JsonSession {
      *
      * @param workspace the workspace root directory (e.g. {@code .agentscope/workspace})
      * @param agentId the agent identifier used in the directory path
+     */
+    /**
+     * 为指定智能体创建工作区会话实例。
+     *
+     * @param workspace 工作区根目录（示例：{@code .agentscope/workspace}）
+     * @param agentId 目录路径中使用的智能体唯一标识
      */
     public WorkspaceSession(Path workspace, String agentId) {
         super(workspace.resolve("agents").resolve(agentId).resolve("context"));

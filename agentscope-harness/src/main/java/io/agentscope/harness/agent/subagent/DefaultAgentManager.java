@@ -42,6 +42,12 @@ import reactor.core.publisher.Mono;
  * agent-internal {@link AgentSpawnTool} uses this directly for
  * lightweight subagent invocation.
  */
+/**
+ * 纯智能体工厂与调用器：负责通过已注册工厂创建智能体，并传入提示词执行调用。
+ *
+ * <p>该组件属于智能体内部底层能力层，不具备会话注册表、调度通道管理、任务运行追踪能力。
+ * 内部工具 {@link AgentSpawnTool} 直接依赖本组件实现轻量子智能体调用。
+ */
 public final class DefaultAgentManager {
 
     private final Map<String, SubagentFactory> agentFactories;

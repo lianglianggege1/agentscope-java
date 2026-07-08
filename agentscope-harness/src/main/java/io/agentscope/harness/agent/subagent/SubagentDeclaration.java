@@ -60,6 +60,42 @@ import java.util.Map;
  *     .build();
  * }</pre>
  */
+/**
+ * 子智能体定义类：描述子智能体标识、工作区解析策略、可选工具白名单。
+ *
+ * <p>一份定义仅支持以下两种资源来源模式之一，二者互斥：
+ *
+ * <ol>
+ *   <li><b>本地定义工作区模式</b> — {@link #getWorkspacePath()} 指向工作目录，目录内至少包含 AGENTS.md。
+ *       该文件作为子智能体系统提示词；当 {@link WorkspaceMode} 为 {@link WorkspaceMode#ISOLATED} 时，
+ *       目录内的技能、知识库、MEMORY记忆文件均可生效。
+ *   <li><b>远程HTTP模式</b> — {@link #getUrl()} 指向 AgentScope 任务HTTP服务端。无本地定义目录、无内联提示文本，
+ *       子智能体独立进程运行，与本地工作区、内联提示模式互斥。
+ * </ol>
+ *
+ * <p>三种资源配置互斥：{@link Builder#workspace(Path)}、非空内联提示 {@link Builder#inlineAgentsBody(String)}、
+ * 非空远程地址 {@link Builder#url(String)} 最多只能配置其中一项。
+ *
+ * <p>工作区路径解析规则遵循 {@link WorkspaceMode} 中五分支决策对照表。
+ *
+ * <p>tools 列表非空时，作为父智能体继承工具的白名单过滤：仅列表内命名的工具会被子智能体继承。
+ * 子智能体自身构建器仍可额外注册本地专属工具。
+ *
+ * <p>通过 {@link #builder()} 获取构建器创建实例。
+ *
+ * <p>代码示例：
+ *
+ * <pre>{@code
+ * SubagentDeclaration decl = SubagentDeclaration.builder()
+ *     .name("code-reviewer")
+ *     .description("Reviews code for security, performance, and readability issues.")
+ *     .workspace(Path.of("./defs/code-reviewer"))
+ *     .workspaceMode(WorkspaceMode.ISOLATED)
+ *     .model("qwen3-max")
+ *     .tools(List.of("read_file", "grep_files", "edit_file"))
+ *     .build();
+ * }</pre>
+ */
 public final class SubagentDeclaration {
 
     private final String name;

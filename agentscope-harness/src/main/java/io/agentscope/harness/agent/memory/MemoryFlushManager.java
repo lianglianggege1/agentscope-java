@@ -50,9 +50,39 @@ import reactor.core.publisher.Mono;
  *       read-only context here.</li>
  * </ul>
  */
+/**
+ * 管理记忆落盘操作：从会话窗口提取长期记忆，并追加写入当日记忆台账。
+ *
+ * <p><b>双层记忆模型</b>（本类仅负责第一层）：
+ * <ul>
+ *   <li>{@code memory/YYYY-MM-DD.md} — 只追加写入的每日台账。每次会话压缩落盘都会在此新增带时间戳的段落，仅由本类写入。</li>
+ *   <li>{@code MEMORY.md} — 全局整理、去重、容量受控的长期记忆库。仅由 {@link MemoryConsolidator} 定时更新，本类仅作为只读上下文读取。</li>
+ * </ul>
+ */
 public class MemoryFlushManager {
 
     private static final Logger log = LoggerFactory.getLogger(MemoryFlushManager.class);
+
+    private static final String FLUSH_SYSTEM_PROMPT_ZH =
+            """
+            你是记忆提取助手。分析下方对话内容，提取需要留存至后续会话的关键事实、决策、偏好与上下文信息。
+
+            仅以Markdown无序列表形式输出提取到的记忆内容，每条条目简洁独立、信息完整；有日期、人名、具体细节时需一并记录。
+
+            若无值得留存的信息，严格仅输出：NO_REPLY
+
+            提取规范：
+            - 提取用户偏好、个人信息、项目相关决议
+            - 记录重要技术决策及其背后考量
+            - 记下各类承诺、截止时间与待办事项
+            - 留存人物协作关系（人员分工、团队架构）
+            - 忽略日常问候、工具调用、临时状态播报
+
+            重要写入与追加规则：
+            - 你本次写入目标为**今日记忆台账（memory/YYYY-MM-DD.md）**，而非MEMORY.md。台账仅支持追加，你的输出会拼接在已有内容后方。
+            - MEMORY.md 是整理后的长期记忆库，仅作为只读参考上下文。已存在于MEMORY.md或今日台账前置内容的信息无需重复复述；系统会通过独立合并流程定期将当日新增内容汇总至MEMORY.md。
+            - 每条记录保持独立完整，便于单独检索。
+            """;
 
     private static final String FLUSH_SYSTEM_PROMPT =
             """

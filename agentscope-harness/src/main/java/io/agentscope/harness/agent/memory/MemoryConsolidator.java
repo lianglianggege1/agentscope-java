@@ -54,6 +54,19 @@ import reactor.core.publisher.Mono;
  * {@link WorkspaceManager}, so this class is backend-agnostic (works with Local,
  * Sandbox, and Remote filesystems without any direct {@code java.nio.file.Files} usage).
  */
+/**
+ * 基于大模型将每日记忆台账整合为标准化长期记忆文件 {@code MEMORY.md}。
+ *
+ * <p>该组件对应双层记忆模型的第二层：
+ * <ul>
+ *   <li><b>第一层——每日台账</b>：由 {@link MemoryFlushManager} 写入的 {@code memory/YYYY-MM-DD.md} 文件，仅支持追加，每次会话压缩落盘生成一段记录。</li>
+ *   <li><b>第二层——整理库 MEMORY.md</b>：由本类全权管理。定时读取自上次整理时间戳后变更的台账文件与当前 MEMORY.md，调用大模型完成合并、去重、精简，最终覆盖写入 MEMORY.md。</li>
+ * </ul>
+ *
+ * <p>配套状态文件 {@code memory/.consolidation_state} 记录上次成功整理的时间戳。修改时间早于或等于该时间戳的每日台账会直接跳过，以此减少token消耗，同时避免旧数据重复覆盖长期记忆库。
+ *
+ * <p>所有文件读写操作均通过 {@link WorkspaceManager} 获取的 {@link AbstractFilesystem} 执行，因此本类与底层存储无关，可兼容本地、沙箱、远程文件系统，不直接使用 {@code java.nio.file.Files}。
+ */
 public class MemoryConsolidator {
 
     private static final RuntimeContext DEFAULT_FS_RUNTIME = RuntimeContext.empty();
@@ -62,6 +75,25 @@ public class MemoryConsolidator {
 
     /** Hidden state file inside {@code memory/} tracking the last consolidation Instant. */
     public static final String STATE_FILE = ".consolidation_state";
+
+    private static final String CONSOLIDATION_PROMPT_ZH =
+            """
+            你是记忆整合助手，负责维护标准化长期记忆文件 MEMORY.md。你的任务是将新增的每日台账记录合并至 MEMORY.md，保证内容精简、无重复、信息密度高。
+
+            输入包含两部分：
+            1. 当前 MEMORY.md 全文（已整理完成的存量长期记忆）
+            2. 自上次整合后新增追加的每日台账记录
+
+            处理规则：
+            - MEMORY.md 是跨日期、跨会话知识的唯一可信来源，需保证内容稳定、具备权威性。
+            - 每日台账为流水式落盘日志，存在冗余、噪音或与存量记忆重复的内容，仅提取具备长期复用价值的信息并入库。
+            - 去重：新增条目若已存在于 MEMORY.md，直接舍弃。
+            - 关联事实合并：将同一主题的多条记录整合为连贯段落，并添加清晰章节标题。
+            - 若新记录覆盖旧信息，则更新或删除过时内容。
+            - 输出总长度控制在 %d Token（约 %d 字符）；裁剪时优先保留近期、高频引用的信息。
+
+            直接输出完整新版 MEMORY.md 全部内容（仅输出全文，不输出差异片段），使用 Markdown 格式。
+            """;
 
     private static final String CONSOLIDATION_PROMPT =
             """

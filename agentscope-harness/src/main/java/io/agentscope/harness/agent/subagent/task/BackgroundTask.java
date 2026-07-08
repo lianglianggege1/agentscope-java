@@ -32,6 +32,18 @@ import java.util.concurrent.TimeoutException;
  *   <li>{@code lastCheckedAt} — when the task status was last polled
  * </ul>
  */
+/**
+ * 封装 {@link CompletableFuture}，用于跟踪后台子智能体任务执行，记录状态、结果、异常及生命周期元数据。
+ * 底层委托原始Future实现线程安全。
+ *
+ * <p>生命周期元数据：
+ *
+ * <ul>
+ *   <li>{@code agentId}：执行任务的子智能体类型标识
+ *   <li>{@code createdAt}：任务创建时间
+ *   <li>{@code lastCheckedAt}：上一次轮询任务状态的时间
+ * </ul>
+ */
 public class BackgroundTask {
 
     private final String taskId;

@@ -37,6 +37,19 @@ import org.slf4j.LoggerFactory;
  * <p>Priority 1 (external sandbox) and Priority 2 (external sandbox state) bypass the guard,
  * since the caller is managing that sandbox externally.
  */
+/**
+ * 管理单次调用过程中 {@link Sandbox} 实例的完整生命周期。
+ *
+ * <p>沙箱获取优先级：{@link SandboxContext#getExternalSandbox()} > {@link
+ * SandboxContext#getExternalSandboxState()} > 持久化存储的 {@link SandboxState} > {@link
+ * SandboxClient#create}。
+ *
+ * <p>若已配置 {@link SandboxExecutionGuard}，针对存在隔离标识的场景，管理器会在恢复/新建沙箱前获取执行租约 {@link SandboxLease}。
+ * 租约会随 {@link SandboxAcquireResult} 一并返回，并由调用方（{@link io.agentscope.harness.agent.hook.SandboxLifecycleHook}）
+ * 在执行 {@link #release} 后释放，保证整个调用周期均持有隔离锁。
+ *
+ * <p>优先级1（外部传入沙箱）与优先级2（外部沙箱状态）会跳过隔离校验器逻辑，这类沙箱由调用方外部自行管控。
+ */
 public class SandboxManager {
 
     private static final Logger log = LoggerFactory.getLogger(SandboxManager.class);

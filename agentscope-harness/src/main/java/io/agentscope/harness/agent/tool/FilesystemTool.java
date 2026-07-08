@@ -34,6 +34,10 @@ import java.util.stream.Collectors;
  * File system tools backed by a {@link AbstractFilesystem}, exposing read/write/edit/grep/glob
  * operations as agent-callable tools.
  */
+/**
+ * 基于 {@link AbstractFilesystem} 实现的文件系统工具集，对外提供可读、写、编辑、检索、通配符匹配等操作，
+ * 可供智能体直接调用。
+ */
 public class FilesystemTool {
 
     private final AbstractFilesystem abstractFilesystem;

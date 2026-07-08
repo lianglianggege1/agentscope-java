@@ -22,6 +22,11 @@ import io.agentscope.harness.agent.sandbox.snapshot.SandboxSnapshotSpec;
  *
  * @param <O> the type of client options for this implementation
  */
+/**
+ * 用于创建与恢复 {@link Sandbox} 实例的工厂接口。
+ *
+ * @param <O> 当前实现对应的客户端配置参数类型
+ */
 public interface SandboxClient<O extends SandboxClientOptions> {
 
     /**
