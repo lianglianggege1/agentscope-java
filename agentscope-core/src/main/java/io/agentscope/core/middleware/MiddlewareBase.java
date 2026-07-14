@@ -15,15 +15,6 @@
  */
 package io.agentscope.core.middleware;
 
-<<<<<<<< HEAD:agentscope-core/src/main/java/io/agentscope/core/middleware/Middleware.java
-/**
- * Type alias retained for source-compatibility with code written against the original
- * {@code Middleware} interface name. New code should target {@link MiddlewareBase} directly; this
- * interface adds no extra contract and inherits all behaviour (including default methods) from
- * its supertype.
- */
-public interface Middleware extends MiddlewareBase {}
-========
 import io.agentscope.core.agent.Agent;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
@@ -150,4 +141,3 @@ public interface MiddlewareBase {
         return Mono.just(currentPrompt);
     }
 }
->>>>>>>> upstream/main:agentscope-core/src/main/java/io/agentscope/core/middleware/MiddlewareBase.java
