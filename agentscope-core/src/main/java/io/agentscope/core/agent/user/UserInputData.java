@@ -28,6 +28,7 @@ import java.util.Map;
  * 包含内容块（用于消息构建）和可选的结构化数据（用于类型化输入验证）。
  * 这种双重性质允许在同一统一输入系统中灵活处理简单文本输入和复杂结构化表单。
  */
+@Deprecated(forRemoval = true, since = "2.0.0")
 public class UserInputData {
 
     private final List<ContentBlock> blocksInput;

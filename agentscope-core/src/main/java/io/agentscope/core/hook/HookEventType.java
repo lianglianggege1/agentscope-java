@@ -25,7 +25,9 @@ package io.agentscope.core.hook;
  *
  * @see Hook
  * @see HookEvent
+ * @deprecated since 2.0.0. Use {@link io.agentscope.core.middleware.MiddlewareBase} instead.
  */
+@Deprecated(forRemoval = true, since = "2.0.0")
 public enum HookEventType {
     /** Before agent starts processing */
     /** 在智能体开始运行之前 */

@@ -15,6 +15,7 @@
  */
 package io.agentscope.harness.agent.tool;
 
+import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.tool.Tool;
 import io.agentscope.core.tool.ToolParam;
 import io.agentscope.harness.agent.workspace.WorkspaceManager;
@@ -29,14 +30,7 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Uses keyword-based search through all memory files visible via the configured
  * {@link io.agentscope.harness.agent.filesystem.AbstractFilesystem} (works across Local,
- * Sandbox, and Store backends).
- */
-/**
- * 用于检索持久化记忆文件（MEMORY.md 以及 memory/*.md 系列文件）的工具。
- *
- * <p>基于关键词检索所有可访问的记忆文件，底层依赖已配置的
- * {@link io.agentscope.harness.agent.filesystem.AbstractFilesystem} 文件抽象层，
- * 兼容本地、沙箱、远程存储多种后端实现。
+ * Sandbox, and Store stores).
  */
 public class MemorySearchTool {
 
@@ -50,31 +44,32 @@ public class MemorySearchTool {
 
     @Tool(
             name = "memory_search",
-//            检索长期记忆文件（MEMORY.md 与 memory 目录下所有 md 文件），查找相关信息。
-//            当需要回答过往工作、决策、日期、人物、偏好、待办事项相关问题时，优先调用该工具。
+            readOnly = true,
             description =
                     "Search through long-term memory files (MEMORY.md and memory/*.md) for"
                             + " relevant information. Use before answering questions about prior"
                             + " work, decisions, dates, people, preferences, or todos.")
     public String memorySearch(
+            RuntimeContext runtimeContext,
             @ToolParam(name = "query", description = "Keywords to search for in memory files")
                     String query) {
         if (query == null || query.isBlank()) {
             return "No query provided";
         }
 
-        return keywordSearch(query);
+        RuntimeContext rc = runtimeContext != null ? runtimeContext : RuntimeContext.empty();
+        return keywordSearch(rc, query);
     }
 
-    private String keywordSearch(String query) {
+    private String keywordSearch(RuntimeContext rc, String query) {
         StringJoiner results = new StringJoiner("\n");
         int matchCount = 0;
 
-        List<String> memoryPaths = workspaceManager.listMemoryFilePaths();
+        List<String> memoryPaths = workspaceManager.listMemoryFilePaths(rc);
         Pattern pattern = Pattern.compile(Pattern.quote(query), Pattern.CASE_INSENSITIVE);
 
         for (String relativePath : memoryPaths) {
-            String content = workspaceManager.readManagedWorkspaceFileUtf8(relativePath);
+            String content = workspaceManager.readManagedWorkspaceFileUtf8(rc, relativePath);
             if (content == null || content.isEmpty()) {
                 continue;
             }

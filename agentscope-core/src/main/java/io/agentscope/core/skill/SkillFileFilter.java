@@ -18,25 +18,24 @@ package io.agentscope.core.skill;
 
 /**
  * Filter for deciding whether a skill resource should be uploaded.
- * 用于决定是否上传技能资源的过滤器。
+ *
+ * @deprecated since 2.0.0. The skill package is removed; manage markdown skill catalogs in
+ *     application code.
  */
 @FunctionalInterface
+@Deprecated(since = "2.0.0")
 public interface SkillFileFilter {
 
     /**
      * Determines whether a resource path should be accepted for upload.
-     * 确定是否应接受资源路径进行上载。
      *
      * @param resourcePath The resource path (relative to the skill root)
-     *                     资源路径（相对于技能根节点）
      * @return true if the resource should be uploaded, false otherwise
-     *              如果资源需要上传，则为 false；否则为 false。
      */
     boolean accept(String resourcePath);
 
     /**
      * Returns a filter that accepts all files.
-     * 返回一个接受所有文件的筛选器。
      *
      * @return A filter that accepts all files
      */

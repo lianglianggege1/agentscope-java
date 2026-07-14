@@ -54,7 +54,10 @@ import java.util.Objects;
  *   <li>Log summary generation input</li>
  *       日志摘要生成输入
  * </ul>
+ *
+ * @deprecated since 2.0.0. Use {@link io.agentscope.core.middleware.MiddlewareBase} instead.
  */
+@Deprecated(forRemoval = true, since = "2.0.0")
 public final class PreSummaryEvent extends SummaryEvent {
 
     private List<Msg> inputMessages;

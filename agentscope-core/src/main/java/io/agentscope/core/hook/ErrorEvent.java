@@ -43,7 +43,10 @@ import java.util.Objects;
  *   <li>Implement custom error handling</li>
  *       实现自定义错误处理
  * </ul>
+ *
+ * @deprecated since 2.0.0. Use {@link io.agentscope.core.middleware.MiddlewareBase} instead.
  */
+@Deprecated(forRemoval = true, since = "2.0.0")
 public final class ErrorEvent extends HookEvent {
 
     private final Throwable error;

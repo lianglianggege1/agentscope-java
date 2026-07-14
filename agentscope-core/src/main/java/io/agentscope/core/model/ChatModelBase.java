@@ -30,6 +30,30 @@ import reactor.core.publisher.Flux;
  */
 public abstract class ChatModelBase implements Model {
 
+    private int contextWindowSize;
+
+    private Boolean nativeStructuredOutputWithTools;
+
+    @Override
+    public int getContextWindowSize() {
+        return contextWindowSize;
+    }
+
+    protected void setContextWindowSize(int contextWindowSize) {
+        this.contextWindowSize = contextWindowSize;
+    }
+
+    @Override
+    public boolean supportsNativeStructuredOutputWithTools() {
+        return nativeStructuredOutputWithTools != null
+                ? nativeStructuredOutputWithTools
+                : supportsNativeStructuredOutput();
+    }
+
+    protected void setNativeStructuredOutputWithTools(boolean nativeStructuredOutputWithTools) {
+        this.nativeStructuredOutputWithTools = nativeStructuredOutputWithTools;
+    }
+
     /**
      * Stream chat completion responses.
      * 流式对话响应的标准实现

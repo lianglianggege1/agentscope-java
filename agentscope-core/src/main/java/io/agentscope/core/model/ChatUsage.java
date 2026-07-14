@@ -15,30 +15,55 @@
  */
 package io.agentscope.core.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 /**
  * Represents token usage information for chat completion responses.
- * 表示聊天完成回复后的token使用信息
  *
  * <p>This immutable data class tracks the number of tokens used during a chat completion,
- * including input tokens (prompt), output tokens (generated response), and execution time.
- * 这个不可变数据类跟踪聊天完成期间使用的token数量，包括输入token（提示），输出token（生成的响应），执行时间。
+ * including input tokens (prompt), output tokens (generated response), cached input tokens, and
+ * execution time.
  */
 public class ChatUsage {
 
     private final int inputTokens;
     private final int outputTokens;
+    private final int cachedTokens;
     private final double time;
 
     /**
-     * Creates a new ChatUsage instance.
+     * Creates a new ChatUsage instance without cached token information.
+     *
+     * <p>This constructor is retained for backward compatibility and delegates to {@link
+     * #ChatUsage(int, int, int, double)} with {@code cachedTokens} defaulting to {@code 0}.
      *
      * @param inputTokens the number of tokens used for the input/prompt
      * @param outputTokens the number of tokens used for the output/generated response
      * @param time the execution time in seconds
      */
     public ChatUsage(int inputTokens, int outputTokens, double time) {
+        this(inputTokens, outputTokens, 0, time);
+    }
+
+    /**
+     * Creates a new ChatUsage instance.
+     *
+     * @param inputTokens the number of tokens used for the input/prompt
+     * @param outputTokens the number of tokens used for the output/generated response
+     * @param cachedTokens the number of input tokens served from the prompt cache (a subset of
+     *     {@code inputTokens}); {@code 0} when the provider does not report cache information
+     * @param time the execution time in seconds
+     */
+    @JsonCreator
+    public ChatUsage(
+            @JsonProperty("inputTokens") int inputTokens,
+            @JsonProperty("outputTokens") int outputTokens,
+            @JsonProperty("cachedTokens") int cachedTokens,
+            @JsonProperty("time") double time) {
         this.inputTokens = inputTokens;
         this.outputTokens = outputTokens;
+        this.cachedTokens = cachedTokens;
         this.time = time;
     }
 
@@ -58,6 +83,19 @@ public class ChatUsage {
      */
     public int getOutputTokens() {
         return outputTokens;
+    }
+
+    /**
+     * Gets the number of input tokens served from the prompt cache.
+     *
+     * <p>Cached tokens are a subset of {@link #getInputTokens()} (i.e. {@code inputTokens =
+     * non-cached prompt tokens + cachedTokens}), not an additional amount, and are typically billed
+     * at a reduced rate. Returns {@code 0} when the provider does not report cache information.
+     *
+     * @return the number of cached input tokens
+     */
+    public int getCachedTokens() {
+        return cachedTokens;
     }
 
     /**
@@ -93,6 +131,7 @@ public class ChatUsage {
     public static class Builder {
         private int inputTokens;
         private int outputTokens;
+        private int cachedTokens;
         private double time;
 
         /**
@@ -118,6 +157,18 @@ public class ChatUsage {
         }
 
         /**
+         * Sets the number of cached input tokens.
+         *
+         * @param cachedTokens the number of input tokens served from the prompt cache (a subset of
+         *     {@code inputTokens})
+         * @return this builder instance
+         */
+        public Builder cachedTokens(int cachedTokens) {
+            this.cachedTokens = cachedTokens;
+            return this;
+        }
+
+        /**
          * Sets the execution time.
          *
          * @param time the execution time in seconds
@@ -134,7 +185,7 @@ public class ChatUsage {
          * @return a new ChatUsage instance
          */
         public ChatUsage build() {
-            return new ChatUsage(inputTokens, outputTokens, time);
+            return new ChatUsage(inputTokens, outputTokens, cachedTokens, time);
         }
     }
 }

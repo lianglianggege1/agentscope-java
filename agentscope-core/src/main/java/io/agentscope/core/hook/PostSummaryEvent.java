@@ -50,7 +50,10 @@ import io.agentscope.core.model.GenerateOptions;
  *   <li>Request to stop the agent via {@link #stopAgent()}</li>
  *       请求通过 {@link #stopAgent()} 停止
  * </ul>
+ *
+ * @deprecated since 2.0.0. Use {@link io.agentscope.core.middleware.MiddlewareBase} instead.
  */
+@Deprecated(forRemoval = true, since = "2.0.0")
 public final class PostSummaryEvent extends SummaryEvent {
 
     private Msg summaryMessage;

@@ -16,10 +16,12 @@
 package io.agentscope.core.state;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import io.agentscope.core.interruption.InterruptControl;
 import io.agentscope.core.message.Msg;
-import io.agentscope.core.permission.PermissionContext;
+import io.agentscope.core.permission.PermissionContextState;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -35,7 +37,7 @@ import java.util.UUID;
  *
  * <p>The {@link #context} list is exposed as a defensive copy via {@link #getContext()} and as a
  * live, mutable handle via {@link #contextMutable()}, mirroring the pattern used by
- * {@link TaskContext}. Storage layers may swap whole {@link AgentState} instances or mutate the
+ * {@link TaskContextState}. Storage layers may swap whole {@link AgentState} instances or mutate the
  * inner collections in place.
  *
  * <p>{@code summary} is modelled as a free-form {@link String}; richer structured forms are left
@@ -43,53 +45,82 @@ import java.util.UUID;
  */
 @JsonPropertyOrder({
     "session_id",
+    "user_id",
     "summary",
     "context",
     "reply_id",
     "cur_iter",
+    "shutdown_interrupted",
     "permission_context",
     "tool_context",
-    "tasks_context"
+    "tasks_context",
+    "plan_mode_context"
 })
-public final class AgentState {
+public final class AgentState implements State {
 
     private final String sessionId;
+    private final String userId;
     private String summary;
     private final List<Msg> context;
     private String replyId;
     private int curIter;
-    private final PermissionContext permissionContext;
-    private final ToolContext toolContext;
-    private final TaskContext tasksContext;
+    private boolean shutdownInterrupted;
+    private PermissionContextState permissionContext;
+    private final ToolContextState toolContext;
+    private final TaskContextState tasksContext;
+    private final PlanModeContextState planModeContext;
+
+    /**
+     * Per-session interrupt signal. Runtime-only (never serialized): a stateless agent engine
+     * attaches one of these per {@code (userId, sessionId)} slot so a targeted {@code interrupt}
+     * signals exactly one session's in-flight call. Lazily created and {@code transient} so it is
+     * not part of {@code equals}/{@code hashCode} or JSON.
+     */
+    private transient volatile InterruptControl interruptControl;
 
     private AgentState(Builder builder) {
         this.sessionId = builder.sessionId == null ? newHex() : builder.sessionId;
+        this.userId = builder.userId;
         this.summary = builder.summary == null ? "" : builder.summary;
         this.context = new ArrayList<>(builder.context);
         this.replyId = builder.replyId == null ? newHex() : builder.replyId;
         this.curIter = builder.curIter;
+        this.shutdownInterrupted = builder.shutdownInterrupted;
         this.permissionContext =
                 builder.permissionContext == null
-                        ? PermissionContext.builder().build()
+                        ? PermissionContextState.builder().build()
                         : builder.permissionContext;
         this.toolContext =
-                builder.toolContext == null ? ToolContext.builder().build() : builder.toolContext;
-        this.tasksContext = builder.tasksContext == null ? new TaskContext() : builder.tasksContext;
+                builder.toolContext == null
+                        ? ToolContextState.builder().build()
+                        : builder.toolContext;
+        this.tasksContext =
+                builder.tasksContext == null ? new TaskContextState() : builder.tasksContext;
+        this.planModeContext =
+                builder.planModeContext == null
+                        ? new PlanModeContextState()
+                        : builder.planModeContext;
     }
 
     @JsonCreator
     static AgentState fromJson(
             @JsonProperty("session_id") String sessionId,
+            @JsonProperty("user_id") String userId,
             @JsonProperty("summary") String summary,
             @JsonProperty("context") List<Msg> context,
             @JsonProperty("reply_id") String replyId,
             @JsonProperty("cur_iter") Integer curIter,
-            @JsonProperty("permission_context") PermissionContext permissionContext,
-            @JsonProperty("tool_context") ToolContext toolContext,
-            @JsonProperty("tasks_context") TaskContext tasksContext) {
+            @JsonProperty("shutdown_interrupted") Boolean shutdownInterrupted,
+            @JsonProperty("permission_context") PermissionContextState permissionContext,
+            @JsonProperty("tool_context") ToolContextState toolContext,
+            @JsonProperty("tasks_context") TaskContextState tasksContext,
+            @JsonProperty("plan_mode_context") PlanModeContextState planModeContext) {
         Builder b = builder();
         if (sessionId != null) {
             b.sessionId(sessionId);
+        }
+        if (userId != null) {
+            b.userId(userId);
         }
         if (summary != null) {
             b.summary(summary);
@@ -103,6 +134,9 @@ public final class AgentState {
         if (curIter != null) {
             b.curIter(curIter);
         }
+        if (shutdownInterrupted != null) {
+            b.shutdownInterrupted(shutdownInterrupted);
+        }
         if (permissionContext != null) {
             b.permissionContext(permissionContext);
         }
@@ -111,6 +145,9 @@ public final class AgentState {
         }
         if (tasksContext != null) {
             b.tasksContext(tasksContext);
+        }
+        if (planModeContext != null) {
+            b.planModeContext(planModeContext);
         }
         return b.build();
     }
@@ -122,6 +159,12 @@ public final class AgentState {
     @JsonProperty("session_id")
     public String getSessionId() {
         return sessionId;
+    }
+
+    /** Nullable; {@code null} = anonymous / single-tenant context. */
+    @JsonProperty("user_id")
+    public String getUserId() {
+        return userId;
     }
 
     @JsonProperty("summary")
@@ -162,23 +205,86 @@ public final class AgentState {
         this.curIter = curIter;
     }
 
+    @JsonProperty("shutdown_interrupted")
+    public boolean isShutdownInterrupted() {
+        return shutdownInterrupted;
+    }
+
+    public void setShutdownInterrupted(boolean shutdownInterrupted) {
+        this.shutdownInterrupted = shutdownInterrupted;
+    }
+
     @JsonProperty("permission_context")
-    public PermissionContext getPermissionContext() {
+    public PermissionContextState getPermissionContext() {
         return permissionContext;
     }
 
+    /**
+     * Replaces the permission context for this session. Used to change the evaluation mode at
+     * runtime (e.g. switching into {@link io.agentscope.core.permission.PermissionMode#BYPASS}).
+     * Callers that cache a {@code PermissionEngine} per session must rebuild it after this call.
+     *
+     * @param permissionContext the new (non-null) permission context
+     */
+    public void setPermissionContext(PermissionContextState permissionContext) {
+        this.permissionContext =
+                java.util.Objects.requireNonNull(
+                        permissionContext, "permissionContext must not be null");
+    }
+
     @JsonProperty("tool_context")
-    public ToolContext getToolContext() {
+    public ToolContextState getToolContext() {
         return toolContext;
     }
 
     @JsonProperty("tasks_context")
-    public TaskContext getTasksContext() {
+    public TaskContextState getTasksContext() {
         return tasksContext;
+    }
+
+    @JsonProperty("plan_mode_context")
+    public PlanModeContextState getPlanModeContext() {
+        return planModeContext;
+    }
+
+    /**
+     * The per-session interrupt signal for this state, created on first access. Runtime-only and not
+     * serialized.
+     */
+    @JsonIgnore
+    public InterruptControl interruptControl() {
+        InterruptControl local = interruptControl;
+        if (local == null) {
+            synchronized (this) {
+                local = interruptControl;
+                if (local == null) {
+                    local = new InterruptControl();
+                    interruptControl = local;
+                }
+            }
+        }
+        return local;
     }
 
     public static Builder builder() {
         return new Builder();
+    }
+
+    /**
+     * Serialize this state to a pretty-printed JSON string.
+     *
+     * <p>Intended for external storage stores to persist the entire agent state as a single
+     * JSON document (e.g., {@code agent_state.json}).
+     */
+    public String toJson() {
+        return io.agentscope.core.util.JsonUtils.getJsonCodec().toPrettyJson(this);
+    }
+
+    /**
+     * Deserialize an {@link AgentState} from a JSON string produced by {@link #toJson()}.
+     */
+    public static AgentState fromJsonString(String json) {
+        return io.agentscope.core.util.JsonUtils.getJsonCodec().fromJson(json, AgentState.class);
     }
 
     @Override
@@ -190,26 +296,32 @@ public final class AgentState {
             return false;
         }
         return curIter == other.curIter
+                && shutdownInterrupted == other.shutdownInterrupted
                 && Objects.equals(sessionId, other.sessionId)
+                && Objects.equals(userId, other.userId)
                 && Objects.equals(summary, other.summary)
                 && Objects.equals(context, other.context)
                 && Objects.equals(replyId, other.replyId)
                 && Objects.equals(permissionContext, other.permissionContext)
                 && Objects.equals(toolContext, other.toolContext)
-                && Objects.equals(tasksContext, other.tasksContext);
+                && Objects.equals(tasksContext, other.tasksContext)
+                && Objects.equals(planModeContext, other.planModeContext);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(
                 sessionId,
+                userId,
                 summary,
                 context,
                 replyId,
                 curIter,
+                shutdownInterrupted,
                 permissionContext,
                 toolContext,
-                tasksContext);
+                tasksContext,
+                planModeContext);
     }
 
     @Override
@@ -220,6 +332,8 @@ public final class AgentState {
                 + replyId
                 + ", curIter="
                 + curIter
+                + ", shutdownInterrupted="
+                + shutdownInterrupted
                 + ", contextSize="
                 + context.size()
                 + '}';
@@ -227,18 +341,27 @@ public final class AgentState {
 
     public static final class Builder {
         private String sessionId;
+        private String userId;
         private String summary;
         private List<Msg> context = new ArrayList<>();
         private String replyId;
         private int curIter;
-        private PermissionContext permissionContext;
-        private ToolContext toolContext;
-        private TaskContext tasksContext;
+        private boolean shutdownInterrupted;
+        private PermissionContextState permissionContext;
+        private ToolContextState toolContext;
+        private TaskContextState tasksContext;
+        private PlanModeContextState planModeContext;
 
         private Builder() {}
 
         public Builder sessionId(String sessionId) {
             this.sessionId = sessionId;
+            return this;
+        }
+
+        /** Nullable; {@code null} = anonymous / single-tenant context. */
+        public Builder userId(String userId) {
+            this.userId = userId;
             return this;
         }
 
@@ -268,18 +391,28 @@ public final class AgentState {
             return this;
         }
 
-        public Builder permissionContext(PermissionContext permissionContext) {
+        public Builder shutdownInterrupted(boolean shutdownInterrupted) {
+            this.shutdownInterrupted = shutdownInterrupted;
+            return this;
+        }
+
+        public Builder permissionContext(PermissionContextState permissionContext) {
             this.permissionContext = permissionContext;
             return this;
         }
 
-        public Builder toolContext(ToolContext toolContext) {
+        public Builder toolContext(ToolContextState toolContext) {
             this.toolContext = toolContext;
             return this;
         }
 
-        public Builder tasksContext(TaskContext tasksContext) {
+        public Builder tasksContext(TaskContextState tasksContext) {
             this.tasksContext = tasksContext;
+            return this;
+        }
+
+        public Builder planModeContext(PlanModeContextState planModeContext) {
+            this.planModeContext = planModeContext;
             return this;
         }
 

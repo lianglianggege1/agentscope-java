@@ -71,6 +71,7 @@ import org.slf4j.LoggerFactory;
  *     List<AgentSkill> allSkills = repository.getAllSkills();
  * }
  * }</pre>
+ *
  */
 public class ClasspathSkillRepository implements AgentSkillRepository {
 

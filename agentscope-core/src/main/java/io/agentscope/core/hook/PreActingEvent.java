@@ -50,7 +50,10 @@ import java.util.Objects;
  *   <li>Log or monitor individual tool invocations</li>
  *       跟踪或监控单个工具调用
  * </ul>
+ *
+ * @deprecated since 2.0.0. Use {@link io.agentscope.core.middleware.MiddlewareBase} instead.
  */
+@Deprecated(forRemoval = true, since = "2.0.0")
 public final class PreActingEvent extends ActingEvent {
 
     /**

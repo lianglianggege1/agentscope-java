@@ -27,8 +27,8 @@ import com.fasterxml.jackson.annotation.JsonValue;
  *
  * <p>Legacy aliases recognised on deserialization:
  * <ul>
- *   <li>{@code RUN_STARTED} → {@link #REPLY_START}</li>
- *   <li>{@code RUN_FINISHED} → {@link #REPLY_END}</li>
+ *   <li>{@code RUN_STARTED}, {@code REPLY_START} → {@link #AGENT_START}</li>
+ *   <li>{@code RUN_FINISHED}, {@code REPLY_END} → {@link #AGENT_END}</li>
  *   <li>{@code MODEL_CALL_STARTED} → {@link #MODEL_CALL_START}</li>
  *   <li>{@code MODEL_CALL_ENDED} → {@link #MODEL_CALL_END}</li>
  *   <li>{@code BINARY_BLOCK_*} → {@code DATA_BLOCK_*}</li>
@@ -38,10 +38,11 @@ import com.fasterxml.jackson.annotation.JsonValue;
  * <p>Serialization always emits the canonical form.
  */
 public enum AgentEventType {
-    @JsonAlias({"RUN_STARTED"})
-    REPLY_START("REPLY_START"),
-    @JsonAlias({"RUN_FINISHED"})
-    REPLY_END("REPLY_END"),
+    @JsonAlias({"RUN_STARTED", "REPLY_START"})
+    AGENT_START("AGENT_START"),
+    @JsonAlias({"RUN_FINISHED", "REPLY_END"})
+    AGENT_END("AGENT_END"),
+    AGENT_RESULT("AGENT_RESULT"),
 
     @JsonAlias({"MODEL_CALL_STARTED"})
     MODEL_CALL_START("MODEL_CALL_START"),
@@ -78,7 +79,14 @@ public enum AgentEventType {
     REQUIRE_USER_CONFIRM("REQUIRE_USER_CONFIRM"),
     REQUIRE_EXTERNAL_EXECUTION("REQUIRE_EXTERNAL_EXECUTION"),
     USER_CONFIRM_RESULT("USER_CONFIRM_RESULT"),
-    EXTERNAL_EXECUTION_RESULT("EXTERNAL_EXECUTION_RESULT");
+    EXTERNAL_EXECUTION_RESULT("EXTERNAL_EXECUTION_RESULT"),
+    REQUEST_STOP("REQUEST_STOP"),
+
+    @JsonAlias({"THREAD_EXPOSED"})
+    SUBAGENT_EXPOSED("SUBAGENT_EXPOSED"),
+
+    HINT_BLOCK("HINT_BLOCK"),
+    CUSTOM("CUSTOM");
 
     private final String value;
 
@@ -113,14 +121,15 @@ public enum AgentEventType {
         }
         // Legacy aliases — keep the mapping co-located with the enum for grep-ability.
         return switch (raw) {
-            case "RUN_STARTED" -> REPLY_START;
-            case "RUN_FINISHED" -> REPLY_END;
+            case "RUN_STARTED", "REPLY_START" -> AGENT_START;
+            case "RUN_FINISHED", "REPLY_END" -> AGENT_END;
             case "MODEL_CALL_STARTED" -> MODEL_CALL_START;
             case "MODEL_CALL_ENDED" -> MODEL_CALL_END;
             case "BINARY_BLOCK_START" -> DATA_BLOCK_START;
             case "BINARY_BLOCK_DELTA" -> DATA_BLOCK_DELTA;
             case "BINARY_BLOCK_END" -> DATA_BLOCK_END;
             case "TOOL_RESULT_BINARY_DELTA" -> TOOL_RESULT_DATA_DELTA;
+            case "THREAD_EXPOSED" -> SUBAGENT_EXPOSED;
             default -> throw new IllegalArgumentException("Unknown AgentEventType value: " + raw);
         };
     }

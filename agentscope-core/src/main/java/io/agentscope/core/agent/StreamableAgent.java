@@ -37,7 +37,15 @@ import reactor.core.publisher.Flux;
  *   <li>Building interactive chat interfaces</li>
  *   构建交互式聊天界面
  * </ul>
+ *
+ * @deprecated since 2.0.0, for removal in a future minor release. Every {@code stream(...)}
+ *     method on this interface returns the coarse-grained {@link Event} type, which is a v1
+ *     carry-over. Use {@code ReActAgent#streamEvents(...)} instead — it returns
+ *     {@code Flux<io.agentscope.core.event.AgentEvent>}, the fine-grained event hierarchy that
+ *     covers the full agent lifecycle (28 typed events including HITL) and is the single
+ *     streaming surface going forward. See the v2 changelog section B.4 for migration details.
  */
+@Deprecated(since = "2.0.0", forRemoval = true)
 public interface StreamableAgent {
 
     /**
@@ -46,7 +54,10 @@ public interface StreamableAgent {
      *
      * @param options Stream configuration options
      * @return Flux of events emitted during execution
+     * @deprecated since 2.0.0, for removal. Use {@code ReActAgent#streamEvents(...)} for the
+     *     fine-grained {@code AgentEvent} stream.
      */
+    @Deprecated(since = "2.0.0", forRemoval = true)
     default Flux<Event> stream(StreamOptions options) {
         return stream(List.of(), options);
     }
@@ -57,7 +68,10 @@ public interface StreamableAgent {
      *
      * @param structuredModel Class defining the structure of the output
      * @return Flux of events emitted during execution
+     * @deprecated since 2.0.0, for removal. Use {@code ReActAgent#streamEvents(...)} for the
+     *     fine-grained {@code AgentEvent} stream.
      */
+    @Deprecated(since = "2.0.0", forRemoval = true)
     default Flux<Event> stream(Class<?> structuredModel) {
         return stream(List.of(), StreamOptions.defaults(), structuredModel);
     }
@@ -69,7 +83,10 @@ public interface StreamableAgent {
      * @param options Stream configuration options
      * @param structuredModel Class defining the structure of the output
      * @return Flux of events emitted during execution
+     * @deprecated since 2.0.0, for removal. Use {@code ReActAgent#streamEvents(...)} for the
+     *     fine-grained {@code AgentEvent} stream.
      */
+    @Deprecated(since = "2.0.0", forRemoval = true)
     default Flux<Event> stream(StreamOptions options, Class<?> structuredModel) {
         return stream(List.of(), options, structuredModel);
     }
@@ -80,7 +97,10 @@ public interface StreamableAgent {
      *
      * @param msg Input message
      * @return Flux of events emitted during execution
+     * @deprecated since 2.0.0, for removal. Use {@code ReActAgent#streamEvents(Msg)} for the
+     *     fine-grained {@code AgentEvent} stream.
      */
+    @Deprecated(since = "2.0.0", forRemoval = true)
     default Flux<Event> stream(Msg msg) {
         return stream(msg, StreamOptions.defaults());
     }
@@ -92,7 +112,10 @@ public interface StreamableAgent {
      * @param msg Input message
      * @param options Stream configuration options
      * @return Flux of events emitted during execution
+     * @deprecated since 2.0.0, for removal. Use {@code ReActAgent#streamEvents(Msg)} for the
+     *     fine-grained {@code AgentEvent} stream.
      */
+    @Deprecated(since = "2.0.0", forRemoval = true)
     default Flux<Event> stream(Msg msg, StreamOptions options) {
         return stream(List.of(msg), options);
     }
@@ -105,7 +128,10 @@ public interface StreamableAgent {
      * @param options Stream configuration options
      * @param structuredModel Class defining the structure of the output
      * @return Flux of events emitted during execution
+     * @deprecated since 2.0.0, for removal. Use {@code ReActAgent#streamEvents(...)} for the
+     *     fine-grained {@code AgentEvent} stream.
      */
+    @Deprecated(since = "2.0.0", forRemoval = true)
     default Flux<Event> stream(Msg msg, StreamOptions options, Class<?> structuredModel) {
         return stream(List.of(msg), options, structuredModel);
     }
@@ -117,7 +143,10 @@ public interface StreamableAgent {
      * @param options Stream configuration options
      * @param schema JSON schema defining the structure
      * @return Flux of events emitted during execution
+     * @deprecated since 2.0.0, for removal. Use {@code ReActAgent#streamEvents(...)} for the
+     *     fine-grained {@code AgentEvent} stream.
      */
+    @Deprecated(since = "2.0.0", forRemoval = true)
     default Flux<Event> stream(Msg msg, StreamOptions options, JsonNode schema) {
         return stream(List.of(msg), options, schema);
     }
@@ -128,7 +157,10 @@ public interface StreamableAgent {
      *
      * @param msgs Input messages
      * @return Flux of events emitted during execution
+     * @deprecated since 2.0.0, for removal. Use {@code ReActAgent#streamEvents(List)} for the
+     *     fine-grained {@code AgentEvent} stream.
      */
+    @Deprecated(since = "2.0.0", forRemoval = true)
     default Flux<Event> stream(List<Msg> msgs) {
         return stream(msgs, StreamOptions.defaults());
     }
@@ -140,8 +172,29 @@ public interface StreamableAgent {
      * @param msgs Input messages
      * @param options Stream configuration options
      * @return Flux of events emitted during execution
+     * @deprecated since 2.0.0, for removal. Use {@code ReActAgent#streamEvents(List)} for the
+     *     fine-grained {@code AgentEvent} stream.
      */
+    @Deprecated(since = "2.0.0", forRemoval = true)
     Flux<Event> stream(List<Msg> msgs, StreamOptions options);
+
+    /**
+     * Stream execution events with a caller-supplied per-call runtime context.
+     *
+     * <p>Implementations that do not consume {@link RuntimeContext} can rely on this default
+     * bridge and continue using the original two-argument stream method.
+     *
+     * @param msgs Input messages
+     * @param options Stream configuration options
+     * @param context Runtime metadata for this call
+     * @return Flux of events emitted during execution
+     * @deprecated since 2.0.0, for removal. Use {@code ReActAgent#streamEvents(...)} for the
+     *     fine-grained {@code AgentEvent} stream.
+     */
+    @Deprecated(since = "2.0.0", forRemoval = true)
+    default Flux<Event> stream(List<Msg> msgs, StreamOptions options, RuntimeContext context) {
+        return stream(msgs, options);
+    }
 
     /**
      * Stream execution events with structured output support.
@@ -151,7 +204,10 @@ public interface StreamableAgent {
      * @param options Stream configuration options
      * @param structuredModel Class defining the structure of the output
      * @return Flux of events emitted during execution
+     * @deprecated since 2.0.0, for removal. Use {@code ReActAgent#streamEvents(...)} for the
+     *     fine-grained {@code AgentEvent} stream.
      */
+    @Deprecated(since = "2.0.0", forRemoval = true)
     Flux<Event> stream(List<Msg> msgs, StreamOptions options, Class<?> structuredModel);
 
     /**
@@ -161,6 +217,9 @@ public interface StreamableAgent {
      * @param options Stream configuration options
      * @param schema JSON schema defining the structure
      * @return Flux of events emitted during execution
+     * @deprecated since 2.0.0, for removal. Use {@code ReActAgent#streamEvents(...)} for the
+     *     fine-grained {@code AgentEvent} stream.
      */
+    @Deprecated(since = "2.0.0", forRemoval = true)
     Flux<Event> stream(List<Msg> msgs, StreamOptions options, JsonNode schema);
 }

@@ -41,6 +41,7 @@ package io.agentscope.core.skill.repository;
  *     true
  * );
  * }</pre>
+ *
  */
 public class AgentSkillRepositoryInfo {
     private final String type;

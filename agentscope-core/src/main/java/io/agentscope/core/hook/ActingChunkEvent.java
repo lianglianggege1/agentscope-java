@@ -49,7 +49,10 @@ import java.util.Objects;
  *   <li>Monitor long-running tool operations</li>
  *       监控长时间运行的工具操作
  * </ul>
+ *
+ * @deprecated since 2.0.0. Use {@link io.agentscope.core.middleware.MiddlewareBase} instead.
  */
+@Deprecated(forRemoval = true, since = "2.0.0")
 public final class ActingChunkEvent extends ActingEvent {
 
     private final ToolResultBlock chunk;

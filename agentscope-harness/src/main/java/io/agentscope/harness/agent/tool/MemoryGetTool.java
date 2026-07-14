@@ -15,6 +15,7 @@
  */
 package io.agentscope.harness.agent.tool;
 
+import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.tool.Tool;
 import io.agentscope.core.tool.ToolParam;
 import io.agentscope.harness.agent.workspace.WorkspaceManager;
@@ -24,9 +25,6 @@ import java.util.List;
 /**
  * Tool for reading specific lines from memory files, typically used after
  * {@link MemorySearchTool} to fetch surrounding context.
- */
-/**
- * 用于读取记忆文件指定行的工具，通常搭配 {@link MemorySearchTool} 使用，获取检索结果周边上下文内容。
  */
 public class MemoryGetTool {
 
@@ -38,22 +36,20 @@ public class MemoryGetTool {
 
     @Tool(
             name = "memory_get",
-            // 读取记忆文件指定行。一般配合 memory_search 使用，用于获取匹配行周边完整上下文。路径为工作区相对路径。
+            readOnly = true,
             description =
                     "Read specific lines from a memory file. Use after memory_search to pull"
                             + " full context around matched lines. Path is relative to workspace.")
     public String memoryGet(
+            RuntimeContext runtimeContext,
             @ToolParam(
                             name = "path",
-//                    记忆文件相对路径，示例：MEMORY.md 或 memory/2026-04-01.md
                             description =
                                     "Relative path to the memory file (e.g., MEMORY.md or"
                                             + " memory/2026-04-01.md)")
                     String path,
-//            起始行号，从1开始，包含该行
             @ToolParam(name = "startLine", description = "Start line number (1-based, inclusive)")
                     int startLine,
-//            结束行号，从1开始，包含该行
             @ToolParam(name = "endLine", description = "End line number (1-based, inclusive)")
                     int endLine) {
         if (path == null || path.isBlank()) {
@@ -65,7 +61,8 @@ public class MemoryGetTool {
             return "Error: path traversal not allowed";
         }
 
-        String text = workspaceManager.readManagedWorkspaceFileUtf8(path);
+        RuntimeContext rc = runtimeContext != null ? runtimeContext : RuntimeContext.empty();
+        String text = workspaceManager.readManagedWorkspaceFileUtf8(rc, path);
         if (text == null || text.isBlank()) {
             return "Error: file not found: " + path;
         }

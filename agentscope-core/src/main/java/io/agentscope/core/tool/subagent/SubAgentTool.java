@@ -17,7 +17,6 @@ package io.agentscope.core.tool.subagent;
 
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.Agent;
-import io.agentscope.core.agent.AgentBase;
 import io.agentscope.core.agent.Event;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.agent.StreamOptions;
@@ -25,12 +24,11 @@ import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.TextBlock;
 import io.agentscope.core.message.ToolResultBlock;
-import io.agentscope.core.session.Session;
-import io.agentscope.core.state.StateModule;
+import io.agentscope.core.state.AgentState;
+import io.agentscope.core.state.AgentStateStore;
 import io.agentscope.core.tool.AgentTool;
 import io.agentscope.core.tool.ToolCallParam;
 import io.agentscope.core.tool.ToolEmitter;
-import io.agentscope.core.tool.ToolExecutionContext;
 import io.agentscope.core.util.JsonUtils;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -42,25 +40,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
 
 /**
  * AgentTool implementation that wraps a sub-agent for multi-turn conversation.
- * AgentTool 实现，封装了一个用于多轮对话的子代理。
  *
  * <p>This tool allows an agent to be called as a tool by other agents, supporting multi-turn
  * conversation with session management. Each session maintains its own agent instance and state.
- * 该工具允许其他代理将某个代理作为工具调用，支持多轮对话和会话管理。每个会话都维护着自己的代理实例和状态。
  *
  * <p>Thread safety is ensured by using {@link SubAgentProvider} to create a fresh agent instance
  * for each new session.
- * 通过使用 {@link SubAgentProvider} 为每个新会话创建一个新的代理实例，从而确保线程安全。
  *
  * <p>The tool exposes two parameters:
  *
  * <ul>
  *   <li>{@code session_id} - Optional. Omit to start a new session, provide to continue an
- *       existing one. 可选。省略此参数将开始新会话，或继续现有会话。
- *   <li>{@code message} - Required. The message to send to the agent. 必填项。要发送给代理人的消息。
+ *       existing one.
+ *   <li>{@code message} - Required. The message to send to the agent.
  * </ul>
  */
 public class SubAgentTool implements AgentTool {
@@ -81,8 +77,8 @@ public class SubAgentTool implements AgentTool {
     /**
      * Creates a new SubAgentTool.
      *
-     * @param agentProvider Provider for creating agent instances 用于创建代理实例的提供程序
-     * @param config Configuration for the tool 工具配置
+     * @param agentProvider Provider for creating agent instances
+     * @param config Configuration for the tool
      */
     public SubAgentTool(SubAgentProvider<?> agentProvider, SubAgentConfig config) {
         // Create a sample agent to derive name and description
@@ -118,15 +114,14 @@ public class SubAgentTool implements AgentTool {
 
     /**
      * Executes a conversation with the sub-agent, managing session lifecycle.
-     * 与子代理执行对话，管理会话生命周期。
      *
      * <p>This method handles:
      *
      * <ul>
-     *   <li>Session ID generation for new conversations 为新对话生成会话 ID
-     *   <li>Agent state loading for continued sessions 代理状态加载以继续会话
-     *   <li>Message execution (streaming or non-streaming based on config) 消息执行（根据配置选择流式或非流式）
-     *   <li>Agent state persistence after execution 执行后代理状态的持久性
+     *   <li>AgentStateStore ID generation for new conversations
+     *   <li>Agent state loading for continued sessions
+     *   <li>Message execution (streaming or non-streaming based on config)
+     *   <li>Agent state persistence after execution
      * </ul>
      *
      * @param param The tool call parameters containing input and emitter
@@ -156,8 +151,8 @@ public class SubAgentTool implements AgentTool {
                         Agent agent = agentProvider.provide();
 
                         // Load existing state if continuing session
-                        if (!isNewSession && agent instanceof StateModule) {
-                            loadAgentState(finalSessionId, (StateModule) agent);
+                        if (!isNewSession) {
+                            loadAgentState(finalSessionId, agent);
                         }
 
                         // Build user message
@@ -166,10 +161,10 @@ public class SubAgentTool implements AgentTool {
                                         .role(MsgRole.USER)
                                         .content(TextBlock.builder().text(message).build())
                                         .build();
-                        RuntimeContext runtimeContext = resolveRuntimeContext(param);
+                        RuntimeContext runtimeContext = param.getRuntimeContext();
 
                         logger.debug(
-                                "Session {} with agent '{}': {}",
+                                "AgentStateStore {} with agent '{}': {}",
                                 isNewSession ? "started" : "continued",
                                 agent.getName(),
                                 message.substring(0, Math.min(50, message.length())));
@@ -193,68 +188,117 @@ public class SubAgentTool implements AgentTool {
                                             agent, userMsg, finalSessionId, runtimeContext);
                         }
 
+                        // Interrupt the sub-agent when the subscription is cancelled
+                        // (e.g. ToolExecutor timeout triggers a retry on a new subscription).
+                        // Without this, the orphan agent keeps consuming LLM tokens, SSH
+                        // connections, and thread pool resources until it finishes naturally.
+                        //
+                        // Uses doFinally(CANCEL) rather than doOnCancel because doOnCancel
+                        // also fires on normal error propagation cleanup, which would
+                        // attempt to interrupt an already-failed agent.
+                        //
+                        // Uses interrupt(RuntimeContext) instead of the deprecated
+                        // interrupt(InterruptSource) because the latter only looks up
+                        // `defaultSessionId` which may differ from the session the call
+                        // actually runs in.
+                        result =
+                                result.doFinally(
+                                        signal -> {
+                                            if (signal == SignalType.CANCEL) {
+                                                interruptAgent(agent, runtimeContext);
+                                            }
+                                        });
+
                         // Save state after execution
-                        return result.doOnSuccess(
-                                r -> {
-                                    if (agent instanceof StateModule) {
-                                        saveAgentState(finalSessionId, (StateModule) agent);
-                                    }
-                                });
+                        return result.doOnSuccess(r -> saveAgentState(finalSessionId, agent));
                     } catch (Exception e) {
                         logger.error("Error in session setup: {}", e.getMessage(), e);
                         return Mono.just(
-                                ToolResultBlock.error("Session setup failed: " + e.getMessage()));
+                                ToolResultBlock.error(
+                                        "AgentStateStore setup failed: " + e.getMessage()));
                     }
                 });
     }
 
     /**
-     * Loads agent state from the session storage.
-     *
-     * <p>If the session exists, the agent's state is restored. Any errors during loading are logged
-     * but do not interrupt execution.
-     *
-     * @param sessionId The session ID to load state from
-     * @param agent The state module to restore state into
+     * Interrupts the sub-agent when the tool call is cancelled (e.g. by timeout-triggered
+     * retry), preventing it from becoming an orphan agent that silently consumes resources.
      */
-    private void loadAgentState(String sessionId, StateModule agent) {
-        Session session = config.getSession();
-        try {
-            agent.loadIfExists(session, sessionId);
-            logger.debug("Loaded state for session: {}", sessionId);
-        } catch (Exception e) {
-            logger.warn("Failed to load state for session {}: {}", sessionId, e.getMessage());
+    private void interruptAgent(Agent agent, RuntimeContext ctx) {
+        if (agent instanceof ReActAgent ra) {
+            ra.interrupt(ctx);
+            logger.warn(
+                    "Sub-agent '{}' (id={}) was interrupted because its tool call subscription "
+                            + "was cancelled.",
+                    ra.getName(),
+                    ra.getAgentId());
         }
     }
 
     /**
-     * Saves agent state to the session storage.
-     * 将代理状态保存到会话存储中。
-     *
-     * <p>Persists the agent's current state. Any errors during saving are logged but do not
-     * interrupt execution.
-     * 保存代理的当前状态。保存过程中出现的任何错误都会被记录，但不会中断执行。
-     *
-     * @param sessionId The session ID to save state under
-     * @param agent The state module to save state from
+     * Loads sub-agent state for the conversation identified by {@code sessionId} from
+     * {@link SubAgentConfig#getStateStore()} and merges it into the live agent's
+     * {@link AgentState}. Errors are logged but do not interrupt execution.
      */
-    private void saveAgentState(String sessionId, StateModule agent) {
-        Session session = config.getSession();
-        try {
-            agent.saveTo(session, sessionId);
-            logger.debug("Saved state for session: {}", sessionId);
-        } catch (Exception e) {
-            logger.warn("Failed to save state for session {}: {}", sessionId, e.getMessage());
+    private void loadAgentState(String sessionId, Agent agent) {
+        if (!(agent instanceof ReActAgent ra)) {
+            return;
         }
+        AgentStateStore subSession = config.getStateStore();
+        if (subSession == null) {
+            return;
+        }
+        try {
+            subSession
+                    .get(null, sessionId, "agent_state", AgentState.class)
+                    .ifPresent(loaded -> applyLoadedState(ra, loaded));
+            logger.debug("Loaded sub-agent state for session: {}", sessionId);
+        } catch (Exception e) {
+            logger.warn(
+                    "Failed to load sub-agent state for session {}: {}", sessionId, e.getMessage());
+        }
+    }
+
+    /**
+     * Saves the live {@link AgentState} for the conversation identified by {@code sessionId} into
+     * {@link SubAgentConfig#getStateStore()}. Errors are logged but do not interrupt execution.
+     */
+    private void saveAgentState(String sessionId, Agent agent) {
+        if (!(agent instanceof ReActAgent ra)) {
+            return;
+        }
+        AgentStateStore subSession = config.getStateStore();
+        if (subSession == null) {
+            return;
+        }
+        try {
+            subSession.save(null, sessionId, "agent_state", ra.getAgentState());
+            logger.debug("Saved sub-agent state for session: {}", sessionId);
+        } catch (Exception e) {
+            logger.warn(
+                    "Failed to save sub-agent state for session {}: {}", sessionId, e.getMessage());
+        }
+    }
+
+    private static void applyLoadedState(ReActAgent agent, AgentState loaded) {
+        AgentState live = agent.getAgentState();
+        if (live == null) {
+            return;
+        }
+        live.contextMutable().clear();
+        live.contextMutable().addAll(loaded.getContext());
+        live.setSummary(loaded.getSummary());
+        live.setReplyId(loaded.getReplyId());
+        live.setCurIter(loaded.getCurIter());
+        live.setShutdownInterrupted(loaded.isShutdownInterrupted());
+        live.getToolContext().setActivatedGroups(loaded.getToolContext().getActivatedGroups());
     }
 
     /**
      * Executes agent call with streaming, forwarding events to the emitter.
-     * 执行流式代理调用，将事件转发给发射器。
      *
      * <p>Uses the agent's streaming API and forwards each event to the provided emitter as JSON.
      * The final response is extracted from the last event.
-     * 使用代理的流式 API，并将每个事件以 JSON 格式转发到指定的发射器。最终响应从最后一个事件中提取。
      *
      * @param agent The agent to execute
      * @param userMsg The user message to send
@@ -300,7 +344,6 @@ public class SubAgentTool implements AgentTool {
 
     /**
      * Executes agent call without streaming.
-     * 执行代理呼叫，无需流式传输。
      *
      * <p>Uses the agent's standard call API. No events are forwarded to the emitter.
      *
@@ -342,23 +385,8 @@ public class SubAgentTool implements AgentTool {
         return agent.call(List.of(userMsg));
     }
 
-    private RuntimeContext resolveRuntimeContext(ToolCallParam param) {
-        ToolExecutionContext context = param.getContext();
-        if (context != null) {
-            RuntimeContext runtimeContext = context.get(RuntimeContext.class);
-            if (runtimeContext != null) {
-                return runtimeContext;
-            }
-        }
-        if (param.getAgent() instanceof AgentBase agentBase) {
-            return agentBase.getRuntimeContext();
-        }
-        return null;
-    }
-
     /**
      * Forwards an event to the emitter as serialized JSON.
-     * 将事件以序列化 JSON 的形式转发给发射器。
      *
      * <p>Serializes the event using JsonCodec and emits it as a text block. Serialization
      * failures are logged but do not interrupt execution.
@@ -386,11 +414,9 @@ public class SubAgentTool implements AgentTool {
 
     /**
      * Builds the final tool result with session context.
-     * 根据会话上下文构建最终工具结果。
      *
      * <p>Formats the response to include the session ID, allowing callers to continue the
      * conversation by passing the session ID in subsequent calls.
-     * 将响应格式化为包含会话 ID，允许呼叫者通过在后续呼叫中传递会话 ID 来继续对话。
      *
      * @param response The agent's response message
      * @param sessionId The session ID to include in the result
@@ -408,7 +434,6 @@ public class SubAgentTool implements AgentTool {
 
     /**
      * Builds the JSON schema for tool parameters.
-     * 构建工具参数的 JSON 模式。
      *
      * <p>Creates a schema with two properties:
      *
@@ -417,7 +442,7 @@ public class SubAgentTool implements AgentTool {
      *   <li>{@code message} - Required string containing the message to send
      * </ul>
      *
-     * @return A map representing the JSON schema for tool parameters 表示工具参数 JSON 模式的映射
+     * @return A map representing the JSON schema for tool parameters
      */
     private Map<String, Object> buildSchema() {
         Map<String, Object> schema = new HashMap<>();
@@ -425,12 +450,12 @@ public class SubAgentTool implements AgentTool {
 
         Map<String, Object> properties = new HashMap<>();
 
-        // Session ID (optional)
+        // AgentStateStore ID (optional)
         Map<String, Object> sessionIdProp = new HashMap<>();
         sessionIdProp.put("type", "string");
         sessionIdProp.put(
                 "description",
-                "Session ID for multi-turn dialogue. Omit to start a NEW session."
+                "AgentStateStore ID for multi-turn dialogue. Omit to start a NEW session."
                         + " To CONTINUE an existing session and retain memory, you MUST extract"
                         + " the session_id from the previous response and pass it here.");
         properties.put(PARAM_SESSION_ID, sessionIdProp);
@@ -449,7 +474,6 @@ public class SubAgentTool implements AgentTool {
 
     /**
      * Resolves the tool name from config or derives it from the agent.
-     * 根据配置解析工具名称，或从代理中推导出工具名称。
      *
      * <p>Priority: explicit config.toolName > derived from agent name.
      * If derived from the agent name, the name will be sanitized to comply with strict LLM API constraints
@@ -540,7 +564,6 @@ public class SubAgentTool implements AgentTool {
 
     /**
      * Resolves the tool description from config or derives it from the agent.
-     * 根据配置解析工具描述，或从代理中推导出工具描述。
      *
      * <p>Priority: config.description > agent.description > default. The default description is
      * generated as "Call {agentName} to complete tasks".

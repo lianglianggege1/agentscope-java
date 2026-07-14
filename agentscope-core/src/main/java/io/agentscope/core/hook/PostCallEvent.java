@@ -39,7 +39,10 @@ import java.util.Objects;
  *   <li>Filter or sanitize output 过滤或消毒输出</li>
  *   <li>Log outgoing responses 记录发出的响应</li>
  * </ul>
+ *
+ * @deprecated since 2.0.0. Use {@link io.agentscope.core.middleware.MiddlewareBase} instead.
  */
+@Deprecated(forRemoval = true, since = "2.0.0")
 public final class PostCallEvent extends HookEvent {
 
     private Msg finalMessage;

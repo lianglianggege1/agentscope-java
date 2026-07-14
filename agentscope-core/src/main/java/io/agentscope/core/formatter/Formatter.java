@@ -41,6 +41,16 @@ import java.util.List;
  * <p>Each formatter is type-safe and handles the exact types expected by the provider's SDK.
  * 每个格式化器都是类型安全的，并且能够处理提供商SDK所期望的确切类型
  *
+ * <p><b>Dependency:</b> This interface requires the provider-specific extension module.
+ * For DashScope, add the following Maven dependency:
+ * <pre>{@code
+ * <dependency>
+ *     <groupId>agentscope</groupId>
+ *     <artifactId>agentscope-extensions-model-dashscope</artifactId>
+ *     <version>${agentscope.version}</version>
+ * </dependency>
+ * }</pre>
+ *
  * @param <TReq> Provider-specific request message type (e.g., com.alibaba.dashscope.common.Message
  *               for DashScope, or ChatCompletionMessageParam for OpenAI)
  * 提供商特定的请求消息类型（例如，DashScope 的 com.alibaba.dashscope.common.Message，

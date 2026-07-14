@@ -17,16 +17,16 @@ package io.agentscope.core.skill;
 
 /**
  * Metadata wrapper for registered skills.
- *  已注册技能的元数据包装器。
  *
  * <p>Records skill registration information including skill ID and activation state.
  * The activation state determines whether the skill's associated tools are available to the LLM.
- * 记录技能注册信息，包括技能ID和激活状态。
- * 激活状态决定了大型语言模型（LLM）是否能使用与该技能相关的工具。
+ *
+ * @deprecated since 2.0.0. The skill package is removed; manage markdown skill catalogs in
+ *     application code.
  */
+@Deprecated(since = "2.0.0")
 class RegisteredSkill {
     private final String skillId;
-    // 激活状态
     private boolean active; // whether this skill is being used by llm, if using need activate the
 
     /**
@@ -41,7 +41,6 @@ class RegisteredSkill {
 
     /**
      * Sets the activation state.
-     * 设置激活状态。
      *
      * @param active Whether to activate the skill
      */
@@ -69,7 +68,6 @@ class RegisteredSkill {
 
     /**
      * Gets the tool group name for this skill.
-     * 获取此技能的工具组名称。
      *
      * @return The tool group name
      */

@@ -49,7 +49,10 @@ import java.util.Objects;
  *   <li>Log reasoning input</li>
  *       记录推理输入
  * </ul>
+ *
+ * @deprecated since 2.0.0. Use {@link io.agentscope.core.middleware.MiddlewareBase} instead.
  */
+@Deprecated(forRemoval = true, since = "2.0.0")
 public final class PreReasoningEvent extends ReasoningEvent {
 
     private List<Msg> inputMessages;

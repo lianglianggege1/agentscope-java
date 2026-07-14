@@ -29,6 +29,7 @@ import reactor.core.publisher.Mono;
  * 实现将原始用户输入转换为包含内容块和可选结构化数据的UserInputData，
  * 在不同输入渠道之间保持一致性。
  */
+@Deprecated(forRemoval = true, since = "2.0.0")
 public interface UserInputBase {
 
     /**
