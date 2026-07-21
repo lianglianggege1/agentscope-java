@@ -39,6 +39,16 @@ import java.util.Set;
  * <p>Read operations retain standard overlay semantics: check upper (workspace) first, fall back
  * to lower (project). Shell {@code execute()} delegates to the upper layer as before.
  */
+/**
+ * 分层文件系统变体，针对非工作区路径将写入操作定向至项目目录，
+ * 而持久记忆、会话、技能等工作区元数据仍保存在上层（工作区）。
+ *
+ * <p>仅当 {@link io.agentscope.harness.agent.filesystem.spec.LocalFilesystemSpec} 配置
+ * {@code projectWritable(true)} 时才会实例化该类；其他文件系统配置（远端文件系统、沙箱文件系统）不受此逻辑影响。
+ *
+ * <p>读取操作仍遵循标准分层规则：优先读取上层（工作区），无匹配则降级读取底层（项目目录）。
+ * Shell 命令执行 {@code execute()} 依旧交由上层处理。
+ */
 public class ProjectAwareOverlay extends OverlayFilesystem implements AbstractSandboxFilesystem {
 
     private static final Set<String> WORKSPACE_PREFIXES =

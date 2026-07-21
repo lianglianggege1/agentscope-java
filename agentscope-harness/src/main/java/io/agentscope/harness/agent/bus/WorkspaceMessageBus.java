@@ -51,6 +51,23 @@ import reactor.core.scheduler.Schedulers;
  *     {entryId}.json       — Mode C entries (append-only)
  * </pre>
  */
+/**
+ * 基于 {@link AbstractFilesystem} 实现的消息总线 {@link MessageBus}。
+ *
+ * <p>可适配任意文件系统底层（本地、远端、沙箱），适用于多JVM共享同一工作目录的跨进程场景。
+ *
+ * <p>D模式（发布订阅）降级为轮询机制：{@link #subscribe} 返回的数据流每3秒发送一次空信号；
+ * {@link #publish} 方法为空实现，无实际作用。
+ *
+ * <p>总线根目录 {@code busRoot} 下文件结构：
+ * <pre>
+ * {busRoot}/
+ *   queues/{key-hash}/
+ *     {entryId}.json       — A模式消息条目（消费逻辑：列出+读取+删除）
+ *   logs/{key-hash}/
+ *     {entryId}.json       — C模式消息条目（仅追加写入）
+ * </pre>
+ */
 public class WorkspaceMessageBus implements MessageBus {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceMessageBus.class);
@@ -64,6 +81,10 @@ public class WorkspaceMessageBus implements MessageBus {
     /**
      * @param filesystem any {@link AbstractFilesystem} implementation
      * @param busRoot    absolute path within the filesystem for bus data (e.g. {@code "/bus"})
+     */
+    /**
+     * @param filesystem 任意 {@link AbstractFilesystem} 实现实例
+     * @param busRoot 文件系统内存储总线数据的绝对路径（示例：{@code "/bus"}）
      */
     public WorkspaceMessageBus(AbstractFilesystem filesystem, String busRoot) {
         this.fs = filesystem;

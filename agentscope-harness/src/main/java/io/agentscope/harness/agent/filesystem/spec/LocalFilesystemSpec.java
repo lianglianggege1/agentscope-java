@@ -46,6 +46,16 @@ import java.util.Map;
  * <p>For distributed deployments where long-term memory must be shared across replicas, prefer
  * {@link RemoteFilesystemSpec} (no shell) or a sandbox filesystem spec (shell via sandbox).
  */
+/**
+ * 本地文件系统模式配置（支持Shell命令执行）。
+ *
+ * <p>该配置会生成 {@link LocalFilesystemWithShell} 实例，文件根目录为智能体工作目录，
+ * Shell 命令直接在宿主机以 {@code sh -c <command>} 方式运行。持久记忆文件（{@code MEMORY.md}、{@code memory/} 目录）与会话日志均存储在本地磁盘。
+ *
+ * <p>适用于单进程部署场景（个人助手、命令行工具、本地开发调试），无需分布式数据共享，且信任智能体具备宿主机Shell执行权限。
+ *
+ * <p>若为分布式部署、且多副本间需要共享持久记忆，推荐使用 {@link RemoteFilesystemSpec}（无Shell执行能力）或沙箱文件系统配置（通过沙箱执行Shell）。
+ */
 public class LocalFilesystemSpec {
 
     private int executeTimeoutSeconds = LocalFilesystemWithShell.DEFAULT_EXECUTE_TIMEOUT;
@@ -57,6 +67,10 @@ public class LocalFilesystemSpec {
      * Path-resolution policy for the upper {@link LocalFilesystemWithShell}. Defaults to
      * {@link LocalFsMode#ROOTED}, so absolute paths supplied by the agent are accepted only when
      * they fall under one of the configured roots (project + workspace + additionalRoots).
+     */
+    /**
+     * 上层 {@link LocalFilesystemWithShell} 的路径解析策略。默认值为 {@link LocalFsMode#ROOTED}，
+     * 即智能体传入的绝对路径仅当位于配置根目录（项目目录、工作目录、附加根目录）范围内时才允许访问。
      */
     private LocalFsMode mode = LocalFsMode.ROOTED;
 
@@ -72,12 +86,24 @@ public class LocalFilesystemSpec {
      * {@link System#getProperty(String) System.getProperty("user.dir")} at
      * {@link #toFilesystem} time.
      */
+    /**
+     * 用户项目根目录（生成的 {@link OverlayFilesystem} 下层文件层）。智能体从此目录读取用户编写的项目内容
+     *（例如 {@code AGENTS.md}、{@code knowledge/}、{@code skills/}），修改时采用写时复制机制拷贝至智能体工作目录。
+     * 同时该目录为 {@code execute()} 执行Shell命令时的默认工作目录 pwd，保证命令输出符合用户预期。
+     *
+     * <p>未调用 {@link #project(Path)} 前该值为 {@code null}；执行 {@link #toFilesystem} 时默认取值为
+     * {@link System#getProperty(String) System.getProperty("user.dir")}。
+     */
     private Path project;
 
     /**
      * Extra host directories beyond {@code project} and {@code workspace} that the agent is
      * allowed to touch in {@link LocalFsMode#ROOTED} mode. Mirrors Claude Code CLI's
      * {@code --add-dir} flag.
+     */
+    /**
+     * 在 {@link LocalFsMode#ROOTED} 模式下，除项目目录与工作目录外，允许智能体访问操作的额外宿主机目录。
+     * 功能对标 Claude Code CLI 的 {@code --add-dir} 参数。
      */
     private final List<Path> additionalRoots = new ArrayList<>();
 
@@ -90,6 +116,12 @@ public class LocalFilesystemSpec {
      * <p>Defaults to {@code false}, preserving the original overlay behaviour where all writes
      * land in the workspace.
      */
+    /**
+     * 该配置为 {@code true} 时，智能体对非工作区路径（排除 {@code MEMORY.md}、{@code agents/}、{@code skills/} 等工作区元数据路径）的文件写入操作
+     * 将定向至项目目录而非工作目录；工作区元数据路径仍会写入工作目录。
+     *
+     * <p>默认值为 {@code false}，保留原始分层文件系统行为：所有写入操作均落地至工作目录。
+     */
     private boolean projectWritable = false;
 
     /**
@@ -97,6 +129,12 @@ public class LocalFilesystemSpec {
      *
      * @param seconds timeout (must be positive)
      * @return this spec
+     */
+    /**
+     * 设置命令执行默认超时时间，单位秒。
+     *
+     * @param seconds 超时时长（必须为正数）
+     * @return 当前配置实例
      */
     public LocalFilesystemSpec executeTimeoutSeconds(int seconds) {
         if (seconds <= 0) {
@@ -111,6 +149,12 @@ public class LocalFilesystemSpec {
      *
      * @param bytes byte cap (must be positive)
      * @return this spec
+     */
+    /**
+     * 设置单条Shell命令输出内容的最大捕获字节数。
+     *
+     * @param bytes 字节上限（必须为正数）
+     * @return 当前配置实例
      */
     public LocalFilesystemSpec maxOutputBytes(int bytes) {
         if (bytes <= 0) {
@@ -127,6 +171,13 @@ public class LocalFilesystemSpec {
      * @param value variable value
      * @return this spec
      */
+    /**
+     * 新增环境变量，所有Shell命令执行时都会注入该变量。
+     *
+     * @param name 变量名
+     * @param value 变量值
+     * @return 当前配置实例
+     */
     public LocalFilesystemSpec env(String name, String value) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("env name must not be blank");
@@ -142,6 +193,12 @@ public class LocalFilesystemSpec {
      * @param inherit whether to inherit parent env
      * @return this spec
      */
+    /**
+     * 控制Shell命令是否继承父进程环境变量。默认值为 {@code false}，此时仅能读取通过 {@link #env(String, String)} 配置的环境变量。
+     *
+     * @param inherit 是否继承父进程环境变量
+     * @return 当前配置实例
+     */
     public LocalFilesystemSpec inheritEnv(boolean inherit) {
         this.inheritEnv = inherit;
         return this;
@@ -156,6 +213,14 @@ public class LocalFilesystemSpec {
      * @return this spec
      * @deprecated use {@link #mode(LocalFsMode)} for the full three-way selection
      */
+    /**
+     * 旧版兼容配置：{@code true} 对应 {@link LocalFsMode#SANDBOXED}，{@code false} 对应 {@link LocalFsMode#UNRESTRICTED}。
+     * 推荐使用 {@link #mode(LocalFsMode)} 方法，可完整支持 {@link LocalFsMode#ROOTED} 三种模式选择。
+     *
+     * @param virtual 是否开启虚拟隔离模式
+     * @return 当前配置实例
+     * @deprecated 请使用 {@link #mode(LocalFsMode)} 以支持完整三档路径权限模式
+     */
     @Deprecated
     public LocalFilesystemSpec virtualMode(boolean virtual) {
         return mode(virtual ? LocalFsMode.SANDBOXED : LocalFsMode.UNRESTRICTED);
@@ -167,6 +232,12 @@ public class LocalFilesystemSpec {
      *
      * @param mode policy mode
      * @return this spec
+     */
+    /**
+     * 设置上层 {@link LocalFilesystemWithShell} 的路径解析策略，默认值为 {@link LocalFsMode#ROOTED}。
+     *
+     * @param mode 路径权限策略模式
+     * @return 当前配置实例
      */
     public LocalFilesystemSpec mode(LocalFsMode mode) {
         if (mode == null) {
@@ -183,6 +254,13 @@ public class LocalFilesystemSpec {
      *
      * @param scope isolation scope
      * @return this spec
+     */
+    /**
+     * 设置文件隔离范围，控制文件路径按用户、会话或智能体进行命名空间隔离。
+     * 默认值为 {@link IsolationScope#USER}，与 {@link RemoteFilesystemSpec} 及沙箱配置保持一致。
+     *
+     * @param scope 隔离级别
+     * @return 当前配置实例
      */
     public LocalFilesystemSpec isolationScope(IsolationScope scope) {
         this.isolationScope = scope;

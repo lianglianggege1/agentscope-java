@@ -72,6 +72,42 @@ import java.util.Set;
  *   <li>{@link IsolationScope#GLOBAL} — single global namespace</li>
  * </ul>
  */
+/**
+ * 无沙箱复合文件系统模式配置类。
+ *
+ * <p>该配置将生成 {@link CompositeFilesystem}，融合两类文件系统：
+ *
+ * <ul>
+ *   <li>原生 {@link LocalFilesystem}（不支持Shell），用于存放工作区本地非托管文件；
+ *   <li>多路由独立 {@link RemoteFilesystem} 实例，用于跨节点路径（持久记忆、技能、子智能体、知识库、会话、任务）。
+ *       每条路由分配专属存储命名空间分片，避免不同路由间键名冲突。
+ * </ul>
+ *
+ * <p>由于底层默认使用 {@link LocalFilesystem}（而非 {@link LocalFilesystemWithShell}），该模式默认不提供Shell执行能力；
+ * 若需要执行Shell，请选用沙箱文件系统配置或 {@link LocalFilesystemWithShell}。
+ *
+ * <p>默认共享路由（每条路由拥有独立隔离的存储命名空间分片）：
+ *
+ * <ul>
+ *   <li>{@code AGENTS.md}、{@code MEMORY.md} → 分片标识 {@code root}
+ *   <li>{@code memory/} → 分片标识 {@code memory}
+ *   <li>{@code skills/} → 分片标识 {@code skills}
+ *   <li>{@code subagents/} → 分片标识 {@code subagents}
+ *   <li>{@code knowledge/} → 分片标识 {@code knowledge}
+ *   <li>{@code plans/} → 分片标识 {@code plans}
+ *   <li>{@code agents/<agentId>/sessions/} → 分片标识 {@code sessions}
+ *   <li>{@code agents/<agentId>/tasks/} → 分片标识 {@code tasks}
+ * </ul>
+ *
+ * <p>共享文件的存储命名空间由 {@link #isolationScope(IsolationScope)} 控制，隔离逻辑与沙箱体系保持一致：
+ *
+ * <ul>
+ *   <li>{@link IsolationScope#SESSION} — 按会话隔离命名空间</li>
+ *   <li>{@link IsolationScope#USER}（默认）— 按用户隔离命名空间，同一用户多会话共享数据</li>
+ *   <li>{@link IsolationScope#AGENT} — 按智能体隔离命名空间，所有用户共用</li>
+ *   <li>{@link IsolationScope#GLOBAL} — 全局唯一命名空间</li>
+ * </ul>
+ */
 public class RemoteFilesystemSpec {
 
     private BaseStore store;

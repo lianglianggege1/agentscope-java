@@ -23,4 +23,10 @@ import java.util.Map;
  * @param entryId transport-level entry identifier (e.g. Redis Stream entry id)
  * @param payload the JSON-serializable payload
  */
+/**
+ * 从 {@link MessageBus} 队列或日志中读取的单条消息条目。
+ *
+ * @param entryId 传输层消息唯一标识（例如 Redis Stream 消息ID）
+ * @param payload 可序列化为JSON的消息载荷
+ */
 public record BusEntry(String entryId, Map<String, Object> payload) {}

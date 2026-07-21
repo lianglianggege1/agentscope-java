@@ -34,6 +34,17 @@ package io.agentscope.harness.agent.workspace;
  *       host paths.
  * </ul>
  */
+/**
+ * 宿主机文件系统（{@link io.agentscope.harness.agent.filesystem.local.LocalFilesystem} 及其子类）的路径解析策略模式。
+ *
+ * <p>用于控制智能体传入绝对路径时的处理逻辑：
+ *
+ * <ul>
+ *   <li>{@link #SANDBOXED} — 所有路径均限定在文件系统根目录内，拒绝使用 {@code ..} 跳出根目录的路径与外部绝对路径。等同于旧版 {@code virtualMode=true}。
+ *   <li>{@link #ROOTED} — 仅允许落在 {@link PathPolicy} 配置的根目录列表（项目目录、工作区及附加目录）内的绝对路径；相对路径仍基于文件系统根目录解析。本地模式智能体默认采用该策略，对标 Claude-Code 风格的「项目目录+附加目录」白名单机制。
+ *   <li>{@link #UNRESTRICTED} — 绝对路径直接透传不作拦截，等同于旧版 {@code virtualMode=false}。适用于需要读取宿主机任意路径的工具或测试场景，作为兜底放开选项。
+ * </ul>
+ */
 public enum LocalFsMode {
     SANDBOXED,
     ROOTED,

@@ -38,6 +38,14 @@ import java.util.Objects;
  * downstream; this wrapper ensures the namespace factory underneath still receives the baked-in
  * identity rather than the (empty) caller context.
  */
+/**
+ * 文件系统包装类，所有委托调用都会替换为固定的 {@link RuntimeContext}，忽略调用方传入的上下文。
+ *
+ * <p>由 {@code HarnessAgent.workspaceFor(userId, sessionId)} 使用，用于创建绑定指定用户身份、
+ * 非业务主线程使用的 {@link io.agentscope.harness.agent.workspace.WorkspaceManager} 视图。
+ * 操作其他用户命名空间的控制器向下传递 {@link RuntimeContext#empty()} 时，
+ * 该包装器可保证底层命名空间工厂使用内置固化的用户身份，而非调用方传入的空上下文。
+ */
 public final class BakedContextFilesystem implements AbstractFilesystem {
 
     private final AbstractFilesystem delegate;

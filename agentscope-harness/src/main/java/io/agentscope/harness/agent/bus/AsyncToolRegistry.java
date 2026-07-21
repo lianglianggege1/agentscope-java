@@ -34,12 +34,31 @@ import reactor.core.publisher.Mono;
  *   <li>{@code WorkspaceAsyncToolRegistry} — single-process, suitable for testing</li>
  * </ul>
  */
+/**
+ * 用于管理已移交后台执行的异步工具任务的注册器。
+ *
+ * <p>当工具执行超出配置的超时时间时，{@code AsyncToolMiddleware} 会将任务注册至此处。该注册器统一维护工具任务生命周期，实现以下能力：
+ * <ul>
+ *   <li>任务正常结束时，更新记录并通过消息收件箱推送执行结果</li>
+ *   <li>进程崩溃或重启后，可识别并清理遗留的运行中任务记录</li>
+ * </ul>
+ *
+ * <p>现有实现类：
+ * <ul>
+ *   <li>{@code WorkspaceAsyncToolRegistry} — 单进程实现，适用于测试场景</li>
+ * </ul>
+ */
 public interface AsyncToolRegistry {
 
     /**
      * Register a new async tool execution.
      *
      * @param record the async tool record with status {@link AsyncToolRecord#RUNNING}
+     */
+    /**
+     * 注册一条新的异步工具执行记录。
+     *
+     * @param record 状态为 {@link AsyncToolRecord#RUNNING} 的异步工具记录对象
      */
     Mono<Void> register(AsyncToolRecord record);
 
@@ -49,6 +68,12 @@ public interface AsyncToolRegistry {
      * @param id     the async tool record id
      * @param result the tool execution result text
      */
+    /**
+     * 将异步工具执行任务标记为已完成。
+     *
+     * @param id     异步工具记录ID
+     * @param result 工具执行结果文本
+     */
     Mono<Void> complete(String id, String result);
 
     /**
@@ -56,6 +81,12 @@ public interface AsyncToolRegistry {
      *
      * @param id    the async tool record id
      * @param error the error message
+     */
+    /**
+     * 将异步工具执行任务标记为执行失败。
+     *
+     * @param id    异步工具记录ID
+     * @param error 错误信息
      */
     Mono<Void> fail(String id, String error);
 
@@ -67,6 +98,14 @@ public interface AsyncToolRegistry {
      * @param ttl       records older than this duration are considered stale
      * @return stale RUNNING records
      */
+    /**
+     * 查询指定会话下运行时长超过指定存活时间的异步工具记录。
+     * 这类记录大概率因进程崩溃成为孤立任务。
+     *
+     * @param sessionId 待检查的会话ID
+     * @param ttl       超过该时长的记录判定为过期
+     * @return 状态为运行中的过期任务记录列表
+     */
     Mono<List<AsyncToolRecord>> findStale(String sessionId, Duration ttl);
 
     /**
@@ -74,6 +113,11 @@ public interface AsyncToolRegistry {
      * subsequent {@link #findStale} calls.
      *
      * @param id the async tool record id
+     */
+    /**
+     * 将过期的异步工具记录标记为超时状态，后续调用 {@link #findStale} 方法时将不再查询到该记录。
+     *
+     * @param id 异步工具记录ID
      */
     Mono<Void> markTimeout(String id);
 }

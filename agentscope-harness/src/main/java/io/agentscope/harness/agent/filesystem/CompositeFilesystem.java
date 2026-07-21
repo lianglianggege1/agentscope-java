@@ -61,6 +61,26 @@ import java.util.Map;
  * fs.read(RuntimeContext.empty(), "/src/Main.java", 0, 100);      // → localFs.read(...)
  * }</pre>
  */
+/**
+ * 根据路径前缀，将文件操作路由至不同的 {@link AbstractFilesystem} 存储实例。
+ *
+ * <p>路径会按最长匹配优先规则匹配路由前缀；未匹配到任何前缀的路径，将交由默认存储处理。
+ *
+ * <p>该复合文件系统仅实现 {@link AbstractFilesystem} 接口，作为统一的无沙箱视图，融合本地工作区与远端存储路径。
+ * 此模式刻意不支持 Shell 执行：跨存储转发 Shell 命令逻辑存在歧义，且其核心适用场景（带用户/会话隔离的分布式持久存储）无需该能力。
+ * 若需执行 Shell 命令，请直接使用基于沙箱的文件系统（{@link AbstractSandboxFilesystem}）或 {@link LocalFilesystemWithShell}。
+ *
+ * <p>使用示例：
+ *
+ * <pre>{@code
+ * CompositeFilesystem fs = new CompositeFilesystem(
+ *     localFs,
+ *     Map.of("/memories/", storeFs, "/cache/", inMemoryFs)
+ * );
+ * fs.read(RuntimeContext.empty(), "/memories/notes.md", 0, 100);  // 转发至 storeFs.read(...)
+ * fs.read(RuntimeContext.empty(), "/src/Main.java", 0, 100);      // 转发至 localFs.read(...)
+ * }</pre>
+ */
 public class CompositeFilesystem implements AbstractFilesystem {
 
     private final AbstractFilesystem defaultBackend;

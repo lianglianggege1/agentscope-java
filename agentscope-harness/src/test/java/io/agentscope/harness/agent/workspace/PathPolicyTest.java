@@ -29,6 +29,9 @@ class PathPolicyTest {
      * same on Linux/macOS; on Windows it picks up the cwd's drive letter so {@code isAbsolute()}
      * returns {@code true}, which is what the test author intended.
      */
+    /**
+     * 将Unix格式文本路径绑定为当前系统真实绝对路径：在Linux/macOS下路径保持不变；Windows环境会自动补充当前工作目录盘符，使{@code isAbsolute()}判定为true，符合测试编写预期。
+     */
     private static Path abs(String p) {
         return Paths.get(p).toAbsolutePath().normalize();
     }

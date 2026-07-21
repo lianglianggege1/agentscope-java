@@ -73,6 +73,17 @@ import org.slf4j.LoggerFactory;
  *       to {@code rootDir}. Equivalent to legacy {@code virtualMode=false}.
  * </ul>
  */
+/**
+ * {@link AbstractFilesystem} 的实现类，用于读写本地磁盘文件。
+ *
+ * <p>路径解析规则由构造函数传入的 {@link LocalFsMode} 控制：
+ *
+ * <ul>
+ *   <li>{@link LocalFsMode#SANDBOXED} — 所有路径限定在根目录 rootDir 内，拦截包含 .. 跳转符以及超出根目录的绝对路径，等同于旧版配置 virtualMode=true。
+ *   <li>{@link LocalFsMode#ROOTED} — 仅允许落在路径策略 {@link PathPolicy} 配置根目录下的绝对路径；相对路径基于 rootDir 解析。
+ *   <li>{@link LocalFsMode#UNRESTRICTED} — 绝对路径直接放行；相对路径仍基于 rootDir 解析，等同于旧版配置 virtualMode=false。
+ * </ul>
+ */
 public class LocalFilesystem implements AbstractFilesystem {
 
     private static final Logger log = LoggerFactory.getLogger(LocalFilesystem.class);
@@ -90,6 +101,10 @@ public class LocalFilesystem implements AbstractFilesystem {
      * Keyed by the absolute, normalized path string so that two callers operating on
      * the same file (even with different input paths) always share the same lock.
      */
+    /**
+     * 用于 {@link #edit} 方法内读写修改流程的文件独立锁。
+     * 以标准化后的绝对路径字符串作为键，保证多个调用方操作同一文件时（即便传入路径格式不同）共用同一把锁。
+     */
     private final ConcurrentHashMap<String, ReentrantLock> fileLocks = new ConcurrentHashMap<>();
 
     /**
@@ -98,6 +113,12 @@ public class LocalFilesystem implements AbstractFilesystem {
      * {@link Path}. Blank strings are rejected.
      *
      * @param rootDir filesystem root as a path string, or {@code null} for process working directory
+     */
+    /**
+     * 效果等同于 {@link #LocalFilesystem(Path)}，内部会先对传入字符串执行 {@link String#strip()} 去首尾空白，再通过 {@link Path#of(String, String...)} 构建路径。
+     * 传入 {@code null} 时，行为与入参为 {@code null} 的 {@link Path} 一致，使用进程当前工作目录；空白字符串会直接拒绝。
+     *
+     * @param rootDir 文件系统根目录路径字符串，传 {@code null} 则使用进程工作目录
      */
     public LocalFilesystem(String rootDir) {
         this(rootDirFromString(rootDir), false, DEFAULT_MAX_FILE_SIZE_MB, null);
@@ -181,6 +202,20 @@ public class LocalFilesystem implements AbstractFilesystem {
      *     ({@code null} treated as empty)
      * @param maxFileSizeMb maximum file size in megabytes for search operations
      * @param namespaceFactory optional namespace factory for path scoping ({@code null} for none)
+     */
+    /**
+     * 根据指定路径解析模式与路径校验策略创建文件系统实例。
+     *
+     * <p>参数 {@code mode} 控制智能体传入绝对路径时的校验规则，三种模式详见 {@link LocalFsMode}：
+     * 采用 {@link LocalFsMode#ROOTED} 模式时，仅当绝对路径位于 {@code pathPolicy} 配置的根目录或 {@code rootDir} 内部才会放行；
+     * {@link LocalFsMode#SANDBOXED} 模式下所有路径都会限定在 {@code rootDir} 范围内；
+     * {@link LocalFsMode#UNRESTRICTED} 模式会直接透传所有绝对路径，不作拦截。
+     *
+     * @param rootDir 相对路径的基准根目录；传 {@code null} 则使用当前工作目录
+     * @param mode 路径解析策略；传 {@code null} 默认使用 {@link LocalFsMode#UNRESTRICTED}
+     * @param pathPolicy 仅在 {@link LocalFsMode#ROOTED} 模式生效的目录白名单，其余模式会忽略该参数；传 {@code null} 等价于空白名单
+     * @param maxFileSizeMb 检索操作支持的最大文件大小，单位MB
+     * @param namespaceFactory 用于路径隔离的命名空间工厂，可选；传 {@code null} 表示不启用
      */
     public LocalFilesystem(
             Path rootDir,

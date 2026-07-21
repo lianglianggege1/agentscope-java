@@ -66,6 +66,48 @@ import java.util.Objects;
  * <p><b>Priority:</b> explicit builder methods ({@code .stateStore()}, {@code .filesystem()})
  * take precedence over {@code distributedStore} for the components they configure.
  */
+/**
+ * 分布式持久化存储组件一站式配置入口。
+ *
+ * <p>无需分别单独配置 {@link AgentStateStore}、{@link BaseStore}、
+ * {@link SandboxSnapshotSpec}、{@link SandboxExecutionGuard}，
+ * 只需传入一个统一的 {@code DistributedStore} 实例至
+ * {@link HarnessAgent.Builder#distributedStore(DistributedStore)} 即可完成全套注入：
+ *
+ * <pre>{@code
+ * // 统一存储方案：全部组件均由 Redis 提供底层存储
+ * DistributedStore store = RedisDistributedStore.fromJedis(jedis);
+ *
+ * // 混合存储方案：MySQL 存储状态/文件数据，Redis 负责沙箱快照与沙箱执行锁控
+ * DistributedStore store = DistributedStore.builder()
+ *     .agentStateStore(mysqlStore.agentStateStore())
+ *     .baseStore(mysqlStore.baseStore())
+ *     .sandboxSnapshotSpec(redisStore.sandboxSnapshotSpec())
+ *     .sandboxExecutionGuard(redisStore.sandboxExecutionGuard())
+ *     .build();
+ *
+ * HarnessAgent.builder()
+ *     .distributedStore(store)
+ *     .filesystem(new RemoteFilesystemSpec()
+ *             .isolationScope(IsolationScope.USER))
+ *     .build();
+ * }</pre>
+ *
+ * <p>传入 {@code distributedStore} 后，框架会自动装配 {@link AgentStateStore}
+ * 以及沙箱相关组件（快照、执行锁控）。
+ * 工作区文件系统模式（{@code RemoteFilesystemSpec}、{@code DockerFilesystemSpec} 等）
+ * 必须由使用者通过 {@code .filesystem(...)} 显式指定，不会由 DistributedStore 自动注入。
+ *
+ * <p>该接口的实现类由对应扩展模块提供：
+ * <ul>
+ *   <li>{@code agentscope-extensions-redis} — 提供 {@code RedisDistributedStore}</li>
+ *   <li>{@code agentscope-extensions-oss} — 提供 {@code OssDistributedStore}</li>
+ *   <li>{@code agentscope-extensions-mysql} — 提供 {@code MysqlDistributedStore}</li>
+ * </ul>
+ *
+ * <p><b>优先级规则：</b>若通过 Builder 直接调用 {@code .stateStore()}、{@code .filesystem()}
+ * 这类显式配置方法，其配置优先级高于 {@code distributedStore} 中内置的同组件配置。
+ */
 public interface DistributedStore {
 
     /**

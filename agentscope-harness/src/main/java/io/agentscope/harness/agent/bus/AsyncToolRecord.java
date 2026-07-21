@@ -27,6 +27,16 @@ import java.time.Instant;
  * @param status      current status: RUNNING, COMPLETED, FAILED, or TIMEOUT
  * @param createdAt   when the async execution was registered
  */
+/**
+ * 用于记录后台异步执行工具任务的全生命周期信息。
+ *
+ * @param id          本条异步工具执行任务的唯一标识
+ * @param sessionId   发起该工具调用的会话ID
+ * @param toolName    待执行工具名称
+ * @param toolCallId  大模型下发的原始工具调用ID
+ * @param status      当前状态：运行中、已完成、执行失败、已超时
+ * @param createdAt   该异步任务的注册时间
+ */
 public record AsyncToolRecord(
         String id,
         String sessionId,

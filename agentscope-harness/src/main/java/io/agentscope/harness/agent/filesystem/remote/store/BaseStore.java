@@ -24,6 +24,11 @@ import java.util.Map;
  * <p>Items are organized by namespaces (hierarchical path-like tuples)
  * and identified by a key within each namespace.
  */
+/**
+ * 基于命名空间的键值存储抽象接口。
+ *
+ * <p>数据项通过命名空间（类分层路径元组）进行组织，在每个命名空间内通过唯一键标识数据。
+ */
 public interface BaseStore {
 
     /**
@@ -33,6 +38,13 @@ public interface BaseStore {
      * @param key the item key within the namespace
      * @return the store item, or {@code null} if not found
      */
+    /**
+     * 根据命名空间与键查询单条存储数据。
+     *
+     * @param namespace 分层命名空间路径
+     * @param key 该命名空间下的数据键
+     * @return 存储数据，不存在时返回 {@code null}
+     */
     StoreItem get(List<String> namespace, String key);
 
     /**
@@ -41,6 +53,13 @@ public interface BaseStore {
      * @param namespace hierarchical namespace path
      * @param key the item key within the namespace
      * @param value the data to store
+     */
+    /**
+     * 新增或更新存储数据。
+     *
+     * @param namespace 分层命名空间路径
+     * @param key 该命名空间下的数据键
+     * @param value 待存储的数据内容
      */
     void put(List<String> namespace, String key, Map<String, Object> value);
 
@@ -71,6 +90,28 @@ public interface BaseStore {
      * @param expectedVersion the version the caller observed; must match the current stored version
      * @return {@code true} if the item was written, {@code false} if the version did not match
      */
+    /**
+     * 条件更新：仅当当前存储数据版本与 {@code expectedVersion} 匹配时，才写入数据。
+     *
+     * <p>该方法为比较并交换（CAS）原子操作，可避免多客户端并发修改同一键时产生更新丢失问题。调用方使用流程：
+     * <ol>
+     *   <li>通过 {@link #get} 查询数据并记录 {@link StoreItem#version()} 版本号。
+     *   <li>在本地计算出新数据值。
+     *   <li>调用 {@code putIfVersion}，传入之前记录的版本作为预期版本。
+     *   <li>若返回 {@code false}，代表数据已被其他客户端修改，需回到第一步重试。
+     * </ol>
+     *
+     * <p>当 {@code expectedVersion} 传入特殊值 {@code 0} 时，表示「仅键不存在时写入」（不存在则创建）。
+     *
+     * <p>默认实现统一返回 {@code false}，保证存量存储实现无需修改即可正常编译。
+     * 支持分布式部署的存储后端应当重写该方法，实现服务端原子校验逻辑。
+     *
+     * @param namespace 分层命名空间路径
+     * @param key 该命名空间下的数据键
+     * @param value 待写入的新数据
+     * @param expectedVersion 调用方读取到的旧版本号，必须与当前存储版本一致才会执行写入
+     * @return 写入成功返回 {@code true}；版本不匹配写入失败返回 {@code false}
+     */
     default boolean putIfVersion(
             List<String> namespace, String key, Map<String, Object> value, long expectedVersion) {
         return false;
@@ -84,6 +125,14 @@ public interface BaseStore {
      * @param offset number of items to skip
      * @return list of matching store items
      */
+    /**
+     * 在指定命名空间内分页查询存储数据。
+     *
+     * @param namespace 分层命名空间路径
+     * @param limit 最大返回数据条数
+     * @param offset 需要跳过的数据条数
+     * @return 匹配的存储数据列表
+     */
     List<StoreItem> search(List<String> namespace, int limit, int offset);
 
     /**
@@ -91,6 +140,12 @@ public interface BaseStore {
      *
      * @param namespace hierarchical namespace path
      * @param key the item key to delete
+     */
+    /**
+     * 根据命名空间与键删除单条存储数据。
+     *
+     * @param namespace 分层命名空间路径
+     * @param key 待删除数据对应的键
      */
     void delete(List<String> namespace, String key);
 }

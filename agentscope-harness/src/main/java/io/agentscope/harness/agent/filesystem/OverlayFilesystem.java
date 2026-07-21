@@ -53,6 +53,23 @@ import java.util.Map;
  *   <li>{@code exists} — true if present in either layer
  * </ul>
  */
+/**
+ * 分层文件系统，在共享底层之上叠加用户专属上层，并提供写时复制机制。
+ *
+ * <p>读取操作优先查询上层，未命中则降级读取底层；写入操作始终作用于上层。
+ * 该机制支持用户在不修改共享原始文件的前提下，对技能、子智能体等共享内容做个性化修改。
+ *
+ * <p>分层合并规则：
+ *
+ * <ul>
+ *   <li>{@code ls} — 合并两层目录；路径冲突时上层条目优先展示
+ *   <li>{@code read} — 先读上层，上层无文件则读取底层
+ *   <li>{@code write}/{@code edit} — 仅写入上层（写时复制）
+ *   <li>{@code delete} — 仅删除上层文件；底层共享文件无法删除
+ *   <li>{@code grep}/{@code glob} — 同时检索两层；路径冲突时上层结果覆盖底层
+ *   <li>{@code exists} — 文件存在于任意一层即返回存在
+ * </ul>
+ */
 public class OverlayFilesystem implements AbstractFilesystem {
 
     private final AbstractFilesystem upper;

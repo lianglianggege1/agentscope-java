@@ -47,6 +47,19 @@ import org.slf4j.LoggerFactory;
  * <p><strong>Thread-safety:</strong> SQLite serialises concurrent writers through its own
  * transaction machinery. No external locks are required.
  */
+/**
+ * 本地工作区尽力型SQLite索引。
+ *
+ * <p>用于记录本地已落地的文件，覆盖两类路径前缀：
+ * {@code agents/*sessions/**} 与 {@code memory/**}。
+ * 在远端存储工作区模式下，该索引可加速 {@code ls / glob / exists / grep} 操作，列举前缀下路径时无需全量扫描存储键。
+ * 索引内不会存储文件<em>内容</em>，执行 {@code grep} 时仍会从远端存储拉取对应文件作为权威数据源。
+ *
+ * <p><strong>一致性说明：</strong>索引为尽力同步机制，可能滞后于远端存储变更，远端写入数据具备最终权威性。
+ * 索引更新失败仅记录日志，不会向上抛给调用方。
+ *
+ * <p><strong>线程安全：</strong>SQLite依靠自身事务机制串行处理并发写入，无需额外外部锁。
+ */
 public class WorkspaceIndex implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceIndex.class);

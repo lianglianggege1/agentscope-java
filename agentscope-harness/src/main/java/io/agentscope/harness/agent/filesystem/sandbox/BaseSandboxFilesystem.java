@@ -52,6 +52,21 @@ import java.util.Map;
  *   <li>{@link #id()} - unique identifier for the sandbox instance</li>
  * </ul>
  */
+/**
+ * 沙箱抽象基础实现，以 {@link #execute} 作为核心抽象方法。
+ *
+ * <p>该类为 {@link AbstractFilesystem} 全部方法提供默认实现，底层均通过调用 {@link #execute} 执行 Shell 命令完成逻辑：
+ * 文件列举、内容检索、通配匹配依赖标准 Unix 命令；文件读取通过服务端命令实现分页读取；
+ * 文件写入交由 {@link #uploadFiles} 完成内容传输；文件编辑使用服务端命令做字符串替换。
+ *
+ * <p>子类必须实现以下方法：
+ * <ul>
+ *   <li>{@link #execute} — 在沙箱中执行命令</li>
+ *   <li>{@link #uploadFiles} — 向沙箱上传文件</li>
+ *   <li>{@link #downloadFiles} — 从沙箱下载文件</li>
+ *   <li>{@link #id()} — 沙箱实例唯一标识</li>
+ * </ul>
+ */
 public abstract class BaseSandboxFilesystem implements AbstractSandboxFilesystem {
 
     @Override

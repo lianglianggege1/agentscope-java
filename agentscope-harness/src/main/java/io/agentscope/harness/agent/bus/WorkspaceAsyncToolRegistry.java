@@ -40,6 +40,15 @@ import reactor.core.publisher.Mono;
  *
  * <p>Works with any filesystem backend (local, remote, sandbox).
  */
+/**
+ * 基于 {@link AbstractFilesystem} 实现的异步工具注册器 {@link AsyncToolRegistry}。
+ *
+ * <p>每条异步工具记录都会持久化为JSON文件，存放路径为
+ * {@code {registryRoot}/async-tools/{sessionId}/{recordId}.json}。该持久化机制可保证进程崩溃后记录不丢失；
+ * 会话恢复时，{@link io.agentscope.harness.agent.middleware.InboxMiddleware} 能够识别出残留的运行中记录，并通知大语言模型。
+ *
+ * <p>支持任意文件系统后端（本地、远程、沙箱文件系统均可）。
+ */
 public class WorkspaceAsyncToolRegistry implements AsyncToolRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceAsyncToolRegistry.class);

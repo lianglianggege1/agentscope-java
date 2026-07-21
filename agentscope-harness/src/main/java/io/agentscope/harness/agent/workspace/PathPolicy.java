@@ -31,6 +31,15 @@ import java.util.Objects;
  * <p>Empty policy ({@link #empty()}) rejects every absolute path; use it only when the caller
  * intends to fall back to relative-only access.
  */
+/**
+ * 不可变宿主机目录白名单，供 {@link LocalFsMode#ROOTED} 模式校验绝对路径是否放行。
+ * 所有根目录均存储为标准化绝对路径，提升子路径归属判断效率。
+ *
+ * <p>Claude-Code 双层本地文件系统采用 {@code PathPolicy.of(project, workspace, additionalRoots)}
+ * 限制智能体可访问范围，无需强制锁定至单一沙箱目录。
+ *
+ * <p>空策略（{@link #empty()}）会拦截所有绝对路径，仅适用于仅允许使用相对路径访问的场景。
+ */
 public final class PathPolicy {
 
     private static final PathPolicy EMPTY = new PathPolicy(List.of());
@@ -50,6 +59,9 @@ public final class PathPolicy {
      * Builds a policy from one or more roots. {@code null} entries are skipped; remaining roots
      * are absolute-normalized.
      */
+    /**
+     * 根据一个或多个根目录构建路径策略。会跳过入参中值为 {@code null} 的项，剩余目录统一标准化为绝对路径。
+     */
     public static PathPolicy of(Path first, Path... rest) {
         List<Path> all = new ArrayList<>();
         addNormalized(all, first);
@@ -63,6 +75,9 @@ public final class PathPolicy {
 
     /**
      * Builds a policy from a collection of roots. {@code null} entries are skipped.
+     */
+    /**
+     * 根据根目录集合构建路径策略，自动过滤集合内值为 {@code null} 的元素。
      */
     public static PathPolicy of(Collection<Path> roots) {
         if (roots == null || roots.isEmpty()) {
@@ -83,6 +98,7 @@ public final class PathPolicy {
     }
 
     /** Returns the configured roots in insertion order. */
+    /** 按插入顺序返回已配置的根目录列表。 */
     public List<Path> roots() {
         return roots;
     }
@@ -95,6 +111,10 @@ public final class PathPolicy {
     /**
      * {@code true} when {@code candidate} is equal to or below one of the configured roots.
      * Caller must pass an absolute path; relative paths return {@code false}.
+     */
+    /**
+     * 若待校验路径与任一配置根目录一致或为其子路径，则返回 {@code true}。
+     * 调用方必须传入绝对路径；传入相对路径将直接返回 {@code false}。
      */
     public boolean isAllowed(Path candidate) {
         if (candidate == null || !candidate.isAbsolute()) {

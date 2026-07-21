@@ -94,6 +94,33 @@ import org.slf4j.LoggerFactory;
  * └── agents/&lt;agentId&gt;/sessions/&lt;sessionId&gt;.log.jsonl
  * </pre>
  */
+/**
+ * 采用双层读取架构、无状态的工作区内容访问器。
+ *
+ * <p><strong>读取流程：</strong>读取任意资源（AGENTS.md、MEMORY.md、知识库等）时，优先查询 {@link AbstractFilesystem}。
+ * 若其返回非空内容，则直接使用该内容（文件系统层优先级更高）；否则降级读取本地磁盘工作区作为兜底方案。
+ * 文件系统层会通过 {@link NamespaceFactory} 透明完成用户、会话维度的数据隔离。
+ *
+ * <p><strong>写入流程：</strong>所有写入操作（记忆、会话数据等）均经由 {@link AbstractFilesystem} 执行。
+ *
+ * <p><strong>文件列举：</strong>列举文件（记忆文件、知识库文件、会话日志）时，合并文件系统层与本地磁盘两方结果，并依据相对路径去重。
+ *
+ * <p>标准目录结构：
+ *
+ * <pre>
+ * workspace/
+ * ├── AGENTS.md
+ * ├── MEMORY.md
+ * ├── memory/YYYY-MM-DD.md
+ * ├── skills/&lt;skill-name&gt;/SKILL.md
+ * ├── knowledge/KNOWLEDGE.md
+ * ├── knowledge/*
+ * ├── subagents/&lt;id&gt;.md                     (子智能体定义文件)
+ * ├── agents/&lt;agentId&gt;/workspace/           (隔离的子智能体运行根目录，自动创建)
+ * ├── agents/&lt;agentId&gt;/sessions/sessions.json
+ * └── agents/&lt;agentId&gt;/sessions/&lt;sessionId&gt;.log.jsonl
+ * </pre>
+ */
 public class WorkspaceManager implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceManager.class);
@@ -113,12 +140,20 @@ public class WorkspaceManager implements AutoCloseable {
      * <p>This is an in-process lock only. For cross-process (multi-node) deployments the Remote
      * backend must additionally use server-side CAS / optimistic locking.
      */
+    /**
+     * 基于工作区相对路径的细粒度锁，用于避免并发读改写竞争问题。
+     * 锁以工作区相对路径作为唯一键（示例：{@code agents/X/tasks/Y.json}、
+     * {@code agents/X/sessions/sessions.json}、{@code memory/YYYY-MM-DD.md}）。
+     *
+     * <p>该锁仅作用于当前进程内。若为多进程/多节点分布式部署，远端存储底层还需额外实现服务端CAS乐观锁机制。
+     */
     private final Map<String, ReentrantLock> pathLocks = new ConcurrentHashMap<>();
 
     private final Path workspace;
     private final AbstractFilesystem filesystem;
 
     /** Best-effort local file index; may be {@code null} if SQLite is unavailable. */
+    /** 尽力型本地文件索引；若SQLite不可用则该实例可为{@code null}。 */
     private final WorkspaceIndex index;
 
     private final NamespaceFactory namespaceFactory;
@@ -128,6 +163,11 @@ public class WorkspaceManager implements AutoCloseable {
      * filesystem)} constructor) and is therefore responsible for closing it. When the index is
      * supplied externally (e.g. by {@link io.agentscope.harness.agent.HarnessAgent}'s builder), the
      * external owner manages its lifecycle and {@link #close()} here is a no-op.
+     */
+    /**
+     * 当此管理器自行创建 {@link #index}（通过入参为工作区、文件系统的构造函数）时该值为 {@code true}，
+     * 此时管理器负责关闭该索引实例。若索引由外部传入（例如由 {@link io.agentscope.harness.agent.HarnessAgent} 构建器提供），
+     * 则由外部持有者管理索引生命周期，本类的 {@link #close()} 方法不会执行任何关闭逻辑。
      */
     private final boolean ownsIndex;
 
@@ -170,6 +210,12 @@ public class WorkspaceManager implements AutoCloseable {
      * <p>Required for tests that use {@code @TempDir} on Windows: the JDBC driver keeps a file
      * handle on {@code .index/workspace.db}, and Windows refuses to delete the temp directory
      * while the handle is open.
+     */
+    /**
+     * 若当前管理器持有SQLite实现的{@link WorkspaceIndex}实例，则释放该索引资源。
+     *
+     * <p>Windows环境下使用{@code @TempDir}的单元测试必须执行此操作：JDBC驱动会持续持有{@code .index/workspace.db}文件句柄，
+     * 句柄未释放时Windows无法删除临时目录。
      */
     @Override
     public void close() {
@@ -522,6 +568,18 @@ public class WorkspaceManager implements AutoCloseable {
      * @param recentWindow only consider files modified within this duration; files known to be
      *     older are assumed to contain only terminal tasks and are skipped
      */
+    /**
+     * 返回指定智能体、所有会话中在{@code recentWindow}时间范围内有过操作的全部{@link TaskRecord}，返回结果无序。
+     *
+     * <p>合并读取本地磁盘与文件系统层的任务JSON文件。若文件已知的最后修改时间（磁盘mtime或{@link FileInfo#modifiedAt()}）早于{@code recentWindow}，则直接跳过：
+     * 当某个会话内所有任务均抵达终态后，对应文件不会再发生修改，因此过期文件不存在未清理的孤立任务。
+     *
+     * <p>该方法供{@link io.agentscope.harness.agent.subagent.task.WorkspaceTaskRepository}中的孤立任务清理器使用，
+     * 在保证不漏取正在运行任务的前提下，限制单次清理循环读取的文件总量。
+     *
+     * @param agentId 父级智能体标识
+     * @param recentWindow 仅读取该时间段内发生过修改的文件；判定为更早的文件仅存放已结束任务，直接跳过
+     */
     public Collection<TaskRecord> listAllTaskRecords(
             RuntimeContext rc, String agentId, Duration recentWindow) {
         if (agentId == null || agentId.isBlank()) {
@@ -602,6 +660,12 @@ public class WorkspaceManager implements AutoCloseable {
      * <p>Stored in {@code agents/<agentId>/tasks/_sweep.marker} as a plain ISO-8601 string. Any
      * node can write to this path, so it naturally propagates through the shared filesystem layer.
      */
+    /**
+     * 读取当前智能体最近一次成功执行孤立任务清理操作的时间戳；若无清理记录，则返回 {@link Optional#empty()}。
+     *
+     * <p>该时间戳以标准ISO-8601字符串格式存储于路径 {@code agents/<agentId>/tasks/_sweep.marker}。
+     * 任意节点均可写入该文件，标记信息可依托共享文件系统层自动同步至各节点。
+     */
     public Optional<Instant> readSweepMarker(RuntimeContext rc, String agentId) {
         if (agentId == null || agentId.isBlank()) {
             return Optional.empty();
@@ -615,6 +679,10 @@ public class WorkspaceManager implements AutoCloseable {
      * Records the current timestamp as the completion time of the most recent orphan-sweep for
      * this agent. Subsequent nodes that read this marker within the sweep interval will skip their
      * own sweep, reducing redundant workspace I/O in multi-node deployments.
+     */
+    /**
+     * 将当前时间戳记录为当前智能体最近一次孤立任务清理操作的完成时间。
+     * 其他节点若在清理周期内读取到该标记，会跳过自身的清理流程，减少多节点部署场景下重复的工作区IO操作。
      */
     public void writeSweepMarker(RuntimeContext rc, String agentId) {
         if (agentId == null || agentId.isBlank()) {
@@ -641,6 +709,10 @@ public class WorkspaceManager implements AutoCloseable {
      * are mutually exclusive with the read-modify-write cycle in {@link #writeTaskRecord}. This
      * prevents a concurrent writer's non-atomic file update (truncate → write) from being observed
      * as a partial JSON read.
+     */
+    /**
+     * 委托执行 {@link #readTaskMap(String)} 前先获取文件粒度锁，保证读取操作与 {@link #writeTaskRecord} 中的读-改-写流程互斥。
+     * 避免并发写入时文件非原子更新（先清空再写入）导致读取到残缺JSON内容。
      */
     private Map<String, TaskRecord> readTaskMapLocked(RuntimeContext rc, String rel) {
         ReentrantLock lock = pathLocks.computeIfAbsent(rel, k -> new ReentrantLock());
@@ -743,6 +815,11 @@ public class WorkspaceManager implements AutoCloseable {
      * stores should be stored on the lower layer so external approval systems can read
      * them across replicas.
      */
+    /**
+     * {@link #writeDraftSkillFile} 与 {@link #moveSkill} 所用启发式判断辅助方法：
+     * 若覆盖层底层为非本地键值存储/远端存储实现（如 {@code RemoteFilesystem}）则返回 {@code true}。
+     * 此类存储上的草稿文件需存放至底层存储，以便外部审批系统可跨副本读取草稿内容。
+     */
     private static boolean isRemoteLowerLayer(AbstractFilesystem fs) {
         if (!(fs instanceof OverlayFilesystem overlay)) {
             return false;
@@ -766,6 +843,15 @@ public class WorkspaceManager implements AutoCloseable {
      * @param rc the runtime context (passed straight through to the filesystem)
      * @param relativePath workspace-relative path (must include the drafts prefix)
      * @param content UTF-8 content
+     */
+    /**
+     * 在{@code skills/_drafts/}目录（或调用方传入的其他草稿目录）下写入单个文件。
+     * 若底层文件系统为底层依托{@code RemoteFilesystem}的{@link OverlayFilesystem}，草稿文件将直接写入底层存储，
+     * 可供其他副本节点、外部审批系统读取；其余场景则走标准上层写入逻辑。
+     *
+     * @param rc 运行时上下文（直接透传给文件系统）
+     * @param relativePath 工作区相对路径（必须携带草稿目录前缀）
+     * @param content UTF-8编码文件内容
      */
     public void writeDraftSkillFile(RuntimeContext rc, String relativePath, String content) {
         if (relativePath == null || content == null) {
@@ -794,6 +880,10 @@ public class WorkspaceManager implements AutoCloseable {
      * → {@code skills/<x>}). Best-effort — falls back to the underlying filesystem's native
      * {@code move} when available; returns {@code true} on success.
      */
+    /**
+     * 在工作区内移动目录（用于草稿转正流程：{@code skills/_drafts/<x>} 迁移至 {@code skills/<x>}）。
+     * 尽力执行：底层文件系统支持原生move操作时优先使用；执行成功返回 {@code true}。
+     */
     public boolean moveSkill(RuntimeContext rc, String fromRelative, String toRelative) {
         if (fromRelative == null || toRelative == null || filesystem == null) {
             return false;
@@ -820,6 +910,9 @@ public class WorkspaceManager implements AutoCloseable {
     /**
      * Two-layer read: filesystem first (namespaced by {@link
      * NamespaceFactory}), local disk fallback.
+     */
+    /**
+     * 双层读取逻辑：优先读取文件系统层（由{@link NamespaceFactory}完成命名空间隔离），读取失败则降级读取本地磁盘。
      */
     private String readWithOverride(RuntimeContext rc, String relativePath) {
         String fsContent = readTextThroughFilesystem(rc, relativePath);
@@ -885,6 +978,12 @@ public class WorkspaceManager implements AutoCloseable {
      * underlying filesystem does not support atomic rename). This prevents concurrent readers from
      * observing a partially-written file.
      */
+    /**
+     * 原子覆盖写入本地磁盘上工作区相对路径的UTF-8文件。
+     *
+     * <p>内容会先写入同级临时文件，再通过{@link StandardCopyOption#ATOMIC_MOVE}重命名覆盖目标文件（尽力保障原子性；若底层文件系统不支持原子重命名，则降级为普通移动操作）。
+     * 该机制可避免并发读取时读到未写完的残缺文件。
+     */
     private void writeLocalFile(String relativePath, String content) {
         Path local = workspace.resolve(relativePath).normalize();
         if (!local.startsWith(workspace)) {
@@ -934,6 +1033,10 @@ public class WorkspaceManager implements AutoCloseable {
      * memory/*.md}). Unions results from the {@link AbstractFilesystem} layer and the local disk,
      * deduplicating by relative path.
      */
+    /**
+     * 返回所有记忆文件的工作区相对路径（包含{@code MEMORY.md}与{@code memory/*.md}）。
+     * 合并{@link AbstractFilesystem}层与本地磁盘的查询结果，并依据相对路径去重。
+     */
     public List<String> listMemoryFilePaths(RuntimeContext rc) {
         Set<String> paths = new LinkedHashSet<>();
 
@@ -974,6 +1077,10 @@ public class WorkspaceManager implements AutoCloseable {
     /**
      * Lists workspace-relative paths of all session log files ({@code *.log.jsonl}).
      * Unions results from the {@link AbstractFilesystem} layer and the local disk.
+     */
+    /**
+     * 列出所有会话日志文件（{@code *.log.jsonl}）对应的工作区相对路径，
+     * 合并{@link AbstractFilesystem}层与本地磁盘的查询结果。
      */
     public List<String> listSessionLogFiles(RuntimeContext rc) {
         Set<String> paths = new LinkedHashSet<>();

@@ -24,12 +24,22 @@ import io.agentscope.harness.agent.filesystem.model.ExecuteResponse;
  *
  * <p>Extends {@link AbstractFilesystem} with {@link #execute} and {@link #id()}.
  */
+/**
+ * 提供Shell命令执行能力的文件系统抽象层（支持沙箱或远程主机）。
+ *
+ * <p>继承 {@link AbstractFilesystem}，新增 {@link #execute} 与 {@link #id()} 方法。
+ */
 public interface AbstractSandboxFilesystem extends AbstractFilesystem {
 
     /**
      * Unique identifier for this filesystem/sandbox instance.
      *
      * @return id string
+     */
+    /**
+     * 当前文件系统/沙箱实例的唯一标识。
+     *
+     * @return 标识字符串
      */
     String id();
 
@@ -41,6 +51,14 @@ public interface AbstractSandboxFilesystem extends AbstractFilesystem {
      * @param timeoutSeconds maximum time in seconds to wait for the command to complete;
      *                       {@code null} uses the filesystem's default timeout
      * @return ExecuteResponse with combined output, exit code, and truncation flag
+     */
+    /**
+     * 在当前文件系统对应的运行环境中执行Shell命令。
+     *
+     * @param runtimeContext 单次调用智能体上下文；无可用上下文时可为 {@code null}
+     * @param command 待执行的完整Shell命令字符串
+     * @param timeoutSeconds 命令执行最大等待秒数；传入 {@code null} 则使用文件系统默认超时时间
+     * @return 执行结果响应对象，包含合并输出、退出码与输出截断标记
      */
     ExecuteResponse execute(RuntimeContext runtimeContext, String command, Integer timeoutSeconds);
 }

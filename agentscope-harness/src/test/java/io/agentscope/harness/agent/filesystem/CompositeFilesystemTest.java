@@ -20,8 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.harness.agent.filesystem.local.LocalFilesystem;
@@ -52,8 +52,9 @@ class CompositeFilesystemTest {
     @Test
     void uploadFiles_propagatesBackendFailure() {
         AbstractFilesystem failingBackend = mock(AbstractFilesystem.class);
-        when(failingBackend.uploadFiles(any(), anyList()))
-                .thenReturn(List.of(FileUploadResponse.fail("/notes.md", "disk full")));
+        doReturn(List.of(FileUploadResponse.fail("/notes.md", "disk full")))
+                .when(failingBackend)
+                .uploadFiles(any(), anyList());
 
         AbstractFilesystem defaultBackend = mock(AbstractFilesystem.class);
 
@@ -81,8 +82,9 @@ class CompositeFilesystemTest {
     @Test
     void uploadFiles_propagatesBackendSuccess() {
         AbstractFilesystem store = mock(AbstractFilesystem.class);
-        when(store.uploadFiles(any(), anyList()))
-                .thenReturn(List.of(FileUploadResponse.success("/notes.md")));
+        doReturn(List.of(FileUploadResponse.success("/notes.md")))
+                .when(store)
+                .uploadFiles(any(), anyList());
 
         AbstractFilesystem defaultBackend = mock(AbstractFilesystem.class);
 

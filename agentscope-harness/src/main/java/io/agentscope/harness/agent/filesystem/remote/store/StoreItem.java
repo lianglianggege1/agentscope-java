@@ -27,6 +27,14 @@ import java.util.Map;
  *     {@code 0} means the version is unknown (e.g. items returned by legacy implementations
  *     that predate versioning).
  */
+/**
+ * 从 {@link BaseStore} 查询得到的单条存储条目。
+ *
+ * @param key 该条目在所属命名空间下的键
+ * @param value 条目数据，为字符串键映射结构
+ * @param version 单调递增版本计数器：初始值为1，每次执行 {@link BaseStore#put} 或 {@link BaseStore#putIfVersion} 成功后自增；
+ *     值为 {@code 0} 代表版本信息未知（例如版本机制上线前的旧实现返回的数据）。
+ */
 public record StoreItem(String key, Map<String, Object> value, long version) {
 
     /** Back-compat constructor for code that does not yet supply a version. */

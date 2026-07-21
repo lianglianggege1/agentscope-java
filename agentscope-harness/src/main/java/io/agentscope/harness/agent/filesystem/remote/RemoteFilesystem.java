@@ -60,6 +60,19 @@ import java.util.Set;
  *     () -> List.of("sessions", sessionIdSupplier.get(), "filesystem"));
  * }</pre>
  */
+/**
+ * 基于 {@link BaseStore} 实现的抽象文件系统（持久化、跨线程可用）。
+ *
+ * <p>文件数据通过命名空间进行管理，可在线程、会话之间持久留存。命名空间支持两种模式：
+ * 静态命名空间（构造实例时固定）、动态命名空间（每次操作通过 {@link NamespaceFactory} 实时解析）。
+ *
+ * <p>动态命名空间示例：
+ *
+ * <pre>{@code
+ * RemoteFilesystem fs = new RemoteFilesystem(store,
+ *     () -> List.of("sessions", sessionIdSupplier.get(), "filesystem"));
+ * }</pre>
+ */
 public class RemoteFilesystem implements AbstractFilesystem {
 
     private final BaseStore store;
@@ -70,6 +83,10 @@ public class RemoteFilesystem implements AbstractFilesystem {
      * and {@code grep} consult the index first and fall back to the remote store only when the
      * index has no matching entries.
      */
+    /**
+     * 可选的尽力型本地索引。不为 {@code null} 时，执行 {@code ls}、{@code glob}、{@code exists}、{@code grep} 操作会优先查询本地索引；
+     * 索引无匹配数据时才降级访问远端存储。
+     */
     private WorkspaceIndex index;
 
     /**
@@ -78,6 +95,13 @@ public class RemoteFilesystem implements AbstractFilesystem {
      *
      * @param store the store to use for persistence
      * @param namespaceFactory factory that returns the namespace tuple per operation
+     */
+    /**
+     * 创建远程文件系统实例，传入每次操作都会执行的 {@link NamespaceFactory}，
+     * 支持基于运行时上下文动态切换命名空间。
+     *
+     * @param store 用于持久化的底层存储
+     * @param namespaceFactory 每次操作生成命名空间分段元组的工厂
      */
     public RemoteFilesystem(BaseStore store, NamespaceFactory namespaceFactory) {
         if (store == null) {
@@ -96,6 +120,12 @@ public class RemoteFilesystem implements AbstractFilesystem {
      * @param store the store to use for persistence
      * @param namespace the namespace tuple for organizing files
      */
+    /**
+     * 使用固定命名空间创建远程文件系统实例。
+     *
+     * @param store 用于持久化的底层存储
+     * @param namespace 用于管理文件的命名空间分段元组
+     */
     public RemoteFilesystem(BaseStore store, List<String> namespace) {
         this(store, toFactory(namespace));
     }
@@ -104,6 +134,11 @@ public class RemoteFilesystem implements AbstractFilesystem {
      * Creates a RemoteFilesystem with a default "filesystem" namespace.
      *
      * @param store the store to use for persistence
+     */
+    /**
+     * 使用默认 "filesystem" 命名空间创建远程文件系统实例。
+     *
+     * @param store 用于持久化的底层存储
      */
     public RemoteFilesystem(BaseStore store) {
         this(store, List.of("filesystem"));
@@ -128,6 +163,23 @@ public class RemoteFilesystem implements AbstractFilesystem {
      *
      * @param index workspace index; {@code null} disables index-backed fast paths
      * @return this instance (fluent)
+     */
+    /**
+     * 绑定尽力同步的 {@link WorkspaceIndex} 索引，用于加速列举/通配匹配/存在判断/内容检索操作。
+     * 索引可为 {@code null}（代表关闭索引），也可能存在数据滞后。
+     *
+     * <p>不同操作的降级逻辑存在差异：
+     *
+     * <ul>
+     *   <li>{@code ls}、{@code glob}、{@code exists} — 若索引中无匹配前缀，则降级全量扫描远端存储；
+     *       即便当前节点索引数据过时，查询结果仍保证准确。
+     *   <li>{@code grep} — 索引不为空时，先从索引筛选待检索文件；若索引未匹配到任何文件，
+     *       则降级全量扫描远端存储，避免遗漏其他节点已写入、但本地索引尚未同步的数据。
+     *       所有候选文件的内容均会从远端存储拉取权威数据。
+     * </ul>
+     *
+     * @param index 工作区索引；传入 {@code null} 将关闭索引快速通道
+     * @return 当前实例（流式调用风格）
      */
     public RemoteFilesystem withIndex(WorkspaceIndex index) {
         this.index = index;

@@ -29,6 +29,13 @@ import java.util.List;
  * <p>Paths that don't match any registered prefix pass through unchanged, preserving the
  * ability to access non-workspace files in modes that allow it.
  */
+/**
+ * 去除当前运行模式的工作区路径前缀，将文件路径统一标准化为工作区相对路径格式。
+ *
+ * <p>仅注册与当前文件系统运行模式匹配的路径前缀，因此不会出现沙箱前缀{@code /workspace/}在本地模式下误匹配宿主机真实目录的问题，反之亦然。
+ *
+ * <p>不匹配任何已注册前缀的路径会原样返回，保证在允许访问外部文件的运行模式中仍可读取工作区以外的文件。
+ */
 public final class WorkspacePathNormalizer {
 
     private final List<String> prefixes;
@@ -43,6 +50,11 @@ public final class WorkspacePathNormalizer {
      * @param workspacePrefix the workspace root path for the active mode (e.g.
      *     {@code "/workspace"} for sandbox, or the host workspace absolute path for local)
      */
+    /**
+     * 创建路径标准化处理器，用于移除指定路径前缀。
+     *
+     * @param workspacePrefix 当前运行模式对应的工作区根路径（沙箱环境为 {@code "/workspace"}，本地模式为宿主机工作区绝对路径）
+     */
     public static WorkspacePathNormalizer of(String workspacePrefix) {
         List<String> list = new ArrayList<>(1);
         String trimmed = trimTrailingSlash(workspacePrefix);
@@ -56,6 +68,9 @@ public final class WorkspacePathNormalizer {
      * Creates a normalizer that tries multiple prefixes in order. Use only when the active
      * mode has more than one valid prefix (e.g. local-with-shell where project dir and
      * workspace dir are both valid roots).
+     */
+    /**
+     * 创建按顺序依次匹配多个前缀的路径标准化处理器。仅适用于当前运行模式存在多个合法根路径前缀的场景（例如带Shell的本地模式，项目目录与工作区目录均为有效根目录）。
      */
     public static WorkspacePathNormalizer of(String... workspacePrefixes) {
         List<String> list = new ArrayList<>(workspacePrefixes.length);
@@ -73,6 +88,12 @@ public final class WorkspacePathNormalizer {
      *
      * @param path the raw path (absolute or relative)
      * @return workspace-relative path, or the original path if no registered prefix matched
+     */
+    /**
+     * 移除当前运行模式的路径前缀，将路径标准化为工作区相对路径。
+     *
+     * @param path 原始路径（可为绝对路径或相对路径）
+     * @return 工作区相对路径；若无匹配的注册前缀，则返回原路径
      */
     public String normalize(String path) {
         if (path == null || path.isBlank()) {

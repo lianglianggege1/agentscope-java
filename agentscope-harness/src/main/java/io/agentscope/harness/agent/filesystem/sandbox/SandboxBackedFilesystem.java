@@ -38,6 +38,12 @@ import org.slf4j.LoggerFactory;
  * via the volatile {@code sandbox} field by {@link
  * io.agentscope.harness.agent.middleware.SandboxLifecycleMiddleware}.
  */
+/**
+ * 基于 {@link BaseSandboxFilesystem} 实现，命令执行转发至运行中的 {@link Sandbox}。
+ *
+ * <p>该代理实例在智能体构建阶段创建，每次操作会通过 volatile 修饰的 {@code sandbox} 字段注入全新沙箱实例，
+ * 注入逻辑由 {@link io.agentscope.harness.agent.middleware.SandboxLifecycleMiddleware} 负责。
+ */
 public class SandboxBackedFilesystem extends BaseSandboxFilesystem implements SandboxAware {
 
     private static final Logger log = LoggerFactory.getLogger(SandboxBackedFilesystem.class);

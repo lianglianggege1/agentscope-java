@@ -43,6 +43,15 @@ import org.slf4j.LoggerFactory;
  * shell execution on your local machine. Use with extreme caution and only in
  * appropriate environments (local dev, CI/CD with proper secret management).
  */
+/**
+ * 支持无限制本地Shell命令执行的文件系统实现。
+ *
+ * <p>该实现继承 {@link LocalFilesystem}，额外提供Shell命令执行能力。
+ * 命令将直接在宿主机运行，无沙箱、进程隔离及任何安全限制。
+ *
+ * <p><b>警告：</b>该实现会赋予智能体本地文件系统直访权限与无限制Shell执行权限。
+ * 务必谨慎使用，仅适用于可控环境（本地开发、配置完善密钥管理的CI/CD环境）。
+ */
 public class LocalFilesystemWithShell extends LocalFilesystem implements AbstractSandboxFilesystem {
 
     private static final Logger log = LoggerFactory.getLogger(LocalFilesystemWithShell.class);
@@ -62,12 +71,23 @@ public class LocalFilesystemWithShell extends LocalFilesystem implements Abstrac
      * keep filesystem operations rooted at the agent workspace while shell sees the user's
      * project directory.
      */
+    /**
+     * 执行Shell命令时传入 {@link ProcessBuilder#directory(java.io.File)} 的工作目录。
+     * 若为 {@code null}，则降级使用 {@link #getCwd()}（携带单次调用对应的命名空间前缀）。
+     * 该参数将Shell当前目录与文件系统根目录解耦，使用覆盖模式的调用方可以让文件操作固定在智能体工作区，
+     * 同时Shell环境展示用户项目目录。
+     */
     private final Path shellCwd;
 
     /**
      * Creates an abstract filesystem with default settings.
      *
      * @param rootDir working directory for both filesystem and shell operations
+     */
+    /**
+     * 使用默认配置创建抽象文件系统实例。
+     *
+     * @param rootDir 文件操作与Shell命令共用的工作根目录
      */
     public LocalFilesystemWithShell(Path rootDir) {
         this(rootDir, false, DEFAULT_EXECUTE_TIMEOUT, 100_000, null, false, null);
@@ -76,6 +96,10 @@ public class LocalFilesystemWithShell extends LocalFilesystem implements Abstrac
     /**
      * Same as {@link #LocalFilesystemWithShell(Path)} with a path string; see
      * {@link LocalFilesystem#LocalFilesystem(String)} for {@code null} / blank rules.
+     */
+    /**
+     * 与 {@link #LocalFilesystemWithShell(Path)} 构造方法功能一致，入参改为字符串路径；
+     * 关于路径为 {@code null} 或空字符串的处理规则可参考 {@link LocalFilesystem#LocalFilesystem(String)}。
      */
     public LocalFilesystemWithShell(String rootDir) {
         this(
