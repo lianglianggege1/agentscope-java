@@ -64,9 +64,14 @@ public class TaskRecord {
      * {@link io.agentscope.harness.agent.middleware.SubagentsMiddleware} to avoid re-delivering
      * the same completion every reasoning round.
      */
+    /**
+     * 记录该终止状态任务的结果作为虚拟{@code <system-reminder>}消息推送至父智能体的时间；尚未推送则为{@code null}。
+     * 供{@link io.agentscope.harness.agent.middleware.SubagentsMiddleware}使用，避免每轮推理重复推送同一条任务完成结果。
+     */
     private Instant deliveredAt;
 
     /** When {@code "agent-protocol"}, this task is driven by {@link AgentProtocolTaskClient}. */
+    /** 当类型为 {@code "agent-protocol"} 时，该任务由 {@link AgentProtocolTaskClient} 驱动管理。 */
     private String transportType;
 
     private String remoteBaseUrl;

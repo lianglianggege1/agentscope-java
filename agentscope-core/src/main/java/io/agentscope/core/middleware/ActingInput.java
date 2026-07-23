@@ -23,4 +23,9 @@ import java.util.List;
  *
  * @param toolCalls the tool calls to execute
  */
+/**
+ * {@link MiddlewareBase#onActing} 的输入上下文。
+ *
+ * @param toolCalls 待执行的工具调用集合
+ */
 public record ActingInput(List<ToolUseBlock> toolCalls) {}

@@ -1904,6 +1904,11 @@ public class HarnessAgent implements Agent, AutoCloseable {
          * constructing the full agent. Useful for callers that need to extract subagent factories
          * up front (for example to mount them on a session router).
          */
+        /**
+         * 构建子智能体条目（通用子智能体 + 声明式子智能体 + 自定义工厂），
+         * 但不实例化完整智能体。适用于需要提前提取子智能体工厂的调用方
+         *（例如将会子智能体挂载至会话路由）。
+         */
         public List<SubagentEntry> buildSubagentEntries(Path resolvedWorkspace) {
             return HarnessAgentBuilderSupport.buildSubagentEntries(this, resolvedWorkspace, null);
         }

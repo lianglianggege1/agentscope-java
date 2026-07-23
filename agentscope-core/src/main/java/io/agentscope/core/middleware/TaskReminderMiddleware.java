@@ -51,6 +51,22 @@ import reactor.core.publisher.Mono;
  * re-injects the list every turn: after conversation compaction the tool output may be gone, but
  * {@code tasksContext} survives, so this middleware guarantees the list is always visible.
  */
+/**
+ * 将智能体待办清单持续暴露给模型，避免长耗时任务出现状态遗忘。
+ *
+ * <p>包含两处钩子逻辑：
+ * <ul>
+ *   <li>{@link #onSystemPrompt}：一次性追加静态说明，指导模型如何使用 {@code todo_write} 工具（基础引导）。
+ *   <li>{@link #onReasoning}：在<strong>每一轮推理之前</strong>追加全新的 {@code <system-reminder>}，
+ *       渲染当前 {@code AgentState.tasksContext}。无论期间执行多少次工具调用，模型始终能看到最新待办状态。
+ * </ul>
+ *
+ * <p>该提醒仅临时附加到推理输入中；不会写入 {@code AgentState.context}，因此不会持久化、压缩或被回溯读取。
+ * 同时会打上 {@link Msg#METADATA_SYNTHETIC} 标记，便于消费方识别并按需忽略这条消息。
+ *
+ * <p>与其他方案（将最新清单留在最近一次工具返回结果中）不同，AgentScope 采用每轮重新注入清单的方式：
+ * 会话压缩后工具输出内容可能被清理，但 {@code tasksContext} 会保留，本中间件以此保证待办清单持续可见。
+ */
 public class TaskReminderMiddleware implements MiddlewareBase {
 
     private static final String GROUNDING =
@@ -63,6 +79,16 @@ public class TaskReminderMiddleware implements MiddlewareBase {
             any) is shown to you before each step inside a `<system-reminder>` block — treat that
             block as the source of truth for task status.\
             """;
+
+    /*private static final String GROUNDING =
+            """
+
+            ## 任务清单
+            你拥有 `todo_write` 工具，用于维护本次会话的结构化任务清单。
+            处理多步骤任务时请使用该工具：将规划记录为待办项，始终仅保留一项任务状态为 `in_progress`，
+            并随着推进更新完整清单。当前任务清单（如有）会在每一轮思考前通过 `<system-reminder>` 区块展示给你，
+            请以此区块内容作为任务状态的唯一可信依据。
+            """;*/
 
     @Override
     public Mono<String> onSystemPrompt(Agent agent, RuntimeContext ctx, String currentPrompt) {

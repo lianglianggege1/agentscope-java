@@ -35,6 +35,10 @@ import org.junit.jupiter.api.io.TempDir;
  * Phase B-3 push delivery semantics on {@link WorkspaceTaskRepository}: pending detection,
  * idempotency, and field preservation across heartbeat round-trips.
  */
+/**
+ * {@link WorkspaceTaskRepository} B-3阶段推送交付语义：待处理状态识别、幂等性，
+ * 以及心跳往返过程中的字段保留机制。
+ */
 class WorkspaceTaskRepositoryDeliveryTest {
 
     @TempDir Path tempDir;

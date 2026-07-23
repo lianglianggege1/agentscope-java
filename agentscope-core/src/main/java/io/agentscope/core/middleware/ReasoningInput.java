@@ -27,4 +27,11 @@ import java.util.List;
  * @param tools     the tool schemas available to the model
  * @param options   generation options
  */
+/**
+ * {@link MiddlewareBase#onReasoning} 的输入上下文。
+ *
+ * @param messages 发送给模型的消息列表
+ * @param tools 可供模型使用的工具定义描述
+ * @param options 生成参数配置
+ */
 public record ReasoningInput(List<Msg> messages, List<ToolSchema> tools, GenerateOptions options) {}

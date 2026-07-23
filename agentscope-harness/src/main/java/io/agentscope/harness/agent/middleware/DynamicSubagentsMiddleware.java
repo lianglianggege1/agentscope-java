@@ -63,6 +63,22 @@ import reactor.core.publisher.Flux;
  *       declarations override them too.
  * </ol>
  */
+/**
+ * {@link SubagentsMiddleware} 的动态实现版本，每次推理步骤都会重新解析已注册子智能体集合，
+ * 依托工作空间 {@link AbstractFilesystem} 实现按用户隔离（例如 {@code CompositeFilesystem}
+ * 将用户域写入路由至远端存储）。
+ *
+ * <p><strong>双层加载机制</strong>（沿用旧 {@code DynamicSubagentsHook} 的覆盖语义）：
+ *
+ * <ol>
+ *   <li><em>第一层（覆盖层）</em> — 通过 {@code filesystem.glob("*.md", "subagents")} 遍历文件并逐个调用
+ *       {@code filesystem.read}。底层自动应用 {@code NamespaceFactory}，各用户仅能访问自身对应的存储分片。
+ *   <li><em>第二层（基础层）</em> — {@code AgentSpecLoader.loadFromDirectory} 直接读取本地工作空间
+ *       {@code subagents/} 目录。
+ *   <li><em>合并规则</em> — 第一层中同名条目覆盖第二层；代码构造器注册的编程式条目作为静态基准保留，
+ *       同名动态声明同样会覆盖这类静态条目。
+ * </ol>
+ */
 public class DynamicSubagentsMiddleware implements HarnessRuntimeMiddleware {
 
     private static final Logger log = LoggerFactory.getLogger(DynamicSubagentsMiddleware.class);
@@ -106,6 +122,10 @@ public class DynamicSubagentsMiddleware implements HarnessRuntimeMiddleware {
      * to be exposed as user-addressable threads. Only effective when the middleware owns a
      * {@link DefaultAgentManager}.
      */
+    /**
+     * 将网关桥装配至内置 {@link AgentSpawnTool}，使创建出的子智能体对外表现为可由用户寻址的会话线程。
+     * 仅当中间件持有 {@link DefaultAgentManager} 实例时生效。
+     */
     public DynamicSubagentsMiddleware setGatewayBridge(
             io.agentscope.harness.agent.gateway.SubagentGatewayBridge bridge) {
         if (agentManager == null) {
@@ -128,6 +148,9 @@ public class DynamicSubagentsMiddleware implements HarnessRuntimeMiddleware {
      * {@code null} when none is owned. Used to wire a gateway materializer for cross-node
      * exposed-subagent recovery.
      */
+    /**
+     * 返回可重新实例化子智能体的内部 {@link DefaultAgentManager}，当无持有实例时返回 {@code null}。用于装配网关实例化器，实现跨节点暴露的子智能体恢复。
+     */
     public DefaultAgentManager getAgentManager() {
         return agentManager;
     }
@@ -135,6 +158,9 @@ public class DynamicSubagentsMiddleware implements HarnessRuntimeMiddleware {
     /**
      * Returns the tool instances this middleware contributes to the agent toolkit. The caller
      * is responsible for registering them on the toolkit at orchestration time.
+     */
+    /**
+     * 返回当前中间件向智能体工具集提供的工具实例。调用方负责在编排阶段将这些工具注册至工具集。
      */
     public List<Object> getTools() {
         return List.of(subagentTool, taskTool);

@@ -23,4 +23,9 @@ import java.util.List;
  *
  * @param msgs the input messages to the agent
  */
+/**
+ * {@link MiddlewareBase#onAgent} 的输入上下文。
+ *
+ * @param msgs 传入智能体的消息列表
+ */
 public record AgentInput(List<Msg> msgs) {}

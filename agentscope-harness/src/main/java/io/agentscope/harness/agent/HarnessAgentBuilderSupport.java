@@ -75,6 +75,42 @@ final class HarnessAgentBuilderSupport {
     //  Subagent context section
     // -----------------------------------------------------------------
 
+    /**
+     * 注入到所有子智能体系统提示词中的子智能体上下文片段。
+     * 用于定义叶子工作智能体的身份、运行规则、输出格式与禁止行为。
+     * 任务本体将作为首条用户消息传入，不在此处重复携带。
+     */
+    /*
+    # 子代理上下文
+
+     你是主代理为特定任务而生成的一个**子代理**。
+
+     ## 你的角色
+     - 完成分配的任务。这是你的全部目的。
+     - 你不是主要代理人。不要试图成为主要代理人。
+
+     ## 规则
+     1. **保持专注** — 专注于完成分配给你的任务，不要分心
+     2. **完成任务** — 您的最终消息将自动报告给主代理
+     3. **不要主动** — 不要主动示好，不要主动采取行动，不要主动做额外任务
+     4. **短暂存在** — 任务完成后，你可能会被终止。这没关系。
+     5. **从截断的工具输出中恢复** — 如果您看到“[截断：输出超出上下文限制]”，请使用较小的数据块（使用偏移量/限制读取，或使用有针对性的grep/head/tail）重新读取您需要的内容，而不是全部重新读取
+
+     ## 输出格式
+     完成后，你的最终回复应包括：
+     - 你所取得的成就或发现
+     - 主要代理人应了解的任何相关细节
+     - 保持简洁但信息丰富
+
+     ## 你不应该做的事
+     - 无用户对话（这是主要代理人的职责）
+     - 不再生成更多子代理 — 你是一名基层工作者
+     - 不要假装自己是主要行动者
+     - 返回纯文本结果；让主代理将它们传递给用户
+     */
+
+
+
     // @formatter:off
     /**
      * Subagent context section injected into every subagent's system prompt.
@@ -111,6 +147,7 @@ final class HarnessAgentBuilderSupport {
             - Return plain text results; let the main agent deliver them to the user
             """;
 
+    // 你是能力完备的通用子智能体。
     // @formatter:on
 
     static final String GENERAL_PURPOSE_BASE_PROMPT =
@@ -120,6 +157,10 @@ final class HarnessAgentBuilderSupport {
      * Builds a system prompt for a subagent by appending {@link #SUBAGENT_CONTEXT_SECTION} to the
      * given base prompt. If the base is blank, only the context section is used.
      */
+    /**
+     * 为子智能体构建系统提示词：将 {@link #SUBAGENT_CONTEXT_SECTION} 追加至传入的基础提示词后。
+     * 若基础提示词为空，则仅使用该上下文片段。
+     */
     static String buildSubagentSysPrompt(String basePrompt) {
         String base =
                 (basePrompt != null && !basePrompt.isBlank()) ? basePrompt.stripTrailing() : "";
@@ -127,6 +168,7 @@ final class HarnessAgentBuilderSupport {
     }
 
     /** Custom-supplied subagent factory entry: name + factory function from name to Agent. */
+    /** 用户自定义子智能体工厂条目：包含名称以及根据名称生成智能体的工厂函数。 */
     record SubagentFactoryEntry(String name, Function<String, Agent> factory) {}
 
     // -----------------------------------------------------------------
@@ -163,6 +205,12 @@ final class HarnessAgentBuilderSupport {
      * {@code BakedContextFilesystem} so the underlying namespace factories see this identity
      * regardless of what the caller passes downstream.
      */
+    /**
+     * 构建 {@link RuntimeContext}，内置传入的 {@code userId} 与 {@code sessionId}，
+     * 供 {@link HarnessAgent#workspaceFor(String, String)} 执行带外IO操作。
+     * 常与 {@code BakedContextFilesystem} 配合使用，确保底层命名空间工厂能够读取该身份信息，
+     * 不受下游调用方传入参数影响。
+     */
     static RuntimeContext buildBakedRuntimeContext(String userId, String sessionId) {
         if ((userId == null || userId.isBlank()) && (sessionId == null || sessionId.isBlank())) {
             return RuntimeContext.empty();
@@ -184,6 +232,9 @@ final class HarnessAgentBuilderSupport {
     /**
      * Builds the subagent entries from programmatic declarations,
      * {@code workspace/subagents/*.md}, and custom factories.
+     */
+    /**
+     * 通过代码声明、{@code workspace/subagents/*.md} 文件以及自定义工厂构建子智能体条目。
      */
     static List<SubagentEntry> buildSubagentEntries(
             HarnessAgent.Builder b, Path resolvedWorkspace, SandboxBackedFilesystem sandboxFs) {
@@ -236,6 +287,12 @@ final class HarnessAgentBuilderSupport {
      * scan itself on every reasoning step (Layer 2), so feeding the same entries in here would
      * register them twice.
      */
+    /**
+     * 作用与 {@link #buildSubagentEntries(HarnessAgent.Builder, Path, SandboxBackedFilesystem)} 一致，
+     * 但跳过本地磁盘 {@code subagents/} 目录扫描。
+     * {@code DynamicSubagentsMiddleware} 会在每一轮推理步骤（第二层）自行执行目录扫描，
+     * 若在此处重复加载会造成子智能体重复注册。
+     */
     static List<SubagentEntry> buildStaticSubagentEntries(
             HarnessAgent.Builder b, Path resolvedWorkspace, SandboxBackedFilesystem sandboxFs) {
         List<SubagentEntry> entries = new ArrayList<>();
@@ -275,6 +332,9 @@ final class HarnessAgentBuilderSupport {
 
     /**
      * Builds a factory for the built-in general-purpose subagent.
+     */
+    /**
+     * 构建内置通用子智能体对应的工厂实例。
      */
     static SubagentFactory buildGeneralPurposeFactory(
             HarnessAgent.Builder b, Path workspace, SandboxBackedFilesystem sandboxFs) {
@@ -369,6 +429,9 @@ final class HarnessAgentBuilderSupport {
 
     /**
      * Builds a factory for a user-declared subagent from a {@link SubagentDeclaration}.
+     */
+    /**
+     * 根据 {@link SubagentDeclaration} 构建用户声明式子智能体的工厂实例。
      */
     static SubagentFactory buildDeclaredFactory(
             HarnessAgent.Builder b,

@@ -89,6 +89,9 @@ public class BackgroundTask {
      * Returns the structured {@link TaskStatus} for this task, reflecting the underlying future
      * state and any explicit cancellation.
      */
+    /**
+     * 返回当前任务结构化状态对象 {@link TaskStatus}，包含底层异步任务执行状态与主动取消标记。
+     */
     public TaskStatus getTaskStatus() {
         if (cancelled || future.isCancelled()) {
             return TaskStatus.CANCELLED;
@@ -102,6 +105,9 @@ public class BackgroundTask {
         return TaskStatus.RUNNING;
     }
 
+    /**
+     * 返回当前任务状态字符串，成功则返回 "Completed"，失败则返回 "Failed: " 加异常信息，运行中则返回 "Running"。
+     */
     /** Returns a human-readable status string. */
     public String getStatus() {
         TaskStatus ts = getTaskStatus();
@@ -112,6 +118,9 @@ public class BackgroundTask {
         return ts.name().charAt(0) + ts.name().substring(1).toLowerCase();
     }
 
+    /**
+     * 非阻塞式任务结果获取，如果任务未完成或发生错误则返回 null。
+     */
     /** Non-blocking result peek; returns null if not yet completed or if an error occurred. */
     public String getResult() {
         try {
@@ -137,6 +146,11 @@ public class BackgroundTask {
      *
      * @return true if completed within timeout, false if timed out
      */
+    /**
+     * 阻塞等待任务完成或超时。
+     *
+     * @return 超时前完成返回true，超时未完成返回false
+     */
     public boolean waitForCompletion(long timeoutMs) throws InterruptedException {
         if (future.isDone()) {
             return true;
@@ -156,6 +170,9 @@ public class BackgroundTask {
     /**
      * Cancels the task. Sets the internal cancelled flag so that {@link #getTaskStatus()} returns
      * {@link TaskStatus#CANCELLED} even if the future cannot be interrupted.
+     */
+    /**
+     * 取消任务。设置内部取消标记，即便底层异步任务无法中断，调用 {@link #getTaskStatus()} 仍会返回 {@link TaskStatus#CANCELLED}。
      */
     public boolean cancel(boolean mayInterruptIfRunning) {
         this.cancelled = true;

@@ -28,6 +28,11 @@ import reactor.core.publisher.Flux;
  * <p>The chain is constructed back-to-front: the last middleware wraps
  * the core logic, and the first middleware is the outermost wrapper.
  */
+/**
+ * 为指定拦截节点构建洋葱模型中间件调用链。
+ *
+ * <p>调用链采用逆序组装：最后一个中间件包裹核心逻辑，首个中间件作为最外层包装器。
+ */
 public final class MiddlewareChain {
 
     private MiddlewareChain() {}
@@ -42,6 +47,17 @@ public final class MiddlewareChain {
      * @param core       the innermost logic to execute when all middlewares delegate
      * @param <I>        the input type for the interception point
      * @return a function that, when applied to an input, runs the full chain
+     */
+    /**
+     * 构建输出类型为 {@code Flux<AgentEvent>} 的中间件调用链。
+     *
+     * @param middlewares 有序中间件列表（首个为最外层）
+     * @param agent 传递给各个中间件的智能体实例
+     * @param ctx 传递给各个中间件的单次调用运行时上下文
+     * @param method 中间件钩子方法引用
+     * @param core 所有中间件逐层转发后最终执行的内层核心逻辑
+     * @param <I> 拦截节点对应的输入类型
+     * @return 函数对象，传入输入参数即可执行完整中间件链路
      */
     public static <I> Function<I, Flux<AgentEvent>> build(
             List<? extends MiddlewareBase> middlewares,
@@ -65,6 +81,11 @@ public final class MiddlewareChain {
      * Functional interface representing one of the onion-pattern middleware hooks.
      *
      * @param <I> the input type
+     */
+    /**
+     * 函数式接口，用于定义洋葱模型中间件钩子。
+     *
+     * @param <I> 输入参数类型
      */
     @FunctionalInterface
     public interface MiddlewareMethod<I> {

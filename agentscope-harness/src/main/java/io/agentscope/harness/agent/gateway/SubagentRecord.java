@@ -38,6 +38,23 @@ import java.util.Map;
  * @param createdAt when the subagent was exposed
  * @param expiresAt optional expiry instant; {@code null} means no TTL
  */
+/**
+ * 用于持久化、支持故障恢复的已暴露子智能体描述信息。
+ * 和内存中的 {@code ExposedSession}（持有活跃 {@code Agent} 引用）不同，
+ * {@code SubagentRecord} 仅保存跨节点重建、路由子智能体所需的配置信息：
+ * 智能体类型（{@code agentId}）、专属会话标识（{@code sessionId}）以及生命周期元数据。
+ *
+ * <p>{@code agentId} 提供给智能体工厂重建实例；调用时传入 {@code sessionId}，
+ * 重建后的智能体即可从分布式 {@code AgentStateStore} 加载对应的对话历史。
+ *
+ * @param subagentId 用户可见标识，用于直接寻址该子智能体
+ * @param agentId 子智能体类型标识（用于重建智能体实例）
+ * @param sessionId 子智能体自身会话ID（用于加载对话状态）
+ * @param userId 原始用户ID，未知时为 {@code null}
+ * @param parentSessionId 对外暴露该子智能体的父会话ID，可为 {@code null}
+ * @param createdAt 子智能体开启暴露的时间
+ * @param expiresAt 可选过期时刻；{@code null} 代表无生命周期限制
+ */
 public record SubagentRecord(
         String subagentId,
         String agentId,
@@ -48,11 +65,13 @@ public record SubagentRecord(
         Instant expiresAt) {
 
     /** Whether this record has a TTL that has already elapsed relative to {@code now}. */
+    /** 判断该记录是否配置存活时长，且当前时间 {@code now} 已超过过期时刻。 */
     public boolean isExpired(Instant now) {
         return expiresAt != null && now != null && now.isAfter(expiresAt);
     }
 
     /** Serializes this record to a flat string/number map for {@code BaseStore} persistence. */
+    /** 将当前记录序列化为扁平字符串/数值映射，用于 {@code BaseStore} 持久化存储。 */
     public Map<String, Object> toMap() {
         Map<String, Object> m = new HashMap<>();
         m.put("subagentId", subagentId);
@@ -74,6 +93,7 @@ public record SubagentRecord(
     }
 
     /** Reconstructs a record from a persisted map, tolerating missing optional fields. */
+    /** 从持久化映射数据重建记录，兼容可选字段缺失的场景。 */
     public static SubagentRecord fromMap(Map<String, Object> m) {
         if (m == null) {
             return null;

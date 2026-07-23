@@ -84,6 +84,31 @@ import reactor.core.publisher.Mono;
  * call()} mode), execution falls back to the non-streaming {@code invokeAgent} path with no
  * overhead.
  */
+/**
+ * 供智能体内部使用的简易子智能体工具，相比 {@code SessionsTool} 轻量化很多：
+ *
+ * <ul>
+ *   <li>{@code agent_spawn} — 创建子智能体、执行任务并返回结果（同步或异步）
+ *   <li>{@code agent_send} — 向已创建的子智能体发送后续消息
+ *   <li>{@code agent_list} — 列出活跃的子智能体
+ * </ul>
+ *
+ * <p>不支持会话、通道、运行注册表与通知分发，仅实现“创建智能体 → 执行调用 → 返回结果”。
+ * 仅依托 {@link DefaultAgentManager} 完成智能体创建与调用。
+ *
+ * <p>异步任务（设置 {@code timeout_seconds=0}）会提交至 {@link TaskRepository}，
+ * 作用域取自 {@link RuntimeContext} 中的当前会话ID。任务状态持久在工作空间存储，
+ * 支持跨节点读取，并可在会话压缩后完成状态恢复。
+ *
+ * <h2>流式输出</h2>
+ *
+ * <p>{@code agent_spawn} 与 {@code agent_send} 返回 {@link Mono}{@code <String>}，
+ * 框架响应式工具调用链路（参见 {@code ToolMethodInvoker}）可在父智能体流式链路中订阅。
+ * 若Reactor上下文内存在 {@link SubagentEventBus}（由 {@code AgentBase.createEventStream} 注入），
+ * 子智能体产生的所有 {@link io.agentscope.core.agent.Event} 将实时转发至父端接收器，
+ * 向消费侧提供完整调用链路扁平化事件流。若无事件总线（普通 {@code call()} 调用模式），
+ * 将自动切换至无额外开销的非流式 {@code invokeAgent} 执行路径。
+ */
 public class AgentSpawnTool {
 
     private static final Logger log = LoggerFactory.getLogger(AgentSpawnTool.class);
@@ -109,7 +134,32 @@ public class AgentSpawnTool {
      * {@link SubagentDeclaration#getExposeToUser()} policy → the LLM's {@code expose_to_user}
      * argument → {@code false}.
      */
+    /**
+     * {@link RuntimeContext} 字符串键，用于单次调用强制覆盖子智能体对外暴露策略。
+     * 在该键下存入 {@link Boolean}（或布尔字符串），即可控制当前调用内所有
+     * {@code agent_spawn} 的暴露行为，不受大模型入参影响。
+     *
+     * <p>示例：
+     * <pre>{@code
+     * RuntimeContext ctx = RuntimeContext.builder()
+     *     .userId("user-1")
+     *     .put(AgentSpawnTool.CTX_EXPOSE_TO_USER, true)
+     *     .build();
+     * }</pre>
+     *
+     * <p>优先级顺序（从高到低）：上下文该键值 → 被创建子智能体的
+     * {@link SubagentDeclaration#getExposeToUser()} 策略 → 大模型传入的 {@code expose_to_user} 参数 → 默认值 {@code false}。
+     */
     public static final String CTX_EXPOSE_TO_USER = "agentscope.subagent.expose_to_user";
+
+    /*private static final String BG_RESULT_TEMPLATE =
+            """
+            status: accepted
+            task_id: %s
+            可使用 task_output(task_id='%s', block=false) 查询状态，\
+            task_cancel(task_id='%s') 终止任务，或调用 task_list() 查看全部任务。\
+            请勿立即调用 task_output — 当前任务刚刚启动。\
+            """;*/
 
     private static final String BG_RESULT_TEMPLATE =
             """
@@ -140,6 +190,14 @@ public class AgentSpawnTool {
      * @param taskRepository background task store
      * @param parentSpawnDepth current spawn-depth of the parent (0 for top-level main agent)
      */
+    /**
+     * 创建 {@code AgentSpawnTool} 实例。该工具从每次工具调用的 {@link RuntimeContext}
+     * 获取当前用户ID，而非使用共享供应器，以此防止单个智能体实例并发服务多个调用者时出现身份竞争问题。
+     *
+     * @param agentManager 子智能体工厂与执行器
+     * @param taskRepository 后台任务存储器
+     * @param parentSpawnDepth 父智能体当前创建层级（顶层主智能体取值为 0）
+     */
     public AgentSpawnTool(
             DefaultAgentManager agentManager, TaskRepository taskRepository, int parentSpawnDepth) {
         this(agentManager, taskRepository, parentSpawnDepth, null);
@@ -153,6 +211,14 @@ public class AgentSpawnTool {
      * @param taskRepository background task store
      * @param parentSpawnDepth current spawn-depth of the parent (0 for top-level main agent)
      * @param gatewayBridge optional bridge for thread exposure; null for standalone mode
+     */
+    /**
+     * 创建 {@code AgentSpawnTool} 实例，可传入可选网关桥接器，用于将子智能体对外暴露为用户可直接访问的会话线程。
+     *
+     * @param agentManager 子智能体工厂与调用执行器
+     * @param taskRepository 后台任务存储
+     * @param parentSpawnDepth 父智能体当前创建层级（顶层主智能体取值为 0）
+     * @param gatewayBridge 用于暴露会话线程的可选桥接器；传入 null 代表独立运行模式
      */
     public AgentSpawnTool(
             DefaultAgentManager agentManager,
@@ -176,10 +242,67 @@ public class AgentSpawnTool {
      *
      * @param gatewayBridge the bridge implementation, or {@code null} to disable exposure
      */
+    /**
+     * 装配（或重新装配）网关桥接器，用于将子智能体对外暴露为用户可寻址会话线程。
+     *
+     * <p>必须在当前运行实例上修改桥接器，而非新建实例替换：
+     * 编排阶段工具集已将 {@code agent_spawn} 绑定至当前对象，替换工具实例将无法接收调用。
+     * 桥接器通常采用延迟注入方式，在智能体构建完成、内部网关创建后进行设置（参见
+     * {@code HarnessAgent#ensureGateway}）。
+     *
+     * @param gatewayBridge 桥接器实现；传入 {@code null} 则关闭暴露能力
+     */
     public void setGatewayBridge(SubagentGatewayBridge gatewayBridge) {
         this.gatewayBridge = gatewayBridge;
     }
 
+    /*
+    @Tool(
+            name = "agent_spawn",
+            stateInjected = true,
+            description =
+                    """
+                    创建独立子智能体，用于任务委派或后台作业。\
+                    每次返回内容以三行信息开头：agent_key（原样传给 agent_send 作为 agent_key）、\
+                    agent_id（子智能体类型名称）、session_id（内部标识，不可用作 agent_key）。\
+                    同步模式在三行信息下方直接返回应答；异步模式（timeout_seconds=0）额外返回 task_id，\
+                    可通过 task_output 查询结果——task_id 不等同于 agent_key。\
+                    """)
+    public Mono<String> agentSpawn(
+            RuntimeContext runtimeContext,
+            AgentState parentState,
+            @ToolParam(name = "agent_id", description = "待实例化的子智能体标识")
+                    String agentId,
+            @ToolParam(
+                            name = "task",
+                            description = "下发给新建子智能体的任务指令或提示词",
+                            required = false)
+                    String task,
+            @ToolParam(
+                            name = "label",
+                            description =
+                                    "可选的可读标签，用于通过 agent_send 引用该子智能体",
+                            required = false)
+                    String label,
+            @ToolParam(
+                            name = "timeout_seconds",
+                            description =
+                                    """
+                                    等待任务结果的最大秒数。0 代表发后即忘，返回 task_id。\
+                                    默认值：30，上限：600。\
+                                    """,
+                            required = false)
+                    Integer timeoutSeconds,
+            @ToolParam(
+                            name = "expose_to_user",
+                            description =
+                                    """
+                                    设为 true 时，用户可通过 thread_id 句柄直接寻址该新建子智能体。\
+                                    返回结果中会携带 thread_id。该功能需要预先配置网关桥接器。\
+                                    """,
+                            required = false)
+                    Boolean exposeToUser) { }
+     */
     @Tool(
             name = "agent_spawn",
             stateInjected = true,
@@ -422,6 +545,45 @@ public class AgentSpawnTool {
                 finalLabel);
     }
 
+    /*
+    @Tool(
+            name = "agent_send",
+            stateInjected = true,
+            description =
+                    """
+                    向已创建的子智能体发送消息。使用 agent_spawn 返回结果首行输出的 agent_key（以 agent: 开头），
+                    或是创建时指定的 label。请勿传入 agent_id、session_id 或 task_id。
+                    timeout_seconds=0 时返回 task_id，可通过 task_output 获取结果。\
+                    """)
+    public Mono<String> agentSend(
+            RuntimeContext runtimeContext,
+            AgentState parentState,
+            @ToolParam(
+                            name = "agent_key",
+                            description =
+                                    "取自 agent_spawn 输出中 'agent_key: ' 后的完整字符串"
+                                        + "（格式 agent:<type>:<uuid>）。并非 agent_id、session_id"
+                                        + "或 task_id。与 label 互斥。",
+                            required = false)
+                    String agentKey,
+            @ToolParam(
+                            name = "label",
+                            description =
+                                    "创建子智能体时设置的标签。与 agent_key 互斥。",
+                            required = false)
+                    String label,
+            @ToolParam(name = "message", description = "发送给子智能体的消息内容")
+                    String message,
+            @ToolParam(
+                            name = "timeout_seconds",
+                            description =
+                                    """
+                                    等待应答的最大秒数。0=发后即忘，返回 task_id。
+                                    默认值：30，上限：600。\
+                                    """,
+                            required = false)
+                    Integer timeoutSeconds) {}
+     */
     @Tool(
             name = "agent_send",
             stateInjected = true,

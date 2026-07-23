@@ -26,6 +26,14 @@ import io.agentscope.harness.agent.gateway.channel.OutboundAddress;
  * <p>When a subagent is exposed, the gateway assigns it a {@code subagentId} that the user can
  * use to send messages directly to that subagent, bypassing normal binding-based routing.
  */
+/**
+ * {@link io.agentscope.harness.agent.tool.AgentSpawnTool} 与网关层之间的桥接器。
+ * 支持将创建出来的子智能体对外暴露为用户可直接访问的入口，
+ * 同时无需让创建工具感知通道、路由或网关具体实现。
+ *
+ * <p>子智能体开启暴露后，网关会分配一个 {@code subagentId}。用户可凭借该标识
+ * 直接向此子智能体发送消息，绕过常规的绑定式路由逻辑。
+ */
 @FunctionalInterface
 public interface SubagentGatewayBridge {
 
@@ -33,6 +41,11 @@ public interface SubagentGatewayBridge {
      * Result of exposing a subagent to the user.
      *
      * @param subagentId the user-visible handle for addressing this subagent directly
+     */
+    /**
+     * 将子智能体对外暴露给用户后的返回结果。
+     *
+     * @param subagentId 用户可见的句柄，用于直接寻址该子智能体
      */
     record ExposeResult(String subagentId) {}
 
@@ -45,6 +58,16 @@ public interface SubagentGatewayBridge {
      * @param replyTo the outbound address for delivering replies back to the user's channel;
      *     may be null if no outbound channel context is available
      * @return the expose result containing the subagentId handle
+     */
+    /**
+     * 将已创建的子智能体在网关中对外暴露为可供用户寻址的接入点。
+     *
+     * @param agentId 子智能体类型标识
+     * @param sessionId 分配给该子智能体的会话ID
+     * @param agent 智能体实例
+     * @param replyTo 用于将回复推送回用户通道的出站地址；
+     *     若无出站通道上下文可为 null
+     * @return 包含 subagentId 句柄的暴露结果
      */
     ExposeResult expose(String agentId, String sessionId, Agent agent, OutboundAddress replyTo);
 }

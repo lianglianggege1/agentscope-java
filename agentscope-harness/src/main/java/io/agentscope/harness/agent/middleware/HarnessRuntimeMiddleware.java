@@ -22,4 +22,9 @@ import io.agentscope.core.middleware.MiddlewareBase;
  *
  * <p>These instances are framework-owned and should not be copied by {@code fromAgent(...)}.
  */
+/**
+ * 由运行时装配器自动安装的中间件标记接口。
+ *
+ * <p>该类实例归属框架管理，禁止通过 {@code fromAgent(...)} 进行拷贝。
+ */
 public interface HarnessRuntimeMiddleware extends MiddlewareBase {}

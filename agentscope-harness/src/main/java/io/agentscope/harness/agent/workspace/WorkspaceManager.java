@@ -488,6 +488,12 @@ public class WorkspaceManager implements AutoCloseable {
      * writes the updated map back. Acquires a per-file {@link ReentrantLock} to prevent
      * concurrent read-modify-write races when multiple tasks share the same session file.
      */
+    /**
+     * 在 {@code agents/<agentId>/tasks/<sessionId>.json} 中更新或新增 {@link TaskRecord}。
+     *
+     * <p>读取现有映射，以 {@code taskId} 为键合并或插入记录，随后将更新后的映射写回。
+     * 针对单个文件获取 {@link ReentrantLock}，避免多个任务共用同一会话文件时产生并发读写竞争。
+     */
     public void writeTaskRecord(
             RuntimeContext rc, String agentId, String sessionId, TaskRecord record) {
         if (agentId == null
@@ -524,6 +530,9 @@ public class WorkspaceManager implements AutoCloseable {
     /**
      * Reads a single {@link TaskRecord} by task ID, or {@link Optional#empty()} if not found.
      */
+    /**
+     * 根据任务ID读取单条 {@link TaskRecord}；未找到则返回 {@link Optional#empty()}。
+     */
     public Optional<TaskRecord> readTaskRecord(
             RuntimeContext rc, String agentId, String sessionId, String taskId) {
         if (agentId == null
@@ -541,6 +550,9 @@ public class WorkspaceManager implements AutoCloseable {
 
     /**
      * Returns all {@link TaskRecord}s for the given agent and session, in insertion order.
+     */
+    /**
+     * 返回指定智能体与会话下全部 {@link TaskRecord}，保持插入顺序。
      */
     public Collection<TaskRecord> listTaskRecords(
             RuntimeContext rc, String agentId, String sessionId) {
@@ -786,6 +798,7 @@ public class WorkspaceManager implements AutoCloseable {
     }
 
     /** Overwrites a workspace-relative UTF-8 file. All writes go through the filesystem. */
+    /** 覆写工作区相对路径下的UTF-8文件。所有写入操作均经由文件系统执行。 */
     public void writeUtf8WorkspaceRelative(RuntimeContext rc, String relativePath, String content) {
         if (relativePath == null || content == null) {
             return;

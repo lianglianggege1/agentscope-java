@@ -36,6 +36,10 @@ import reactor.core.publisher.Flux;
  * Unit tests for {@link SubagentSpecGenerator}. Uses a tiny in-process {@link Model} stub that
  * returns canned markdown without touching any real provider — keeps the test deterministic.
  */
+/**
+ * {@link SubagentSpecGenerator} 的单元测试。使用轻量进程内 {@link Model} 模拟桩，
+ * 返回预设 Markdown 内容，不调用任何真实模型服务，保障测试结果可复现。
+ */
 class SubagentSpecGeneratorTest {
 
     private static Model fixedModel(String markdown) {
@@ -61,6 +65,16 @@ class SubagentSpecGeneratorTest {
 
     @Test
     void generateAndValidate_returnsParsedDeclaration() {
+        /*"""
+                ---
+                description: 审查代码中的安全问题与并发缺陷
+                mode: subagent
+                hidden: false
+                temperature: 0.2
+                steps: 8
+                ---
+                你是代码审查专员，重点关注安全风险与并发问题。审查结果使用无序列表输出。
+                """;*/
         String spec =
                 """
                 ---

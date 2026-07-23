@@ -120,6 +120,13 @@ public final class AgentSpecLoader {
      *     values; may be {@code null} (relative paths will remain relative)
      * @return list of parsed declarations; never {@code null}
      */
+    /**
+     * 非递归遍历 {@code subagentsDir} 目录下所有 `.md` 文件，并将每个文件解析为 {@link SubagentDeclaration} 配置对象。
+     *
+     * @param subagentsDir 待扫描的 subagents 根目录
+     * @param mainWorkspace 用于解析配置中相对路径 {@code workspace.path} 的父级工作区；允许传 {@code null}（相对路径会原样保留不转换）
+     * @return 解析完成的配置列表，永不为 {@code null}
+     */
     public static List<SubagentDeclaration> loadFromDirectory(
             Path subagentsDir, Path mainWorkspace) {
         if (subagentsDir == null || !Files.isDirectory(subagentsDir)) {
@@ -162,6 +169,14 @@ public final class AgentSpecLoader {
      * @param mainWorkspace the parent workspace for resolving relative workspace paths; may be
      *     {@code null}
      * @return list of parsed declarations; never {@code null}
+     */
+    /**
+     * 通过 {@link AbstractFilesystem} 加载子智能体配置，并遵循命名空间隔离规则。
+     * 使用文件系统通配符扫描 subagents/ 目录下全部 *.md 配置文件。
+     *
+     * @param filesystem 文件系统抽象层（内部自动处理命名空间隔离逻辑）
+     * @param mainWorkspace 用于解析相对工作区路径的父工作区，允许传入 {@code null}
+     * @return 解析后的配置对象列表，永不为 {@code null}
      */
     public static List<SubagentDeclaration> loadFromFilesystem(
             AbstractFilesystem filesystem, Path mainWorkspace) {
@@ -212,6 +227,13 @@ public final class AgentSpecLoader {
      * @return parsed declaration, or {@code null} if the file is malformed / missing required
      *     fields
      */
+    /**
+     * 解析单个Markdown配置声明文件。
+     *
+     * @param filePath 待解析的.md文件路径
+     * @param mainWorkspace 用于解析配置内workspace.path相对路径的工作区根目录，允许传{@code null}
+     * @return 解析完成的配置对象；若文件格式异常、缺失必填字段则返回{@code null}
+     */
     public static SubagentDeclaration loadFromFile(Path filePath, Path mainWorkspace)
             throws IOException {
         String content = Files.readString(filePath, StandardCharsets.UTF_8);
@@ -227,6 +249,14 @@ public final class AgentSpecLoader {
      * @param mainWorkspace workspace root used to resolve relative {@code workspace.path} values;
      *     may be {@code null}
      * @return parsed declaration, or {@code null} if the content is malformed
+     */
+    /**
+     * 解析带有YAML头部元数据的Markdown文本，转换为{@link SubagentDeclaration}配置对象。
+     *
+     * @param markdown 文件完整文本内容
+     * @param name 子智能体名称（从文件名提取，不含后缀.md）
+     * @param mainWorkspace 用于解析workspace.path相对路径的工作区根目录，允许传入{@code null}
+     * @return 解析后的配置实例；内容格式错误时返回{@code null}
      */
     @SuppressWarnings("unchecked")
     public static SubagentDeclaration parse(String markdown, String name, Path mainWorkspace) {

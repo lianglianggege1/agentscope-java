@@ -36,12 +36,14 @@ import java.util.function.Supplier;
 public sealed interface TaskRunSpec {
 
     /** In-process execution via {@link Supplier}. */
+    /** 通过 {@link Supplier} 实现进程内本地执行。 */
     record LocalTaskRunSpec(Supplier<String> execution) implements TaskRunSpec {}
 
     /**
      * Remote HTTP task execution. The {@code taskId} is chosen by the client and used as the
      * remote task key end-to-end.
      */
+    /** 远端HTTP任务执行模式。taskId由客户端指定，并全程作为远端任务唯一标识。 */
     record RemoteTaskRunSpec(
             String baseUrl, Map<String, String> headers, String agentId, String input)
             implements TaskRunSpec {}
@@ -50,6 +52,10 @@ public sealed interface TaskRunSpec {
      * Adopts an already-running {@link CompletableFuture} as a tracked background task. Used when
      * a sync execution exceeds its timeout and is promoted to async: the future is still in
      * progress and only needs status-tracking callbacks, not a new executor submission.
+     */
+    /**
+     * 接管已在运行的 {@link CompletableFuture} 作为托管后台任务。适用于同步执行超时后转为异步的场景：
+     * 该异步任务仍在执行中，仅需挂载状态跟踪回调，无需重新提交至执行器。
      */
     record AdoptedTaskRunSpec(CompletableFuture<String> future) implements TaskRunSpec {}
 }

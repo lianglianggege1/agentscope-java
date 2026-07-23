@@ -29,5 +29,13 @@ import java.util.List;
  * @param options  generation options
  * @param model    the model instance to call
  */
+/**
+ * {@link MiddlewareBase#onModelCall} 的输入上下文。
+ *
+ * @param messages 发送给模型的消息列表
+ * @param tools 工具定义描述
+ * @param options 生成参数配置
+ * @param model 待调用的模型实例
+ */
 public record ModelCallInput(
         List<Msg> messages, List<ToolSchema> tools, GenerateOptions options, Model model) {}

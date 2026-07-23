@@ -30,6 +30,10 @@ import org.junit.jupiter.api.Test;
  * Phase A {@code mode} + {@code hidden} semantics: schema parsing, LLM-facing visibility
  * filtering, and spawn-rejection of PRIMARY-only declarations.
  */
+/**
+ * A阶段 mode 与 hidden 语义处理：包含模式解析、面向大模型的可见性过滤，
+ * 以及对仅主实例声明的生成拦截校验。
+ */
 class SubagentModeHiddenTest {
 
     @Test

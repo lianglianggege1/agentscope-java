@@ -52,5 +52,11 @@ public interface SubagentFactory {
      * @param parentRc parent agent's runtime context at spawn time; may be
      *     {@link RuntimeContext#empty()} when caller has no scope
      */
+    /**
+     * 根据传入的父级运行时上下文创建全新子智能体实例。
+     * 实现类需负责将 {@code parentRc} 转换为对应的状态隔离标识（例如感知父智能体的 {@code SessionKey}），详情参见类级JavaDoc。
+     *
+     * @param parentRc 子智能体创建时父智能体的运行时上下文；调用方无作用域时可传入 {@link RuntimeContext#empty()}
+     */
     Agent create(RuntimeContext parentRc);
 }

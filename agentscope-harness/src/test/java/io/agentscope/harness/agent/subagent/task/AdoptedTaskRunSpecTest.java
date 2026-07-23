@@ -37,6 +37,12 @@ import org.junit.jupiter.api.io.TempDir;
  * correctly tracked by {@link WorkspaceTaskRepository}: status transitions, result persistence,
  * and push delivery eligibility.
  */
+/**
+ * {@link TaskRunSpec.AdoptedTaskRunSpec} 相关测试用例
+ * 该实现用于同步执行因超时而升级为异步任务的场景。
+ * 校验外部创建的 {@link CompletableFuture} 能否被 {@link WorkspaceTaskRepository} 正确托管：
+ * 状态流转、结果持久化、推送下发资格校验。
+ */
 class AdoptedTaskRunSpecTest {
 
     @TempDir Path tempDir;

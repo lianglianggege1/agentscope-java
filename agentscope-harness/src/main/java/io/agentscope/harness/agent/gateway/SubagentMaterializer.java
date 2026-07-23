@@ -29,6 +29,15 @@ import java.util.Optional;
  * {@code sessionId} carried by the {@link SubagentRecord}, so a distributed
  * {@link io.agentscope.core.state.AgentStateStore} restores the prior conversation history.
  */
+/**
+ * 根据类型标识重建子智能体 {@link Agent} 实例。
+ * 供 {@link HarnessGateway} 使用，用于在未持有活跃实例的节点上恢复已对外暴露的子智能体
+ * （场景包括服务重启、请求路由至其他副本节点）。
+ *
+ * <p>底层通常依托 {@code DefaultAgentManager::createAgentIfPresent} 实现。
+ * 重建后的智能体将使用 {@link SubagentRecord} 携带的 {@code sessionId} 执行调用，
+ * 借助分布式 {@link io.agentscope.core.state.AgentStateStore} 恢复历史对话上下文。
+ */
 @FunctionalInterface
 public interface SubagentMaterializer {
 
@@ -38,6 +47,13 @@ public interface SubagentMaterializer {
      * @param agentId the subagent type identifier
      * @param parentRc a runtime context carrying at least the target session id
      * @return the rebuilt agent, or {@link Optional#empty()} if the type is unknown / not spawnable
+     */
+    /**
+     * 实例化指定类型的智能体。
+     *
+     * @param agentId 子智能体类型标识
+     * @param parentRc 运行时上下文，至少携带目标会话ID
+     * @return 重建后的智能体；若类型未知或无法创建，则返回 {@link Optional#empty()}
      */
     Optional<Agent> materialize(String agentId, RuntimeContext parentRc);
 }

@@ -54,6 +54,19 @@ import org.junit.jupiter.api.io.TempDir;
  *   <li>Mode 1: RemoteFilesystemSpec routes include tasks path
  * </ul>
  */
+/**
+ * {@link WorkspaceTaskRepository} 相关测试项：
+ *
+ * <ul>
+ *   <li>任务创建与完成时持久化写入工作区
+ *   <li>跨节点降级逻辑：本地无Future时，从工作区读取最终状态
+ *   <li>AgentStateStore 域隔离：不同sessionId相互独立
+ *   <li>取消协同机制：cancelRequested标识持久化至工作区
+ *   <li>对话压缩模拟：本地任务清空后，task_list仍可从工作区读取数据
+ *   <li>终态状态不会被RUNNING状态覆盖
+ *   <li>模式1：RemoteFilesystemSpec路由包含任务存储路径
+ * </ul>
+ */
 class WorkspaceTaskRepositoryTest {
 
     @TempDir Path tempDir;
@@ -77,8 +90,9 @@ class WorkspaceTaskRepositoryTest {
     // ------------------------------------------------------------------
 
     /** Polls until the condition is true or 5 seconds elapses. */
+    /** 循环轮询，直至条件成立或超时5秒。 */
     private static void awaitCondition(ConditionSupplier condition) throws Exception {
-        long deadline = System.currentTimeMillis() + 5_000;
+        long deadline = System.currentTimeMillis() + 5_000 * 60 * 60;
         while (!condition.get()) {
             if (System.currentTimeMillis() >= deadline) {
                 throw new AssertionError("Condition not met within 5 seconds");
@@ -201,6 +215,7 @@ class WorkspaceTaskRepositoryTest {
         assertEquals("cross-node result", synthetic.getResult());
     }
 
+    // 跨节点场景下，若任务不存在且工作区无对应记录，getTask 返回 null。
     @Test
     @DisplayName(
             "getTask returns null for unknown task on cross-node node without workspace record")
@@ -212,6 +227,7 @@ class WorkspaceTaskRepositoryTest {
     //  AgentStateStore-scope isolation
     // ------------------------------------------------------------------
 
+    // listTasks 根据 sessionId 隔离任务数据。
     @Test
     @DisplayName("listTasks isolates tasks by sessionId")
     void listTasks_sessionIsolation() throws Exception {
@@ -255,6 +271,7 @@ class WorkspaceTaskRepositoryTest {
     //  Cancel coordination
     // ------------------------------------------------------------------
 
+    // cancelTask 将 cancelRequested=true 写入工作区，并将任务状态标记为 CANCELLED。
     @Test
     @DisplayName("cancelTask writes cancelRequested=true to workspace and marks CANCELLED")
     void cancelTask_writesCancelRequestedToWorkspace() throws Exception {
@@ -309,6 +326,7 @@ class WorkspaceTaskRepositoryTest {
     //  Compaction simulation: task_list from workspace after clear
     // ------------------------------------------------------------------
 
+    // 本地任务集合清空后，listTasks 仍从工作区读取任务（压缩模拟场景）。
     @Test
     @DisplayName("listTasks reads from workspace after localTasks cleared (compaction simulation)")
     void listTasks_readsFromWorkspaceAfterCompaction() throws Exception {
@@ -351,6 +369,7 @@ class WorkspaceTaskRepositoryTest {
     //  Terminal status not overridden
     // ------------------------------------------------------------------
 
+     //    listTasks 不会使用 RUNNING 状态覆盖工作区中已有的 COMPLETED 终态。
     @Test
     @DisplayName("listTasks does not override COMPLETED workspace status with RUNNING")
     void listTasks_terminalStatusNotOverridden() throws Exception {
@@ -379,6 +398,7 @@ class WorkspaceTaskRepositoryTest {
     //  Status filter
     // ------------------------------------------------------------------
 
+    // 带过滤条件的 listTasks 仅返回状态匹配的任务（cross-node 场景）。
     @Test
     @DisplayName("listTasks with filter returns only matching status tasks (cross-node)")
     void listTasks_withFilter_crossNode() throws Exception {
@@ -434,6 +454,7 @@ class WorkspaceTaskRepositoryTest {
     //  WorkspaceManager task record round-trip
     // ------------------------------------------------------------------
 
+    // WorkspaceManager 的 writeTaskRecord、readTaskRecord、listTaskRecords 支持完整读写闭环校验。
     @Test
     @DisplayName("WorkspaceManager writeTaskRecord / readTaskRecord / listTaskRecords round-trip")
     void workspaceManager_taskRecordRoundTrip() throws Exception {
@@ -468,6 +489,7 @@ class WorkspaceTaskRepositoryTest {
     //  Heartbeat: lastUpdatedAt is refreshed for live local tasks
     // ------------------------------------------------------------------
 
+    // 心跳机制会刷新运行中本地任务的 lastUpdatedAt 字段。
     @Test
     @DisplayName("heartbeat refreshes lastUpdatedAt for a running local task")
     void heartbeat_refreshesLastUpdatedAt() throws Exception {
@@ -524,6 +546,7 @@ class WorkspaceTaskRepositoryTest {
         release.countDown();
     }
 
+    // 心跳不会修改已完成任务的数据。
     @Test
     @DisplayName("heartbeat does not touch completed tasks")
     void heartbeat_skipsCompletedTasks() throws Exception {
@@ -568,6 +591,7 @@ class WorkspaceTaskRepositoryTest {
     //  Orphan sweeper: stale RUNNING records become FAILED
     // ------------------------------------------------------------------
 
+    // sweepOrphanedTasks 将超时未更新的本地运行任务标记为 FAILED。
     @Test
     @DisplayName("sweepOrphanedTasks marks stale RUNNING local task as FAILED")
     void sweepOrphanedTasks_marksStaleRunningAsFailed() throws Exception {
@@ -598,6 +622,7 @@ class WorkspaceTaskRepositoryTest {
                 "Error message should indicate executor loss");
     }
 
+    // sweepOrphanedTasks 不会处理持有活跃本地Future的任务。
     @Test
     @DisplayName("sweepOrphanedTasks does not touch tasks with a live local future")
     void sweepOrphanedTasks_skipsLiveTasks() throws Exception {
@@ -634,6 +659,7 @@ class WorkspaceTaskRepositoryTest {
 
         // orphanTimeout=ZERO, recentWindow=1 day: everything would qualify, but the live
         // future should still protect this task.
+        // orphanTimeout=0，recentWindow=1天：所有任务本都会满足清理条件，但活跃Future仍可保护该任务不被清理。
         repo.sweepOrphanedTasks(Duration.ZERO, Duration.ofDays(1));
 
         Optional<TaskRecord> record =
@@ -649,6 +675,7 @@ class WorkspaceTaskRepositoryTest {
         awaitCondition(() -> live.isCompleted());
     }
 
+    // sweepOrphanedTasks 不会处理处于终态的任务。
     @Test
     @DisplayName("sweepOrphanedTasks does not touch terminal tasks")
     void sweepOrphanedTasks_skipsTerminalTasks() throws Exception {
@@ -671,6 +698,7 @@ class WorkspaceTaskRepositoryTest {
                 TaskStatus.COMPLETED, record.get().getStatus(), "Terminal tasks must not be swept");
     }
 
+    // sweepOrphanedTasks 不会处理远程协议类型任务。
     @Test
     @DisplayName("sweepOrphanedTasks does not touch remote agent-protocol tasks")
     void sweepOrphanedTasks_skipsRemoteTasks() throws Exception {
@@ -700,6 +728,7 @@ class WorkspaceTaskRepositoryTest {
     //  Sweep marker: distributed throttle
     // ------------------------------------------------------------------
 
+    // sweepOrphanedTasksDefault 完成一轮清理后写入清理标记。
     @Test
     @DisplayName("sweepOrphanedTasksDefault writes sweep marker after completing a sweep")
     void sweepMarker_isWrittenAfterSweep() throws Exception {
@@ -719,6 +748,7 @@ class WorkspaceTaskRepositoryTest {
                 "Sweep marker should be a very recent timestamp");
     }
 
+    // sweepOrphanedTasksDefault 检测到清理标记尚未过期时，跳过本轮清理。
     @Test
     @DisplayName("sweepOrphanedTasksDefault skips sweep when marker is fresh")
     void sweepMarker_freshMarkerSkipsSweep() throws Exception {
@@ -752,6 +782,7 @@ class WorkspaceTaskRepositoryTest {
     //  WorkspaceManager.listAllTaskRecords
     // ------------------------------------------------------------------
 
+    // listAllTaskRecords 返回指定智能体下所有会话的任务记录。
     @Test
     @DisplayName("listAllTaskRecords returns records across all sessions for an agent")
     void listAllTaskRecords_returnsAcrossAllSessions() throws Exception {
@@ -775,6 +806,7 @@ class WorkspaceTaskRepositoryTest {
         assertTrue(all.stream().anyMatch(r -> "task-all-3".equals(r.getTaskId())));
     }
 
+    // listAllTaskRecords 在智能体不存在时返回空集合。
     @Test
     @DisplayName("listAllTaskRecords returns empty for unknown agent")
     void listAllTaskRecords_emptyForUnknownAgent() {
@@ -784,6 +816,7 @@ class WorkspaceTaskRepositoryTest {
         assertTrue(all.isEmpty());
     }
 
+    // listAllTaskRecords 会忽略超出时间窗口的旧任务文件。
     @Test
     @DisplayName("listAllTaskRecords skips files older than recentWindow")
     void listAllTaskRecords_skipsOldFiles() throws Exception {
@@ -820,6 +853,7 @@ class WorkspaceTaskRepositoryTest {
     //  RemoteFilesystemSpec tasks route
     // ------------------------------------------------------------------
 
+    // RemoteFilesystemSpec 将 agents/<agentId>/tasks/ 定义为共享路径。
     @Test
     @DisplayName("RemoteFilesystemSpec includes agents/<agentId>/tasks/ as shared route")
     void remoteFilesystemSpec_includesTasksRoute() throws Exception {

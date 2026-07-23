@@ -23,6 +23,10 @@ import io.agentscope.harness.agent.subagent.SubagentFactory;
  * {@link SubagentFactory}, and optional {@link SubagentDeclaration} (for
  * remote URL and headers).
  */
+/**
+ * 子智能体描述器，包含智能体ID、描述信息、{@link SubagentFactory}，
+ * 以及可选的 {@link SubagentDeclaration}（用于远程地址与请求头配置）。
+ */
 public record SubagentEntry(
         String name, String description, SubagentFactory factory, SubagentDeclaration declaration) {
     public SubagentEntry(String name, String description, SubagentFactory factory) {

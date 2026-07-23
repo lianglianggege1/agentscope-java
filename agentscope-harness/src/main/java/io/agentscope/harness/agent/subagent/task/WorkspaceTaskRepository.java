@@ -95,6 +95,10 @@ public class WorkspaceTaskRepository implements TaskRepository {
      * How often (in seconds) the heartbeat refreshes {@code lastUpdatedAt} for live local tasks.
      * Must be well below {@link #ORPHAN_TIMEOUT_MINUTES} to avoid false orphan detection.
      */
+    /**
+     * 本地运行任务刷新lastUpdatedAt心跳间隔（单位：秒）。
+     * 该值必须远小于{@link #ORPHAN_TIMEOUT_MINUTES}，防止误判孤立任务。
+     */
     static final int HEARTBEAT_INTERVAL_SECONDS = 30;
 
     /**
@@ -102,9 +106,14 @@ public class WorkspaceTaskRepository implements TaskRepository {
      * marks it {@link TaskStatus#FAILED}. Should be several multiples of
      * {@link #HEARTBEAT_INTERVAL_SECONDS} to tolerate transient delays.
      */
+    /**
+     * 本地未终止任务无心跳更新的最大时长（单位：分钟），超时后清理器会将任务标记为 {@link TaskStatus#FAILED}。
+     * 该值应设为心跳间隔 {@link #HEARTBEAT_INTERVAL_SECONDS} 的数倍，以容忍临时延迟。
+     */
     static final int ORPHAN_TIMEOUT_MINUTES = 10;
 
     /** How often (in minutes) the orphan sweeper scans all workspace task records. */
+    /** 孤立任务清理器扫描全工作区任务记录的周期（单位：分钟）。 */
     static final int SWEEP_INTERVAL_MINUTES = 5;
 
     private final WorkspaceManager workspaceManager;
@@ -115,11 +124,18 @@ public class WorkspaceTaskRepository implements TaskRepository {
      * In-memory local task handles. Keyed by {@code "<sessionId>:<taskId>"} to provide session
      * isolation when multiple parent sessions are active in the same JVM process.
      */
+    /**
+     * 内存本地任务句柄存储，键格式为 {@code "<sessionId>:<taskId>"}。
+     * 同一JVM进程内多父会话并发时，依靠该键实现会话数据隔离。
+     */
     private final Map<String, BackgroundTask> localTasks = new ConcurrentHashMap<>();
 
     /**
      * Maps {@code localKey} → {@code sessionId} so the heartbeat can iterate running tasks without
      * needing to parse the composite key string.
+     */
+    /**
+     * localKey 映射至 sessionId，心跳遍历运行中任务时无需解析复合字符串键。
      */
     private final Map<String, String> localTaskSessionIds = new ConcurrentHashMap<>();
 
@@ -127,6 +143,10 @@ public class WorkspaceTaskRepository implements TaskRepository {
      * Maps {@code localKey} → {@link RuntimeContext} captured at {@code putTask} time so the
      * background future and the heartbeat thread can persist task state under the originating
      * user's namespace.
+     */
+    /**
+     * localKey 映射至提交任务时捕获的 {@link RuntimeContext}。
+     * 后台异步任务与心跳线程可依托该上下文，将任务状态持久化至发起用户对应的命名空间。
      */
     private final Map<String, RuntimeContext> localTaskContexts = new ConcurrentHashMap<>();
 
@@ -161,6 +181,12 @@ public class WorkspaceTaskRepository implements TaskRepository {
      *
      * <p>Unit tests invoke {@link #heartbeat()} and {@link #sweepOrphanedTasks} directly; leaving
      * the maintenance scheduler enabled causes flaky races on slow CI hosts (notably Windows).
+     */
+    /**
+     * 仅用于测试的工厂类，不启动后台心跳与孤立任务清理线程。
+     *
+     * <p>单元测试需手动调用 {@link #heartbeat()} 和 {@link #sweepOrphanedTasks}；
+     * 若开启定时维护调度器，在慢速CI环境（尤其是Windows）会产生不稳定的竞态问题。
      */
     static WorkspaceTaskRepository forTests(
             WorkspaceManager workspaceManager, String parentAgentId) {
@@ -229,6 +255,13 @@ public class WorkspaceTaskRepository implements TaskRepository {
      * the persisted {@link TaskRecord} directly.
      *
      * <p>Only one callback is supported; a second call replaces the previous one.
+     */
+    /**
+     * 注册任务终止回调：任意任务进入终态（完成/失败）时触发。
+     * 由 {@link io.agentscope.harness.agent.middleware.SubagentsMiddleware} 使用，用于将结果推送至会话收件箱并唤醒会话。
+     * 任务失败时传入回调的 result 参数为 null；如需获取异常信息，调用方应直接读取持久化的 {@link TaskRecord}。
+     *
+     * <p>仅支持单个回调，重复注册会覆盖原有回调。
      */
     public void setCompletionCallback(TaskCompletionCallback callback) {
         this.completionCallback = callback;
@@ -546,6 +579,11 @@ public class WorkspaceTaskRepository implements TaskRepository {
      * orphan-sweeper cannot accidentally clobber the field via their RUNNING/FAILED writes
      * (those paths reconstruct the record around status-only fields).
      */
+    /**
+     * 给持久化任务记录写入deliveredAt推送时间戳，操作具备幂等性：仅首次写入非空值生效，后续调用直接返回，不操作工作区存储。
+     * 该方法采用独立的读改写逻辑，而非复用{@link #updateStatus}；
+     * 避免心跳、孤立任务清理器在更新运行/失败状态时覆盖此字段（这类更新逻辑仅重建状态相关字段，会丢失推送标记）。
+     */
     @Override
     public void markDelivered(RuntimeContext rc, String sessionId, String taskId) {
         RuntimeContext effRc = rc != null ? rc : RuntimeContext.empty();
@@ -583,6 +621,7 @@ public class WorkspaceTaskRepository implements TaskRepository {
     }
 
     /** Shuts down the maintenance scheduler and (if owned) the task executor. */
+    /** 关闭定时维护调度器，若持有任务执行器则同步销毁执行器。 */
     public void shutdown() {
         if (maintenanceScheduler != null) {
             maintenanceScheduler.shutdown();
@@ -615,6 +654,12 @@ public class WorkspaceTaskRepository implements TaskRepository {
      *
      * <p>Package-private for direct invocation in unit tests.
      */
+    /**
+     * 刷新工作区中所有仍在运行的本地任务的lastUpdatedAt更新时间。
+     * 按固定周期执行，供孤立任务清理器区分正常运行任务与节点失联失效任务。
+     *
+     * <p>包私有访问权限，单元测试可直接调用。
+     */
     void heartbeat() {
         localTasks.forEach(
                 (key, task) -> {
@@ -640,6 +685,7 @@ public class WorkspaceTaskRepository implements TaskRepository {
     }
 
     /** Package-private entry point for unit tests that need to invoke the default sweep path. */
+    /** 包私有入口，供单元测试直接调用默认孤立任务清理逻辑。 */
     void sweepOrphanedTasksDefault_forTest() {
         sweepOrphanedTasksDefault();
     }
@@ -696,6 +742,18 @@ public class WorkspaceTaskRepository implements TaskRepository {
      * @param recentWindow only session files modified within this window are scanned; files older
      *     than this are assumed to contain only terminal tasks (see
      *     {@link WorkspaceManager#listAllTaskRecords})
+     */
+    /**
+     * 扫描当前代理下所有持久化任务记录，若本地非远端任务长时间未更新心跳（lastUpdatedAt早于孤立超时阈值），则将其标记为 {@link TaskStatus#FAILED}。
+     *
+     * <p>孤立任务定义：任务创建节点宕机，未写入终态且心跳中断。远端协议任务不参与清理，其存活状态由远端服务管控，不受本地心跳约束。
+     *
+     * <p>支持多节点并发执行：工作区写入操作幂等，多节点先后标记同一失效任务无冲突（任务已失联，任意节点先标记均可）。
+     *
+     * <p>包私有访问权限，单元测试可直接调用。
+     *
+     * @param orphanTimeout 本地未终止任务判定为孤立任务的心跳超时时长
+     * @param recentWindow 仅扫描该时间窗口内修改过的会话任务文件；超出该窗口的文件默认仅存已终止任务（参考 {@link WorkspaceManager#listAllTaskRecords}）
      */
     void sweepOrphanedTasks(Duration orphanTimeout, Duration recentWindow) {
         // Sweep runs without per-user RC. Tasks persisted under user-scoped namespaces are
@@ -814,6 +872,10 @@ public class WorkspaceTaskRepository implements TaskRepository {
      * Creates a synthetic {@link BackgroundTask} from a persisted {@link TaskRecord}. The future
      * is already-completed (or failed/cancelled) to reflect the stored terminal status.
      */
+    /**
+     * 根据持久化的 {@link TaskRecord} 构造虚拟后台任务 {@link BackgroundTask}。
+     * 返回的异步Future已完成/失败/取消，与记录中存储的终态保持一致。
+     */
     private BackgroundTask syntheticTask(RuntimeContext rc, TaskRecord record) {
         CompletableFuture<String> future;
         switch (record.getStatus()) {
@@ -900,6 +962,11 @@ public class WorkspaceTaskRepository implements TaskRepository {
      * Implementations typically push the result to the session inbox and enqueue a wakeup signal.
      * {@code result} is {@code null} when the task failed; callers should read the persisted
      * {@link TaskRecord} for the error message.
+     */
+    /**
+     * 后台任务抵达终态（完成/失败）时触发的回调接口。
+     * 实现类通常将任务结果推送至会话收件箱并加入唤醒信号。
+     * 任务失败时result参数为null；调用方需读取持久化的{@link TaskRecord}获取异常信息。
      */
     @FunctionalInterface
     public interface TaskCompletionCallback {

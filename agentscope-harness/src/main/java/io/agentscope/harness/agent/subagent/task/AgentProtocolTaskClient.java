@@ -33,6 +33,11 @@ import java.util.Objects;
  *
  * <p>The client-supplied {@code taskId} is used as the remote task identifier (no separate run id).
  */
+/**
+ * 适配内部 AgentScope 任务协议的轻量 HTTP 客户端（接口路径：{@code POST/GET /tasks/...}）。
+ *
+ * <p>外部传入的 {@code taskId} 直接作为远端任务标识，不额外分配独立运行ID。
+ */
 public final class AgentProtocolTaskClient {
 
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -105,6 +110,10 @@ public final class AgentProtocolTaskClient {
      * {@code GET /tasks/{taskId}/wait?timeout_seconds=<n>} — blocks until the server completes
      * the task. The HTTP read timeout is set to {@code timeoutSeconds + 60} seconds to give the
      * server time to respond.
+     */
+    /**
+     * 接口 {@code GET /tasks/{taskId}/wait?timeout_seconds=<n>} — 阻塞等待直至服务端任务执行完成。
+     * HTTP读取超时设置为 {@code timeoutSeconds + 60} 秒，预留充足时间供服务端返回结果。
      */
     public String waitForResult(
             String baseUrl, Map<String, String> headers, String taskId, long timeoutSeconds)

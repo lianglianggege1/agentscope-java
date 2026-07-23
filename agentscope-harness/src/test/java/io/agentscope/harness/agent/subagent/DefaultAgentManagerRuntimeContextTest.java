@@ -30,6 +30,12 @@ import org.junit.jupiter.api.Test;
  * {@link DefaultAgentManager#createAgent(String, RuntimeContext)} forward the parent
  * {@link RuntimeContext} to the registered {@link SubagentFactory} unchanged.
  */
+/**
+ * B-0阶段——校验 {@link DefaultAgentManager#createAgentIfPresent(String, RuntimeContext)}
+ * 与 {@link DefaultAgentManager#createAgent(String, RuntimeContext)}
+ * 是否将父级 {@link RuntimeContext} 完整原样透传给已注册的 {@link SubagentFactory}。
+ */
+// 这个还需要看---
 class DefaultAgentManagerRuntimeContextTest {
 
     private static SubagentDeclaration plainDecl(String name) {

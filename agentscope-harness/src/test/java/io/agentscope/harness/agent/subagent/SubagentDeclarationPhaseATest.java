@@ -25,6 +25,10 @@ import org.junit.jupiter.api.Test;
  * Phase A schema additions to {@link SubagentDeclaration}: {@code temperature}, {@code topP},
  * {@code variant}, {@code steps} (renamed from {@code maxIters}).
  */
+/**
+ * {@link SubagentDeclaration} A阶段结构扩展项：{@code temperature}、{@code topP}、
+ * {@code variant}、{@code steps}（由 {@code maxIters} 重命名而来）。
+ */
 class SubagentDeclarationPhaseATest {
 
     @Test

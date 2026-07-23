@@ -37,6 +37,12 @@ import org.junit.jupiter.api.io.TempDir;
  * (userId, sessionId), distinct IDs are sufficient to guarantee state isolation across all
  * configured AgentStateStore stores.
  */
+/**
+ * 端到端 B-0 阶段隔离性验证：在不同父 {@link RuntimeContext} 下创建同一 {@code SubagentDeclaration}，
+ * 校验每个子 {@link ReActAgent} 最终获得独立的会话ID。
+ * 由于 {@code AgentStateStore.save}/{@code get} 已基于 (userId, sessionId) 做数据分区，
+ * 只要会话ID互不重复，即可保证所有已配置的 AgentStateStore 之间状态相互隔离。
+ */
 class SubagentIsolationIntegrationTest {
 
     @TempDir Path workspace;
