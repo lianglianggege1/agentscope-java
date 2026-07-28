@@ -43,6 +43,10 @@ class EnvironmentAndAllowListFilterTest {
         return new AgentSkill(name, "desc " + name, "# " + name, null);
     }
 
+    /**
+     * 环境过滤器：生产环境排除草稿技能。
+     * 开启后草稿状态的技能在生产环境中会被过滤。
+     */
     @Test
     void environmentFilter_excludesDraftFromProd() {
         store.markAgentDraft("draft-x", null); // environments=[draft]
@@ -56,6 +60,7 @@ class EnvironmentAndAllowListFilterTest {
         assertEquals("prod-y", out.get(0).getName());
     }
 
+    /** 环境过滤器：放行外部技能 */
     @Test
     void environmentFilter_passesThroughExternalSkills() {
         // No sidecar entry → external skill, must always pass through env filter.
@@ -65,6 +70,9 @@ class EnvironmentAndAllowListFilterTest {
         assertEquals(1, out.size());
     }
 
+    /**
+     * 白名单过滤器：仅允许列表内由Agent创建的技能通过。
+     */
     @Test
     void allowListFilter_admitsOnlyListedAgentCreated() {
         store.markAgentCreated("yes", "auto", List.of("prod"));
@@ -77,6 +85,9 @@ class EnvironmentAndAllowListFilterTest {
         assertEquals("yes", out.get(0).getName());
     }
 
+    /**
+     * 白名单过滤器：放行外部技能
+     */
     @Test
     void allowListFilter_passesThroughExternalSkills() {
         // External skill — allow-list shouldn't apply.
@@ -85,6 +96,7 @@ class EnvironmentAndAllowListFilterTest {
         assertEquals(1, f.filter(List.of(external), RuntimeContext.empty()).size());
     }
 
+    /** 组合过滤器：链式校验、短路判定 */
     @Test
     void compositeFilter_chainsAndShortCircuits() {
         store.markAgentCreated("a", "auto", List.of("prod"));

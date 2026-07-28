@@ -26,12 +26,24 @@ package io.agentscope.harness.agent.tool;
  * {@code SkillManageConfig.builder().autoPromote(true).build()} — agent writes go straight to the
  * live skills root, becoming visible on the next reasoning turn.
  */
+/**
+ * {@link SkillManageTool} 的配置项。
+ *
+ * <p>默认参数面向企业生产环境调优：新建技能存放于草稿子目录（而非正式技能根目录），
+ * 静态安全扫描默认开启，智能体无法通过 {@code create} 静默覆盖已有技能。
+ *
+ * <p>个人助手/实验场景推荐覆盖配置：
+ * {@code SkillManageConfig.builder().autoPromote(true).build()} —
+ * 智能体写入的技能直接落地至正式技能根目录，在下一轮推理即可生效。
+ */
 public final class SkillManageConfig {
 
     /** Default subdirectory under workspace for staging drafts. */
+    /** 工作空间下用于存放草稿暂存文件的默认子目录。 */
     public static final String DEFAULT_DRAFTS_DIR = "skills/_drafts";
 
     /** Default subdirectory under workspace for promoted skills. */
+    /** 工作空间下存放已发布正式技能的默认子目录。 */
     public static final String DEFAULT_MAIN_DIR = "skills";
 
     private final boolean autoPromote;
@@ -47,21 +59,25 @@ public final class SkillManageConfig {
     }
 
     /** Skip the draft staging path and write directly to the live skills root. */
+    /** 跳过草稿暂存目录，直接写入正式技能根目录。 */
     public boolean autoPromote() {
         return autoPromote;
     }
 
     /** Run {@code SkillSecurityScanner} after every write. */
+    /** 每次写入操作后执行 {@code SkillSecurityScanner} 安全扫描。 */
     public boolean securityScan() {
         return securityScan;
     }
 
     /** Workspace-relative directory where drafts land. */
+    /** 草稿文件存放目录，路径相对于工作空间。 */
     public String draftsDir() {
         return draftsDir;
     }
 
     /** Workspace-relative directory where promoted skills live. */
+    /** 已上线正式技能所在目录，路径相对于工作空间。 */
     public String mainDir() {
         return mainDir;
     }

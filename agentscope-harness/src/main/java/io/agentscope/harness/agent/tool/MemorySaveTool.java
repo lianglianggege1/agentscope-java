@@ -37,6 +37,17 @@ import java.time.format.DateTimeFormatter;
  * <p>Writes are append-only; deduplication and size-trimming are handled by the
  * periodic {@link io.agentscope.harness.agent.memory.MemoryConsolidator}.
  */
+/**
+ * 专用工具，用于将用户记忆持久写入 {@code MEMORY.md} 与当日日志文件
+ *（{@code memory/YYYY-MM-DD.md}）。
+ *
+ * <p>这是智能体写入长期记忆**唯一受官方认可**入口。系统提示词引导大模型使用本工具，
+ * 而非直接通过 {@code write_file}/{@code edit_file} 修改记忆相关文件路径，
+ * 避免大模型随意命名文件或遗漏每日日志，消除行为不确定性。
+ *
+ * <p>写入采用追加模式；去重与容量裁剪由定时任务
+ * {@link io.agentscope.harness.agent.memory.MemoryConsolidator} 统一处理。
+ */
 public class MemorySaveTool {
 
     private final WorkspaceManager workspaceManager;
@@ -45,6 +56,23 @@ public class MemorySaveTool {
         this.workspaceManager = workspaceManager;
     }
 
+    /*
+    @Tool(
+            name = "memory_save",
+            description =
+                    "将一条或多条信息持久存入长期记忆。当用户要求你记住内容，或是你捕捉到重要偏好、"
+                        + "决策、跨会话需留存的上下文时使用。禁止使用 write_file 或 edit_file 修改 MEMORY.md，"
+                        + "务必调用本工具。")
+    public String memorySave(
+            RuntimeContext runtimeContext,
+            @ToolParam(
+                            name = "content",
+                            description =
+                                    "待记忆信息，采用Markdown无序列表格式。每条条目应当简洁、语义完整。示例：\\n"
+                                            + "- 用户偏好深色模式\\n"
+                                            + "- 项目截止日期为2026-07-01")
+                    String content) {}
+     */
     @Tool(
             name = "memory_save",
             description =

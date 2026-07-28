@@ -25,6 +25,10 @@ import java.util.HexFormat;
  * parts using SHA-256, guaranteeing the same inputs always yield the same output regardless of
  * JVM instance or machine.
  */
+/**
+ * 确定性会话ID生成逻辑。基于任意输入片段通过SHA-256生成12位十六进制字符串，
+ * 保证相同输入无论在哪个JVM实例或机器上运行，输出结果始终一致。
+ */
 public final class SessionIdUtils {
 
     private SessionIdUtils() {}
@@ -38,6 +42,16 @@ public final class SessionIdUtils {
      *
      * @param parts one or more non-null seed values
      * @return 12-char hex string
+     */
+    /**
+     * 将传入的多个片段以 {@code "/"} 拼接后，生成12位小写十六进制哈希字符串并返回。
+     *
+     * <p>该哈希具备确定性：相同输入在任意机器上都会得到一致结果。
+     * 输出内容仅包含小写十六进制字符，可安全用作文件名。
+     * 在常规会话数量场景下，哈希冲突概率极低（取值空间为 2^48）。
+     *
+     * @param parts 一个或多个非空种子参数
+     * @return 12位十六进制字符串
      */
     public static String deterministicHash(String... parts) {
         String seed = String.join("/", parts);

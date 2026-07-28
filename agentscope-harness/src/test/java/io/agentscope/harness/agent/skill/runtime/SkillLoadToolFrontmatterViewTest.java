@@ -35,6 +35,10 @@ import org.junit.jupiter.api.Test;
  * full markdown document (YAML frontmatter + body) rather than the body-only view, so the LLM's
  * read matches what {@code skill_manage(action=patch)} operates on.
  */
+/**
+ * 验证 #7-B 变更：{@code load_skill_through_path(path="SKILL.md")} 现返回完整 Markdown 文档
+ *（包含YAML前置元数据与正文），不再仅返回正文，确保大模型读取内容与 {@code skill_manage(action=patch)} 的操作对象保持一致。
+ */
 @SuppressWarnings("deprecation")
 class SkillLoadToolFrontmatterViewTest {
 

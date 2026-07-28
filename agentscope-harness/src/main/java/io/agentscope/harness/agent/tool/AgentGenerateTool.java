@@ -39,6 +39,18 @@ import reactor.core.publisher.Mono;
  * <p>Not registered by {@link io.agentscope.harness.agent.middleware.SubagentsMiddleware} by
  * default; callers must opt in via {@code SubagentsMiddleware#enableAgentGenerateTool(...)}.
  */
+/**
+ * 可供智能体调用的工具，依据自然语言描述生成子智能体配置文档。
+ * 可将配置持久化保存至 {@code subagents/<name>.md}，
+ * 下一轮推理时 {@link io.agentscope.harness.agent.middleware.DynamicSubagentsMiddleware} 会自动加载；
+ * 也可直接返回Markdown文本供人工审核。
+ *
+ * <p>内部封装 {@link SubagentSpecGenerator}，负责名称合法性校验、
+ * 与运行态 {@link DefaultAgentManager} 注册表进行重名冲突检测，同时支持试运行模式。
+ *
+ * <p>默认情况下不会由 {@link io.agentscope.harness.agent.middleware.SubagentsMiddleware} 注册；
+ * 需要使用者主动调用 {@code SubagentsMiddleware#enableAgentGenerateTool(...)} 开启该工具。
+ */
 public class AgentGenerateTool {
 
     private static final Logger log = LoggerFactory.getLogger(AgentGenerateTool.class);
@@ -59,6 +71,34 @@ public class AgentGenerateTool {
         this.filesystem = filesystem;
     }
 
+    /*
+    @Tool(
+            name = "agent_generate",
+            description =
+                    "基于自然语言描述生成全新子智能体配置。"
+                        + "按照子智能体声明规范校验大模型输出内容，并写入 subagents/<name>.md，"
+                        + "下一轮推理时 DynamicSubagentsMiddleware 将自动加载该配置。"
+                        + "设置 dry_run=true 可预览生成的 Markdown，不执行持久化写入。")
+    public Mono<String> agentGenerate(
+            RuntimeContext runtimeContext,
+            @ToolParam(
+                            name = "name",
+                            description =
+                                    "短横线命名格式的子智能体标识（例如 code-reviewer），"
+                                            + "不可与已有智能体重名。")
+                    String name,
+            @ToolParam(
+                            name = "description",
+                            description =
+                                    "子智能体职责说明：包含目标、预期输出以及适用场景。")
+                    String description,
+            @ToolParam(
+                            name = "dry_run",
+                            description =
+                                    "设为 true 时仅返回生成的 Markdown 文本，不持久化保存（默认 false）。",
+                            required = false)
+                    Boolean dryRun) {}
+     */
     @Tool(
             name = "agent_generate",
             description =

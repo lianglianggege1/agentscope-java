@@ -35,6 +35,13 @@ import reactor.core.publisher.Mono;
  * should supply a prompter that bridges to whatever HITL surface is available — typically
  * via {@code RequestStopEvent} so the agent's outer loop can pause for the prompt.
  */
+/**
+ * 单副本人工介入网关。调用用户提供的提示函数，由人工输入（终端、命令行、IDE弹窗等）返回同意/拒绝结果。
+ * 若提示操作超时，则本次判定暂不处理。
+ *
+ * <p>默认构造函数内置空实现提示器，行为始终为暂不处理。正式部署时需传入对接人工交互界面的提示器，
+ * 通常借助 {@code RequestStopEvent}，让代理外层循环暂停以等待人工确认。
+ */
 public class LocalApprovalGate implements SkillPromotionGate {
 
     private static final Logger log = LoggerFactory.getLogger(LocalApprovalGate.class);

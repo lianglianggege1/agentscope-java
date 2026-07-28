@@ -24,9 +24,13 @@ import io.agentscope.harness.agent.filesystem.sandbox.AbstractSandboxFilesystem;
 /**
  * Shell execution tool backed by a {@link AbstractSandboxFilesystem}.
  */
+/**
+ * 由 {@link AbstractSandboxFilesystem} 提供底层支持的 Shell 执行工具。
+ */
 public class ShellExecuteTool {
 
     /** Registered tool name (derived from the {@link #execute} method name). */
+    /** 注册工具名称（由 {@link #execute} 方法名推导得出）。 */
     public static final String NAME = "execute";
 
     private final AbstractSandboxFilesystem sandbox;
@@ -35,9 +39,29 @@ public class ShellExecuteTool {
         this.sandbox = sandbox;
     }
 
+    /*
+    @Tool(
+            description =
+                    "执行Shell命令。适用于git、npm、构建、测试及其他终端操作。"
+                            + "返回合并输出内容与退出码。")
+    public String execute(
+            RuntimeContext runtimeContext,
+            @ToolParam(name = "command", description = "待执行的Shell命令") String command,
+            @ToolParam(
+                            name = "working_directory",
+                            description =
+                                    "工作目录（相对于工作空间根路径，可选参数）")
+                    String workingDirectory,
+            @ToolParam(name = "timeout", description = "超时时间，单位秒（默认：30）")
+                    int timeout) {}
+     */
     /**
      * @param runtimeContext per-call agent runtime injected by the framework (not an LLM argument);
      *     may be {@code null} when no merged context is available
+     */
+    /**
+     * @param runtimeContext 框架注入的单次调用智能体运行时上下文（不属于大模型入参）；
+     *     无合并上下文时可为 {@code null}
      */
     @Tool(
             description =

@@ -36,6 +36,20 @@ import java.util.Map;
  * kept; {@code deny} always wins regardless of {@code allow}. Empty/absent values mean "no
  * filtering on this side".
  */
+/**
+ * 从 {@code workspace/tools.json} 加载的工作空间级工具配置。
+ *
+ * <p>承担两项职责：
+ *
+ * <ul>
+ *   <li>{@link #allow} / {@link #deny} — 过滤框架内置工具集合。
+ *   <li>{@link #mcpServers} — 声明由外部MCP服务端提供的扩展工具。
+ * </ul>
+ *
+ * <p>过滤规则：若 {@code allow} 非空，仅保留名称在白名单内的工具；
+ * {@code deny} 黑名单优先级高于白名单，始终生效。
+ * 字段为空或未配置代表“不执行该维度过滤”。
+ */
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ToolsConfig {

@@ -31,8 +31,14 @@ import org.junit.jupiter.api.Test;
  * when any match found) and original-string offset recovery (the patch must apply to the
  * original bytes, not the normalised view).
  */
+/**
+ * 针对 {@code SkillManageTool#patch} 使用的模糊匹配梯度策略进行行为覆盖测试。
+ * 每组用例验证梯度中的某一级匹配规则，同时覆盖跨级短路逻辑（命中匹配时优先采用更严格规则）
+ * 以及原始文本偏移还原机制（补丁必须作用于原始字节，而非规范化后的文本视图）。
+ */
 class FuzzyTextMatcherTest {
 
+    // 空值 / 空检索串输入时直接返回空结果，不会引发异常崩溃。
     @Test
     @DisplayName("Empty/null needles return an empty result without crashing")
     void emptyNeedle() {
@@ -41,6 +47,7 @@ class FuzzyTextMatcherTest {
         assertTrue(FuzzyTextMatcher.search(null, "x").isEmpty());
     }
 
+    // 精确匹配返回EXACT等级，附带字节级精准偏移量。
     @Test
     @DisplayName("Exact match returns EXACT level with byte-precise offsets")
     void exactMatch() {
@@ -54,6 +61,7 @@ class FuzzyTextMatcherTest {
         assertEquals("beta", existing.substring(m.start(), m.end()));
     }
 
+    // 精确匹配将返回精确匹配等级，并附带字节级精准偏移量。
     @Test
     @DisplayName("Exact match finds all occurrences in order")
     void exactMultiple() {
@@ -66,6 +74,7 @@ class FuzzyTextMatcherTest {
         assertEquals(16, r.matches().get(2).start());
     }
 
+    // 检索目标缺少末尾空格时，启用末尾空白梯度匹配。
     @Test
     @DisplayName("Trailing-whitespace ladder matches when needle missed trailing spaces")
     void trailingWhitespaceStripped() {
@@ -83,6 +92,7 @@ class FuzzyTextMatcherTest {
         assertTrue(existing.substring(m.start(), m.end()).contains("line three"));
     }
 
+    // 空白压缩梯度匹配可识别缩进偏移问题。
     @Test
     @DisplayName("Whitespace-collapsed ladder catches indentation drift")
     void whitespaceCollapsed() {
@@ -102,6 +112,7 @@ class FuzzyTextMatcherTest {
         assertTrue(existing.substring(m.start(), m.end()).contains("return 2"));
     }
 
+    // 即便宽松等级也能匹配，仍优先采用严格等级。
     @Test
     @DisplayName("Strict level wins even if looser levels would also match")
     void strictWins() {
@@ -124,6 +135,7 @@ class FuzzyTextMatcherTest {
         assertTrue(r.isEmpty());
     }
 
+    // 区间映射正确性——在原始子串内执行替换将生成预期补丁。
     @Test
     @DisplayName(
             "Range mapping correctness — replacing in original substring yields expected patch")

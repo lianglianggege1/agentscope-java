@@ -63,6 +63,21 @@ import org.yaml.snakeyaml.Yaml;
  * {@code .archive/<name>-<ts>/} rather than removed, matching the curator's never-delete
  * invariant.
  */
+/**
+ * 基于 {@link AbstractFilesystem} 实现的 {@link AgentSkillRepository}，通过 {@link LazyResourceCapable}
+ * 提供惰性资源访问能力。本类替代旧版组合 {@code FilesystemBackedSkillRepository} + {@code WritableFilesystemSkillRepository}：
+ * 可写属性调整为构造入参，不再通过子类区分。
+ *
+ * <p>通过在 {@code skillsRelativeDir} 下通配查找 {@code SKILL.md} 来发现技能。注册阶段仅读取 SKILL.md 文本；
+ * 引用文档、脚本、静态资源等内容按需经由 {@link #resourcesFor(String, RuntimeContext)} 获取。
+ * 当 {@code load_skill_through_path} 在内存映射表查询缺失时，由技能运行时框架读取这些资源。
+ *
+ * <p>所有文件操作均携带当前 {@link RuntimeContext}，透明支持按用户隔离命名空间与沙箱路由。
+ * 保留旧实现中的供给器模式，确保每次调用都能感知调用方已合并的上下文。
+ *
+ * <p>删除操作非破坏性：技能目录会迁移至 {@code .archive/<name>-<ts>/} 归档目录而非直接删除，
+ * 遵循管理器“永不彻底销毁数据”的约束规范。
+ */
 @SuppressWarnings("deprecation")
 public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResourceCapable {
 
@@ -86,6 +101,13 @@ public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResou
      * @param skillsRelativeDir relative directory holding {@code <skill>/SKILL.md} (non-null)
      * @param contextSupplier   supplies the {@link RuntimeContext} on each call (non-null)
      */
+    /**
+     * 创建只读仓库实例。
+     *
+     * @param filesystem        底层文件系统（不可为null）
+     * @param skillsRelativeDir 存放 {@code <skill>/SKILL.md} 的相对目录（不可为null）
+     * @param contextSupplier   每次调用时提供 {@link RuntimeContext} 的供给器（不可为null）
+     */
     public WorkspaceSkillRepository(
             AbstractFilesystem filesystem,
             String skillsRelativeDir,
@@ -96,6 +118,9 @@ public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResou
     /**
      * Creates a writable repository (matches the legacy
      * {@code WritableFilesystemSkillRepository} default).
+     */
+    /**
+     * 创建可写仓库实例（兼容旧版 {@code WritableFilesystemSkillRepository} 默认行为）。
      */
     public WorkspaceSkillRepository(
             AbstractFilesystem filesystem,
@@ -114,6 +139,15 @@ public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResou
      * @param source            source identifier attached to loaded skills; falls back to
      *                          {@code "workspace"} when null or blank
      * @param writable          whether {@link #save} and {@link #delete} are permitted
+     */
+    /**
+     * 创建仓库实例，显式指定数据源与可写属性。
+     *
+     * @param filesystem        底层文件系统（不可为 null）
+     * @param skillsRelativeDir 存放 {@code <skill>/SKILL.md} 的相对目录（不可为 null）
+     * @param contextSupplier   每次调用提供 {@link RuntimeContext}（不可为 null）
+     * @param source            挂载到已加载技能上的来源标识；为 null 或空白时默认使用 {@code "workspace"}
+     * @param writable          是否允许调用 {@link #save} 和 {@link #delete}
      */
     public WorkspaceSkillRepository(
             AbstractFilesystem filesystem,
@@ -308,6 +342,10 @@ public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResou
      * Reads a single raw file under {@code <skillsRelativeDir>/<skillName>/<relPath>}.
      * Returns {@code null} when the file does not exist or read fails.
      */
+    /**
+     * 读取 {@code <skillsRelativeDir>/<skillName>/<relPath>} 路径下的原始文件。
+     * 文件不存在或读取失败时返回 {@code null}。
+     */
     public String readSkillFile(String skillName, String relPath) {
         if (skillName == null || skillName.isBlank() || relPath == null || relPath.isBlank()) {
             return null;
@@ -328,6 +366,10 @@ public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResou
      * Writes (or overwrites) a single raw file under {@code <skillsRelativeDir>/<skillName>/<relPath>}.
      * Caller is responsible for validating {@code relPath} (allowed subdirs, path traversal,
      * size limits). Returns {@code true} on success.
+     */
+    /**
+     * 写入（或覆盖）位于 {@code <skillsRelativeDir>/<skillName>/<relPath>} 的原始文件。
+     * 调用方负责校验 {@code relPath}（允许的子目录、路径穿越防护、大小限制）。写入成功返回 {@code true}。
      */
     public boolean writeSkillFile(String skillName, String relPath, String content) {
         if (!writable) {
@@ -497,6 +539,17 @@ public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResou
      * and namespaced paths alike, because it matches a substring rather than relying on the
      * path being relative to the search root.
      */
+    /**
+     * 当路径指向位于元数据子目录内的技能时返回 {@code true}；
+     * 元数据子目录示例：根目录下直接存在的 {@code _drafts/}、{@code .archive/}、{@code .audit/}、{@code .backups/}。
+     * 匹配规则：路径包含 {@code "/<base>/<x>/"}，其中 {@code <x>} 以 {@code _} 或 {@code .} 开头。
+     *
+     * <p>特殊处理 {@code base == "."} 与 {@code base == ""}：此种场景下校验路径首段是否以 {@code _} 或 {@code .} 开头，
+     * 保证工作区根目录扫描时仍能过滤 {@code .skills-cache/} 这类元数据目录树。
+     *
+     * <p>与底层存储无关：可作用于绝对路径（本地文件系统默认）、虚拟路径、带命名空间路径；
+     * 依靠子串匹配实现，不要求路径必须是相对于检索根目录的相对路径。
+     */
     static boolean hasMetadataAncestor(String path, String base) {
         if (path == null || base == null) {
             return false;
@@ -639,6 +692,10 @@ public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResou
          * Strips {@code skillDir} prefix from {@code path}, handling absolute / virtual /
          * namespaced stores uniformly by matching the last occurrence of the directory
          * marker.
+         */
+        /**
+         * 从路径 {@code path} 中剔除 {@code skillDir} 前缀。
+         * 通过匹配最后一处目录分隔标记，统一兼容绝对路径、虚拟路径以及带命名空间的存储路径。
          */
         private static String relativeTo(String path, String skillDir) {
             String normPath = path.replace('\\', '/');

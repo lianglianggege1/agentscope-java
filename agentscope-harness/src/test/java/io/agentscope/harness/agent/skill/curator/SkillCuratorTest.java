@@ -60,6 +60,7 @@ class SkillCuratorTest {
     }
 
     /** Plant a skill record + a real SKILL.md so {@code mainRepo.delete} can move it. */
+    /** 植入技能记录以及真实的 SKILL.md 文件，使 {@code mainRepo.delete} 能够完成迁移操作。 */
     private void plantAgent(String name, Instant lastUsedAt) {
         var skill =
                 new io.agentscope.core.skill.AgentSkill(name, "desc " + name, "# " + name, null);

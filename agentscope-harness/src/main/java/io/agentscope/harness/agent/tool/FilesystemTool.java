@@ -58,6 +58,17 @@ public class FilesystemTool {
         return pathNormalizer != null ? pathNormalizer.normalize(path) : path;
     }
 
+    /*
+    @Tool(
+    name = "read_file",
+    readOnly = true,
+    description = "读取带行号的文件内容，支持 offset、limit 分页。")
+    public String readFile(
+            RuntimeContext runtimeContext,
+            @ToolParam(name = "path", description = "待读取文件路径") String path,
+            @ToolParam(name = "offset", description = "起始行（0索引），默认0") int offset,
+            @ToolParam(name = "limit", description = "最大返回行数，默认0表示读取全部") int limit) {}
+     */
     @Tool(
             name = "read_file",
             readOnly = true,
@@ -80,6 +91,15 @@ public class FilesystemTool {
         return r.fileData() != null ? r.fileData().content() : "";
     }
 
+    /*
+    @Tool(
+            name = "write_file",
+            description = "向新文件写入内容，必要时自动创建上级目录。")
+    public String writeFile(
+            RuntimeContext runtimeContext,
+            @ToolParam(name = "path", description = "目标文件路径") String path,
+            @ToolParam(name = "content", description = "待写入的文件内容") String content) {}
+     */
     @Tool(
             name = "write_file",
             description = "Write content to a new file, creating parent directories if needed.")
@@ -91,6 +111,22 @@ public class FilesystemTool {
         return r.isSuccess() ? "Written to " + r.path() : "Error: " + r.error();
     }
 
+    /*
+    @Tool(
+            name = "edit_file",
+            description =
+                    "在文件内执行精确字符串替换。除非开启 replace_all，否则待查找文本必须唯一。")
+    public String editFile(
+            RuntimeContext runtimeContext,
+            @ToolParam(name = "path", description = "待编辑文件路径") String path,
+            @ToolParam(name = "old_string", description = "待查找文本") String oldString,
+            @ToolParam(name = "new_string", description = "替换文本") String newString,
+            @ToolParam(
+                            name = "replace_all",
+                            description = "替换全部匹配项（默认 false）",
+                            required = false)
+                    Boolean replaceAll) {}
+     */
     @Tool(
             name = "edit_file",
             description =
@@ -115,6 +151,19 @@ public class FilesystemTool {
                 : "Error: " + r.error();
     }
 
+    /*
+    @Tool(
+            name = "grep_files",
+            readOnly = true,
+            description = "按纯文本内容检索文件。")
+    public String grepFiles(
+            RuntimeContext runtimeContext,
+            @ToolParam(name = "pattern", description = "需要检索的纯文本")
+                    String pattern,
+            @ToolParam(name = "path", description = "待检索目录或文件路径") String path,
+            @ToolParam(name = "glob", description = "可选文件通配符过滤（例如 *.java）")
+                    String glob) {}
+     */
     @Tool(
             name = "grep_files",
             readOnly = true,
@@ -139,6 +188,14 @@ public class FilesystemTool {
                 .collect(Collectors.joining("\n"));
     }
 
+    /*
+    @Tool(name = "glob_files", readOnly = true, description = "查找匹配通配符规则的文件。")
+    public String globFiles(
+            RuntimeContext runtimeContext,
+            @ToolParam(name = "pattern", description = "通配符表达式（例如 **.java）")
+        String pattern,
+        @ToolParam(name = "path", description = "检索起始根目录") String path) {}
+     */
     @Tool(name = "glob_files", readOnly = true, description = "Find files matching a glob pattern.")
     public String globFiles(
             RuntimeContext runtimeContext,
@@ -158,6 +215,15 @@ public class FilesystemTool {
                 .collect(Collectors.joining("\n"));
     }
 
+    /*
+    @Tool(
+            name = "list_files",
+            readOnly = true,
+            description = "列出指定路径下的文件与目录。")
+    public String listFiles(
+            RuntimeContext runtimeContext,
+            @ToolParam(name = "path", description = "待浏览目录路径") String path) {}
+     */
     @Tool(
             name = "list_files",
             readOnly = true,

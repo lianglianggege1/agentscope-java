@@ -91,6 +91,7 @@ class SkillPromoterTest {
         assertEquals(PromotionResult.Status.DEFERRED, result.status());
     }
 
+    // 审批闸门策略：审批通过后将草稿技能迁移至正式目录，并打上边车标记
     @Test
     void approveGate_movesDraftToMain_andStampsSidecar() {
         var draft =
@@ -162,6 +163,7 @@ class SkillPromoterTest {
         assertEquals(SkillUsageRecord.State.DRAFT, store.get("rej").orElseThrow().state());
     }
 
+    // 高危扫描结果拦截转正操作
     @Test
     void dangerousScan_blocksPromote() {
         // Plant a draft with a destructive script — scanner must catch it before the gate.

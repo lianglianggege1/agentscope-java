@@ -30,6 +30,14 @@ import org.slf4j.LoggerFactory;
  * <p>After this tool returns, the next reasoning step's {@code InboxMiddleware} will drain the
  * inbox and inject the results into context.
  */
+/**
+ * 阻塞工具，持续等待会话收件箱接收异步结果或达到超时阈值。
+ * 允许大模型在单次 {@code call()} 调用内等待后台任务返回结果，
+ * 无需先退出调用、依靠唤醒机制重新轮询。
+ *
+ * <p>该工具返回后，下一轮推理的 {@code InboxMiddleware} 将消费收件箱消息，
+ * 并将结果注入运行时上下文。
+ */
 public class WaitAsyncResultsTool {
 
     private static final Logger log = LoggerFactory.getLogger(WaitAsyncResultsTool.class);
@@ -42,6 +50,22 @@ public class WaitAsyncResultsTool {
         this.messageBus = messageBus;
     }
 
+    /*
+    @Tool(
+            name = "wait_async_results",
+            description =
+                    "等待后台异步工具或子智能体执行结果返回。"
+                            + "当你发起异步任务且需要等待任务完成，而非直接回复用户时调用。"
+                            + "该工具成功返回后可继续推理，执行结果会自动注入上下文。",
+            readOnly = true)
+    public String waitForResults(
+            @ToolParam(
+                            name = "timeout_seconds",
+                            description = "最长等待秒数，默认60。")
+                    Integer timeoutSeconds,
+            RuntimeContext runtimeContext)
+            throws InterruptedException {}
+     */
     @Tool(
             name = "wait_async_results",
             description =

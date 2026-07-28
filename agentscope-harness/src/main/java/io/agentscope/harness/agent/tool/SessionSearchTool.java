@@ -39,6 +39,14 @@ import org.slf4j.LoggerFactory;
  * (e.g. {@link io.agentscope.harness.agent.memory.MemoryFlushManager}), keeping this tool
  * lightweight and fast for in-process search.
  */
+/**
+ * 用于检索历史会话记录、查看会话日志的工具。
+ *
+ * <p>仅基于本地会话缓存执行检索。远程同步逻辑由写入链路中的
+ * {@link io.agentscope.harness.agent.memory.session.SessionTree#load()}
+ *（例如 {@link io.agentscope.harness.agent.memory.MemoryFlushManager}）负责处理，
+ * 保证本工具检索轻量化、进程内查询响应迅速。
+ */
 public class SessionSearchTool {
 
     private static final Logger log = LoggerFactory.getLogger(SessionSearchTool.class);
@@ -49,6 +57,27 @@ public class SessionSearchTool {
         this.workspaceManager = workspaceManager;
     }
 
+    /*
+    @Tool(
+            name = "session_search",
+            readOnly = true,
+            description =
+                    "在历史会话记录中检索关键词或语句，返回附带会话上下文的匹配条目。")
+    public String sessionSearch(
+            RuntimeContext runtimeContext,
+            @ToolParam(name = "query", description = "检索条件（关键词或短语）")
+                    String query,
+            @ToolParam(
+                            name = "agentId",
+                            description = "待检索会话所属智能体ID",
+                            required = false)
+                    String agentId,
+            @ToolParam(
+                            name = "maxResults",
+                            description = "最大返回结果数量（默认：10）",
+                            required = false)
+                    Integer maxResults) {}
+     */
     @Tool(
             name = "session_search",
             readOnly = true,
@@ -100,6 +129,16 @@ public class SessionSearchTool {
         return sb.toString();
     }
 
+    /*
+    @Tool(
+            name = "session_list",
+            readOnly = true,
+            description = "列出指定智能体可用会话，展示会话ID与元信息。")
+    public String sessionList(
+            RuntimeContext runtimeContext,
+            @ToolParam(name = "agentId", description = "待列举会话的智能体ID")
+                    String agentId) {}
+     */
     @Tool(
             name = "session_list",
             readOnly = true,
@@ -162,6 +201,22 @@ public class SessionSearchTool {
         return sb.toString();
     }
 
+    /*
+    @Tool(
+            name = "session_history",
+            readOnly = true,
+            description =
+                    "获取指定会话的对话历史，返回该会话内所有消息。")
+    public String sessionHistory(
+            RuntimeContext runtimeContext,
+            @ToolParam(name = "agentId", description = "智能体ID") String agentId,
+            @ToolParam(name = "sessionId", description = "AgentStateStore 会话标识") String sessionId,
+            @ToolParam(
+                            name = "lastN",
+                            description = "需要返回的最近消息条数（默认：20）",
+                            required = false)
+                    Integer lastN) {}
+     */
     @Tool(
             name = "session_history",
             readOnly = true,
@@ -225,6 +280,11 @@ public class SessionSearchTool {
      * Collects all {@code .log.jsonl} files under the sessions directory for the given agent
      * (or all agents when {@code agentId} is {@code null}).
      * Only scans the local disk; remote-only sessions are handled via sessionList / sessionHistory.
+     */
+    /**
+     * 收集指定智能体会话目录下所有 {@code .log.jsonl} 文件
+     * 若 {@code agentId} 为 null，则收集全部智能体的相关文件。
+     * 仅扫描本地磁盘；仅存在远端的会话需通过 sessionList / sessionHistory 接口处理。
      */
     private List<Path> listLogFiles(RuntimeContext rc, String agentId) {
         List<Path> files = new ArrayList<>();

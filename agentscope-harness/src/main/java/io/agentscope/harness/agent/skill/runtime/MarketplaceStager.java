@@ -59,6 +59,23 @@ import org.slf4j.LoggerFactory;
  * sandbox-backed filesystem) and projection covers them through the regular {@code skills}
  * root.
  */
+/**
+ * 将非工作区技能资源（一层/二层/市场来源）落地至
+ * {@code <wsRoot>/.skills-cache/<source-ns>/<skill-name>/}，以实现以下目标：
+ *
+ * <ul>
+ *   <li>Shell 模式运行框架代理（沙箱或本地带Shell环境）可通过绝对路径执行已暂存脚本
+ *   <li>沙箱映射机制（已将 {@code .skills-cache} 纳入 {@code DEFAULT_WORKSPACE_PROJECTION_ROOTS}）
+ *       在启动时把暂存内容加载进沙箱
+ * </ul>
+ *
+ * <p>暂存器不维护跨调用状态：每次执行都会重新生成 {@code .skills-cache} 目录保留白名单，
+ * 重新落地SHA-256哈希发生变更的文件，并删除白名单以外的孤立目录。
+ *
+ * <p>工作区原生技能（由 {@link WorkspaceSkillRepository} 提供）不执行暂存：
+ * 这类技能本身存放于 {@code <wsRoot>/skills/}（或由沙箱文件系统延迟生成），
+ * 通过标准 {@code skills} 根目录纳入沙箱映射。
+ */
 @SuppressWarnings("deprecation")
 public final class MarketplaceStager {
 
@@ -90,6 +107,18 @@ public final class MarketplaceStager {
      *                      (handles repos with colliding {@code getSource()} via {@code _idx}
      *                      suffix)
      * @return ordered map (insertion-order preserved) keyed by {@code skill.name}
+     */
+    /**
+     * 暂存所有符合条件的输入技能，并返回 {@code skill.name} 映射至解析后 {@link StageResult} 的结果集。
+     * 若输入技能所属仓库为 {@link WorkspaceSkillRepository}，将返回 {@link StageResult.WorkspaceNative}
+     * ——此类技能无需暂存，工作区目录树已包含对应资源。
+     *
+     * <p>每次调用都会重新构建暂存目录白名单；位于 {@code .skills-cache/<source-ns>/} 下、
+     * 不在白名单内的已有目录将被清理（轻量孤立回收：市场仓库下架技能后不会残留文件）。
+     *
+     * @param visible       按组合顺序排列的【技能+仓库】配对（上游已按技能名称去重，保留优先级最高项）
+     * @param sourceNs      仓库标识映射至解析后的源命名空间（通过 {@code _idx} 后缀区分 {@code getSource()} 冲突的仓库）
+     * @return 有序映射（保留插入顺序），键为 {@code skill.name}
      */
     public Map<String, StageResult> stage(
             List<RepoBound> visible, Map<AgentSkillRepository, String> sourceNs) {
@@ -248,12 +277,15 @@ public final class MarketplaceStager {
     }
 
     /** Known interpreter / script suffixes. Conservative — we only mark "obvious" scripts. */
+    /** 已知解释器/脚本后缀。策略保守——仅标记“显而易见”的脚本文件。 */
     private static final Set<String> SCRIPT_SUFFIXES =
             Set.of(".sh", ".bash", ".zsh", ".ksh", ".py", ".rb", ".pl", ".js", ".mjs");
 
     /** Package-private for direct heuristic testing without spinning up {@link #stage}. */
+    /** 包私有访问权限，便于无需启动 {@link #stage} 即可直接测试该启发式逻辑。 */
     static boolean shouldBeExecutable(Path target, byte[] bytes) {
         // 1. Shebang detection — strongest signal regardless of filename.
+        // 1. Shebang 检测——优先级最高，不受文件名影响。
         if (bytes != null && bytes.length >= 2 && bytes[0] == '#' && bytes[1] == '!') {
             return true;
         }
@@ -368,6 +400,11 @@ public final class MarketplaceStager {
      * {@code getSource()}, the second and subsequent ones receive an {@code _<idx>} suffix
      * (with a warning log). Layer-1 host repositories whose source string is empty get
      * {@link #GLOBAL_NAMESPACE}.
+     */
+    /**
+     * 解析各仓库对应的 {@code source} 命名空间。当多个仓库返回相同 {@code getSource()} 值时，
+     * 第二个及后续仓库名称追加 {@code _<idx>} 后缀（同时输出警告日志）。
+     * 源字符串为空的一层宿主仓库，统一分配 {@link #GLOBAL_NAMESPACE}。
      */
     public static Map<AgentSkillRepository, String> resolveSourceNamespaces(
             List<AgentSkillRepository> repos) {

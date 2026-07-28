@@ -37,15 +37,35 @@ import reactor.core.publisher.Mono;
  * @see SkillCandidate
  * @see PromotionDecision
  */
+/**
+ * 判定草稿技能是否允许晋升至正式技能目录。
+ *
+ * <p>实现类列表：
+ * <ul>
+ *   <li>{@code RejectAllGate} — 全部暂缓处理；仅可通过程序调用
+ *       {@code HarnessAgent.promoteSkill(...)} 推进草稿（企业版默认策略）</li>
+ *   <li>{@code LocalApprovalGate} — 单副本人工介入网关，依托宿主机 Shell / 命令行交互确认</li>
+ *   <li>{@code NotifyAndWaitGate} — 支持多副本：在草稿同级目录生成 {@code .review_request.json}
+ *       文件，并推送通知至一个或多个 {@code NotificationSink}；等待外部系统再次调用 {@code promoteSkill} 完成晋升</li>
+ * </ul>
+ *
+ * @see SkillCandidate
+ * @see PromotionDecision
+ */
 public interface SkillPromotionGate {
 
     /**
      * Review a draft. Implementations should perform whatever side effects they need
      * (notification, prompt, etc.) and return a {@link PromotionDecision}.
      */
+    /**
+     * 审核一份草稿技能。实现类可执行所需的各类副作用操作（发送通知、唤起交互弹窗等），
+     * 并返回 {@link PromotionDecision} 晋升决策结果。
+     */
     Mono<PromotionDecision> review(SkillCandidate candidate, RuntimeContext ctx);
 
     /** Final outcome of a gate review. */
+    /** 网关审核的最终结果。 */
     sealed interface PromotionDecision
             permits PromotionDecision.Approve, PromotionDecision.Reject, PromotionDecision.Defer {
 

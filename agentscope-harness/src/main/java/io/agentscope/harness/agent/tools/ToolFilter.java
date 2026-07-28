@@ -39,6 +39,21 @@ import org.slf4j.LoggerFactory;
  * <p>Names that don't correspond to a currently registered tool are logged at WARN and otherwise
  * ignored — typos in the workspace file should not abort the agent.
  */
+/**
+ * 根据 {@code workspace/tools.json} 中的 {@link ToolsConfig#getAllow() allow} 白名单、
+ * {@link ToolsConfig#getDeny() deny} 黑名单，对 {@link Toolkit} 内已注册工具进行过滤。
+ *
+ * <p>生效规则：
+ *
+ * <ul>
+ *   <li>若 {@code allow} 非空，仅保留名称存在于白名单内的工具。
+ *   <li>黑名单 {@code deny} 内的工具始终被移除，不受白名单影响。
+ *   <li>白名单、黑名单均为空/未配置时，工具集保持原样。
+ * </ul>
+ *
+ * <p>配置中出现不存在的工具名称会输出警告日志并直接忽略，
+ * 工作空间配置文件的拼写错误不会造成智能体启动中断。
+ */
 public final class ToolFilter {
 
     private static final Logger log = LoggerFactory.getLogger(ToolFilter.class);

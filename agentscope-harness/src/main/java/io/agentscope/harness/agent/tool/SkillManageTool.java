@@ -57,6 +57,27 @@ import reactor.core.publisher.Mono;
  * remove_file}/{@code delete} resolve the skill by name across both draft and main directories
  * (drafts win on collision). Set {@code autoPromote=true} to write straight to {@code skills/}.
  */
+/**
+ * 可供智能体调用的工具，允许 {@code ReActAgent} 在工作空间内创建、编辑、局部修改与归档技能。
+ * 移植自 hermes-agent 的 {@code skill_manage} 工具接口，保证现有技能编写提示词具备可移植性。
+ *
+ * <p>依据 {@code action} 参数分发六种操作：
+ * <ul>
+ *   <li>{@code create} — 创建全新 {@code SKILL.md}（必须包含前置元数据）</li>
+ *   <li>{@code edit} — 完整重写已有技能的 {@code SKILL.md}</li>
+ *   <li>{@code patch} — 在 {@code SKILL.md} 或附属文件内执行定向查找替换</li>
+ *   <li>{@code write_file} — 在 {@code references/}、{@code templates/}、{@code scripts/}、{@code assets/}
+ *       目录下新增/覆盖单个文件</li>
+ *   <li>{@code remove_file} — 删除单个附属文件</li>
+ *   <li>{@code delete} — 归档整个技能目录（非破坏性删除）</li>
+ * </ul>
+ *
+ * <p><b>暂存机制</b>：默认配置（{@link SkillManageConfig#autoPromote()} = false）下，
+ * {@code create} 将写入 {@code skills/_drafts/<name>/}；
+ * {@code edit}/{@code patch}/{@code write_file}/{@code remove_file}/{@code delete}
+ * 会根据名称同时检索草稿目录与正式目录（存在重名时草稿目录优先级更高）。
+ * 设置 {@code autoPromote=true} 可直接写入 {@code skills/} 正式目录。
+ */
 public class SkillManageTool implements AgentTool {
 
     private static final Logger log = LoggerFactory.getLogger(SkillManageTool.class);
@@ -73,15 +94,19 @@ public class SkillManageTool implements AgentTool {
             Set.of("references", "templates", "scripts", "assets");
 
     /** Repository pointing at the live skills root (e.g. {@code skills/}). */
+    /** 指向正式技能根目录的资源仓库（例如 {@code skills/}）。 */
     private final WorkspaceSkillRepository mainRepo;
 
     /** Repository pointing at the draft staging dir (e.g. {@code skills/_drafts/}). */
+    /** 指向草稿暂存目录的资源仓库（例如 {@code skills/_drafts/}）。 */
     private final WorkspaceSkillRepository draftsRepo;
 
     /** Optional telemetry sidecar; null disables provenance + counter writes. */
+    /** 可选遥测辅助组件；为 {@code null} 时将关闭溯源信息与计数写入功能。 */
     private final SkillUsageStore usageStore;
 
     /** Optional audit log; null disables auditing. */
+    /** 可选审计日志组件；为 {@code null} 时关闭审计功能。 */
     private final SkillAuditLog auditLog;
 
     private final SkillManageConfig config;

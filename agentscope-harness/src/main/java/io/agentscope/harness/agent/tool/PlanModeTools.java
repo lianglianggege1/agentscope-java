@@ -43,6 +43,19 @@ import reactor.core.publisher.Mono;
  * <p>{@code plan_enter} / {@code plan_write} / {@code plan_exit} are always permitted by
  * {@code PlanModeMiddleware}; every other mutating tool is denied while plan mode is active.
  */
+/**
+ * 面向模型、支撑规划模式的三类工具，全部由共享 {@link PlanModeManager} 提供底层能力。
+ *
+ * <ul>
+ *   <li>{@code plan_enter} — 切换至只读规划模式，在执行变更前开展调研与方案设计。
+ *   <li>{@code plan_write} — 创建/覆盖规划Markdown草案（仅规划模式下允许调用）。
+ *   <li>{@code plan_exit} — 请求退出规划模式并开始执行。受内部自检{@code ASK}管控，
+ *       智能体获得写权限前，需经由现有人工权限流程由用户确认方案。
+ * </ul>
+ *
+ * <p>{@code plan_enter} / {@code plan_write} / {@code plan_exit} 始终可通过 {@code PlanModeMiddleware} 放行；
+ * 规划模式激活期间，其余所有具备修改能力的工具均被拦截。
+ */
 public final class PlanModeTools {
 
     /** Tool names that {@code PlanModeMiddleware} always allows, even in plan mode. */

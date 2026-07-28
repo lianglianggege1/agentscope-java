@@ -33,6 +33,18 @@ import io.agentscope.core.agent.RuntimeContext;
  * marketplace extensions) do not need to implement this — the in-memory map already covers
  * every path.
  */
+/**
+ * 供 {@link io.agentscope.core.skill.repository.AgentSkillRepository} 实现类选用的标记接口。
+ * 实现该接口后，除内存中的 {@code AgentSkill.resources} 映射表外，还可对外提供 {@link SkillResources} 访问器。
+ *
+ * <p>技能运行时框架通过 {@code instanceof} 检测此接口：若仓库实现该接口，运行时会按技能维度获取 {@link SkillResources}。
+ * 当 {@code load_skill_through_path} 在内存映射表中查找失败时，将以此作为兜底查询方案。
+ * 依托该机制，{@link WorkspaceSkillRepository} 能够将技能惰性存储在磁盘（或沙箱）中，无需在注册阶段预加载全部字节内容。
+ *
+ * <p>对于将所有资源预加载至 {@code AgentSkill.resources} 的仓库（例如内核中的
+ * {@code FileSystemSkillRepository}、{@code ClasspathSkillRepository} 以及绝大多数第三方市场扩展实现），
+ * 无需实现此接口，内存映射表已可覆盖全部资源路径。
+ */
 public interface LazyResourceCapable {
 
     /**
@@ -47,6 +59,17 @@ public interface LazyResourceCapable {
      * @return accessor for that skill's resource tree, never {@code null}
      *         (return {@link SkillResources#empty()} if the skill does not belong to this
      *         repository)
+     */
+    /**
+     * 返回指定名称技能的惰性资源访问器。
+     *
+     * <p>返回的访问器必须捕获并遵循传入的 {@code ctx}，保证多次调用时按用户隔离的命名空间保持正确。
+     *
+     * @param skillName 技能名称 {@code name}（并非 {@code skillId}）
+     * @param ctx       当前运行时上下文；永远不为 {@code null}（无可用上下文时调用方传入
+     *                  {@link RuntimeContext#empty()}）
+     * @return 该技能资源树的访问器，永不为 {@code null}；
+     *         若技能不属于当前仓库，则返回 {@link SkillResources#empty()}
      */
     SkillResources resourcesFor(String skillName, RuntimeContext ctx);
 }

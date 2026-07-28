@@ -32,8 +32,16 @@ import org.junit.jupiter.api.Test;
  * filesystem, and only exercises the byte/path predicate. Plain unit test, runs on any
  * platform.
  */
+/**
+ * 针对 {@link MarketplaceStager#shouldBeExecutable(Path, byte[])} 的专项单元测试。
+ * 该方法为启发式判定逻辑：在导入路径丢失POSIX权限信息后，重新推导文件是否应具备可执行权限。
+ *
+ * <p>刻意缩小测试范围：不构造 MarketplaceStager 实例、不操作文件系统，仅执行【路径+字节数组】判定谓词。
+ * 纯单元测试，可在任意平台运行。
+ */
 class MarketplaceStagerExecBitTest {
 
+    // 字节0/1位置存在Shebang头 → 无论后缀是什么，均判定为可执行文件
     @Test
     @DisplayName("Shebang at byte 0/1 → executable regardless of suffix")
     void shebangAlwaysTriggers() {

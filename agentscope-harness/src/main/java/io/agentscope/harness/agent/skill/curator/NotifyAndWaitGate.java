@@ -36,6 +36,14 @@ import reactor.core.publisher.Mono;
  *
  * <p>Sinks are best-effort. A failed sink is logged but does not block the gate or the agent.
  */
+/**
+ * 多副本网关。执行 {@code review} 时，在草稿技能同级目录写入 {@code .review_request.json} 文件
+ *（保证任意副本接收后续审批调用时均可读取该文件），并并发触发所有已配置的 {@link NotificationSink}。
+ * 该方法始终返回 {@link SkillPromotionGate.PromotionDecision.Defer}；真正的审批动作由外部系统
+ * 在任意副本上调用 {@code HarnessAgent.promoteSkill(...)} 完成。
+ *
+ * <p>通知接收器采用尽力投递策略。单个接收器发送失败仅记录日志，不会阻塞网关与代理执行流程。
+ */
 public class NotifyAndWaitGate implements SkillPromotionGate {
 
     private static final Logger log = LoggerFactory.getLogger(NotifyAndWaitGate.class);

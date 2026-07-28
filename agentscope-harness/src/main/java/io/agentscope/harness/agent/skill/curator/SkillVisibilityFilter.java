@@ -32,9 +32,23 @@ import java.util.List;
  *   <li>{@link CompositeFilter} — chains other filters with AND semantics</li>
  * </ul>
  */
+/**
+ * 运行时网关，基于单次调用判定向模型暴露哪些技能。
+ * 挂载时机位于 {@code DynamicSkillMiddleware} 组装完成合并仓库视图之后，
+ * 能够在候选技能列表送入系统提示词之前获取最终候选清单。
+ *
+ * <p>标准实现均位于当前包内：
+ * <ul>
+ *   <li>{@link EnvironmentFilter} — 环境匹配过滤（适用于所有技能）</li>
+ *   <li>{@link CanaryFilter} — 基于用户ID的灰度放量过滤（仅代理创建技能生效）</li>
+ *   <li>{@link AllowListFilter} — 技能名称显式白名单过滤（仅代理创建技能生效）</li>
+ *   <li>{@link CompositeFilter} — 组合多个过滤器，采用逻辑与规则链式执行</li>
+ * </ul>
+ */
 @SuppressWarnings("deprecation")
 public interface SkillVisibilityFilter {
 
     /** Filter the skill list down to those visible for the current runtime context. */
+    /** 将技能列表过滤为当前运行上下文可见的技能集合。 */
     List<AgentSkill> filter(List<AgentSkill> all, RuntimeContext ctx);
 }

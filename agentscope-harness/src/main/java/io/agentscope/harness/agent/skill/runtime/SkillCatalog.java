@@ -27,6 +27,12 @@ import java.util.Map;
  * <p>Keyed by {@code skillId} (the AgentSkill's {@code name + "_" + source}), insertion-order
  * preserved so the prompt renders skills in compose order.
  */
+/**
+ * 单次 {@code onSystemPrompt} 流程可见技能的不可变快照。
+ *
+ * <p>以 {@code skillId}（即 AgentSkill 的 {@code name + "_" + source}）作为键，保留插入顺序，
+ * 确保提示词按组合顺序渲染各项技能。
+ */
 public final class SkillCatalog {
 
     private final Map<String, HarnessSkillEntry> entries;

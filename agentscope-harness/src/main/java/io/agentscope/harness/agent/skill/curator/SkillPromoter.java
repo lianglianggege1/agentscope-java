@@ -33,6 +33,13 @@ import reactor.core.publisher.Mono;
  * <p>Surfaced via {@code ReActAgent.promoteSkill(name, reviewerId)}; standalone here so it can
  * be unit tested without spinning up a full agent.
  */
+/**
+ * 调度晋升流水线：定位草稿技能 → 执行安全扫描 → 调用评审网关 →
+ * 将 {@code _drafts/<name>/} 物理迁移至 {@code skills/<name>/} → 更新 Sidecar。
+ *
+ * <p>通过 {@code ReActAgent.promoteSkill(name, reviewerId)} 对外暴露；
+ * 独立封装便于单元测试，无需启动完整代理实例。
+ */
 @SuppressWarnings("deprecation")
 public class SkillPromoter {
 
@@ -84,6 +91,13 @@ public class SkillPromoter {
      * @param reviewerId tag stamped onto the sidecar's {@code promoted_by}
      * @param ctx runtime context (forwarded to gate / filesystem)
      */
+    /**
+     * 晋升一份草稿技能，并返回描述执行结果的对象。
+     *
+     * @param name 技能名称（草稿仓库下必须存在该技能）
+     * @param reviewerId 将写入Sidecar {@code promoted_by} 字段的标识
+     * @param ctx 运行时上下文（透传给评审网关与文件操作模块）
+     */
     public Mono<PromotionResult> promote(String name, String reviewerId, RuntimeContext ctx) {
         if (name == null || name.isBlank()) {
             return Mono.just(PromotionResult.invalid("name is required"));
@@ -101,6 +115,8 @@ public class SkillPromoter {
         // 1. Security scan (always — even when SkillManageTool already scanned, this is the
         //    last gate before going live). Pull resources off disk because the repository's
         //    {@code getSkill(name)} only loads SKILL.md.
+        // 1. 安全扫描（必执行，即便 SkillManageTool 已完成扫描，这也是上线前最后一道关卡）。
+        //    直接从磁盘读取资源文件，仓库的 {@code getSkill(name)} 仅加载 SKILL.md。
         java.util.Map<String, String> resources = loadDraftResources(name);
         SkillSecurityScanner.ScanResult scan =
                 SkillSecurityScanner.scan(name, mdOf(draft), resources);
@@ -112,6 +128,7 @@ public class SkillPromoter {
         }
 
         // 2. Build candidate package and call the gate.
+        // 2. 构建候选技能包并调用评审网关。
         SkillCandidate candidate = buildCandidate(draft, scan);
         return gate.review(candidate, ctx)
                 .map(decision -> applyDecision(name, reviewerId, decision, scan));
@@ -135,6 +152,7 @@ public class SkillPromoter {
         }
 
         // 3. Physically move _drafts/<name>/ → <mainDir>/<name>/
+        // 3. 将目录物理迁移：_drafts/<name>/ → <mainDir>/<name>/
         String src = draftsDir + "/" + name;
         String dst = mainDir + "/" + name;
         if (workspaceManager == null) {
@@ -146,6 +164,7 @@ public class SkillPromoter {
         }
 
         // 4. Update sidecar with promoted state + reviewer info.
+        // 4. 更新Sidecar，写入已晋升状态与审核人信息。
         if (usageStore != null) {
             try {
                 List<String> envs = approve.targetEnvironments();
@@ -232,12 +251,18 @@ public class SkillPromoter {
      * assets/) so the security scanner sees the full payload — the repository's
      * {@code getSkill} only deserialises SKILL.md.
      */
+    /**
+     * 读取草稿技能下所有配套文件（scripts/、references/、templates/、assets/），
+     * 使安全扫描器能够获取完整负载；仓库提供的 {@code getSkill} 仅会反序列化 SKILL.md。
+     */
     private java.util.Map<String, String> loadDraftResources(String skillName) {
         java.util.Map<String, String> out = new java.util.LinkedHashMap<>();
         for (String sub : new String[] {"scripts", "references", "templates", "assets"}) {
             // Read each known support directory under <draftsDir>/<name>/<sub>/.
             // We can't directly enumerate via the read-only repo API, so we ask the underlying
             // filesystem for a glob match scoped to that subdirectory.
+            // 读取 <draftsDir>/<name>/<sub>/ 下所有已知配套目录。
+            // 无法通过只读仓库API直接枚举文件，因此调用底层文件系统，在该子目录范围内执行通配匹配。
             String relDir = draftsDir + "/" + skillName + "/" + sub;
             try {
                 var glob =

@@ -28,6 +28,13 @@ import java.util.List;
  *
  * <p>Subclasses implement {@link #shouldPassForAgentCreated} for the agent-tracked skills.
  */
+/**
+ * 可见性过滤器基类，仅对代理创建的技能生效。
+ * 用户创建、市场安装、预置内置技能（Sidecar 中 {@code createdBy == null}）会直接放行，
+ * 避免 {@link CanaryFilter} 误隐藏运营方预置的定制技能。
+ *
+ * <p>子类实现 {@link #shouldPassForAgentCreated} 方法，处理由代理管理的技能过滤逻辑。
+ */
 @SuppressWarnings("deprecation")
 public abstract class AbstractAgentCreatedFilter implements SkillVisibilityFilter {
 
@@ -51,6 +58,7 @@ public abstract class AbstractAgentCreatedFilter implements SkillVisibilityFilte
                     usageStore != null ? usageStore.get(skill.getName()).orElse(null) : null;
             if (rec == null || !"agent".equals(rec.createdBy())) {
                 // Pass-through: external / pre-existing skill, do not gate.
+                // 直通放行：外部/已存在技能，不做准入管控。
                 out.add(skill);
                 continue;
             }
@@ -65,6 +73,10 @@ public abstract class AbstractAgentCreatedFilter implements SkillVisibilityFilte
      * Return {@code true} to keep an agent-authored skill visible for this context, {@code
      * false} to filter it out. {@code rec} is guaranteed non-null with {@code createdBy ==
      * "agent"}.
+     */
+    /**
+     * 返回 {@code true} 表示当前上下文可见该代理创建技能；返回 {@code false} 则过滤移除。
+     * {@code rec} 保证不为 null，且 {@code createdBy == "agent"}。
      */
     protected abstract boolean shouldPassForAgentCreated(
             AgentSkill skill, SkillUsageRecord rec, RuntimeContext ctx);

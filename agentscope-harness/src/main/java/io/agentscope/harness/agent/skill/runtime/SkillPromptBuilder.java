@@ -38,12 +38,56 @@ import java.util.regex.Pattern;
  *       {@link SkillLoadTool}; the prompt does not need to mention it.
  * </ul>
  */
+/**
+ * 根据 {@link SkillCatalog} 渲染框架 {@code <available_skills>} 系统提示词区块。
+ *
+ * <p>与旧版 {@code AgentSkillPromptProvider} 的差异：
+ *
+ * <ul>
+ *   <li>每个 {@code <skill>} 可选择携带 {@code <files-root>} 子节点，提供该技能文件的绝对路径。
+ *       中间件根据 Shell 是否可用、技能来源决定是否填充此字段。
+ *   <li>仅当目录中至少存在一条记录拥有非空 {@code filesRoot} 时，才输出 {@code <code_execution>}
+ *       区块（即可用Shell，且至少有一个技能文件可访问）。新指令告知大模型使用各技能自身的
+ *       {@code <files-root>}，而非单一硬编码根路径。
+ *   <li>非 SKILL.md 路径的资源降级读取逻辑由 {@link SkillLoadTool} 实现；提示词无需体现该逻辑。
+ * </ul>
+ */
 @SuppressWarnings("deprecation")
 public final class SkillPromptBuilder {
 
     private static final String INDENT = "  ";
     private static final Pattern XML_TAG_NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_.-]*");
 
+    /*
+    public static final String DEFAULT_HEADER =
+            """
+            ## 可用技能
+
+            <usage>
+            技能提供专用能力与领域知识，任务匹配时请选用对应技能。
+
+            技能使用方式：
+            - 加载技能：load_skill_through_path(skillId="<skill-id>", path="SKILL.md")
+            - 技能将被激活并加载文档，内含详细指引
+            - 可使用同一工具搭配其他路径加载额外资源（脚本、静态资源、参考资料等）
+
+            使用示例：
+            1. 用户提出数据分析需求 → 在下方找到匹配技能（例如 <skill-id>data-analysis_workspace</skill-id>）
+            2. 执行加载：load_skill_through_path(skillId="data-analysis_workspace", path="SKILL.md")
+            3. 按照技能返回的指引执行操作
+
+            每条 <skill> 节点下以XML形式展示元数据：
+            - 标量元数据直接作为子节点
+            - 嵌套Map转换为嵌套XML节点
+            - 列表转换为多条 <item> 节点
+            - 始终附带 <skill-id>，用于工具加载
+            - 若存在 <files-root>，代表执行该技能脚本所需的Shell绝对路径
+            </usage>
+
+            <available_skills>
+
+            """;
+     */
     public static final String DEFAULT_HEADER =
             """
             ## Available Skills
@@ -73,6 +117,25 @@ public final class SkillPromptBuilder {
 
             """;
 
+    /*
+    public static final String DEFAULT_CODE_EXECUTION_INSTRUCTION =
+            """
+
+            ## 代码执行
+
+            <code_execution>
+            你可以使用 execute_shell_command 工具。<available_skills> 内每项技能均包含 <files-root>，
+            代表该技能文件所在的绝对路径。
+
+            执行流程：
+            1. 加载技能后，查看 <available_skills> 中该技能对应的 <files-root>
+            2. 列出文件：    ls <files-root>/
+            3. 运行脚本：     python3 <files-root>/scripts/<script-name>
+            4. 必须基于 <files-root> 拼接绝对路径，禁止自行编造路径
+            5. 若任务已有配套脚本，直接运行脚本，不要在代码内重写脚本逻辑
+            </code_execution>
+            """;
+     */
     public static final String DEFAULT_CODE_EXECUTION_INSTRUCTION =
             """
 
@@ -116,6 +179,13 @@ public final class SkillPromptBuilder {
      * @param catalog the per-call snapshot (non-null)
      * @param filter  visibility filter applied per skillId (non-null; use {@link SkillFilter#all()})
      * @return prompt text, or empty string when nothing is visible
+     */
+    /**
+     * 渲染提示词区块。若无技能通过过滤条件则返回空字符串，调用方可直接跳过拼接操作。
+     *
+     * @param catalog 单次调用的技能快照（不可为 null）
+     * @param filter  按 skillId 生效的可见性过滤器（不可为 null；如需不过滤可使用 {@link SkillFilter#all()}）
+     * @return 提示文本；无可见技能时返回空字符串
      */
     public String render(SkillCatalog catalog, SkillFilter filter) {
         if (catalog == null || catalog.isEmpty()) {

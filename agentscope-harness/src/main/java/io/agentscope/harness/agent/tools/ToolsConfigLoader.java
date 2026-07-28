@@ -38,6 +38,16 @@ import org.slf4j.LoggerFactory;
  * failures never throw — they log and return {@link Optional#empty()} so the agent still builds
  * with its default toolkit.
  */
+/**
+ * 加载 {@code workspace/tools.json} 并解析为 {@link ToolsConfig}。
+ *
+ * <p>通过 {@link WorkspaceManager#readManagedWorkspaceFileUtf8} 读取文件，
+ * 能够像处理 {@code AGENTS.md} 一样正确适配文件系统覆盖层（沙箱/远端工作空间）路径。
+ * 在JSON原始文本解析前，依据 {@link System#getenv} 执行 {@code ${ENV_VAR}} 环境变量替换，
+ * 避免密钥明文写入配置文件头部、环境变量、URL等字段中。
+ * 解析失败不会抛出异常，仅打印日志并返回 {@link Optional#empty()}，
+ * 保证智能体仍可基于默认工具集正常启动。
+ */
 public final class ToolsConfigLoader {
 
     private static final Logger log = LoggerFactory.getLogger(ToolsConfigLoader.class);

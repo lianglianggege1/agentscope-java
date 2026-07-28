@@ -50,6 +50,21 @@ import reactor.core.publisher.Mono;
  * {@link SkillRuntime} so the registered tool instance can be reused across {@code call()}
  * rounds without re-registering, while the catalog itself is rebuilt every round.
  */
+/**
+ * 框架原生 {@code load_skill_through_path} {@link AgentTool} 工具。
+ *
+ * <p>针对除 {@code SKILL.md} 以外任意路径的查询优先级：
+ *
+ * <ol>
+ *   <li>{@code skill.getResources().get(path)} — 内存映射（一层/三层宿主仓库与预加载全部资源的市场仓库）
+ *   <li>{@code entry.lazyResources().read(path)} — 实现 {@link io.agentscope.harness.agent.skill.LazyResourceCapable}
+ *       的数据源降级访问文件系统（例如 {@code WorkspaceSkillRepository}）
+ *   <li>未找到 → 返回错误，并汇总列出 {@code SKILL.md}、内存资源键、延迟可枚举资源（已去重）
+ * </ol>
+ *
+ * <p>工具持有的目录引用由 {@link SkillRuntime} 提供 {@link AtomicReference} 管理，
+ * 因此注册的工具实例可在多轮 {@code call()} 之间复用，无需重复注册；而技能目录本身每轮都会重新构建。
+ */
 @SuppressWarnings("deprecation")
 public final class SkillLoadTool implements AgentTool {
 
@@ -175,6 +190,10 @@ public final class SkillLoadTool implements AgentTool {
      * Wrapping fence used to demarcate file content from the surrounding tool-result header.
      * Four backticks so it stays unambiguous even when the wrapped body contains the more common
      * triple-backtick code fences.
+     */
+    /**
+     * 用于分隔文件内容与工具返回头部信息的包装边界。
+     * 使用四个反引号，即便被包裹内容内部存在更常见的三重反引号代码块，也能避免歧义。
      */
     private static final String CONTENT_FENCE = "````";
 

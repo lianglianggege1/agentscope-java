@@ -26,6 +26,13 @@ import reactor.core.publisher.Mono;
  * <p>This is the most paranoid default: the agent's own actions can never put a skill on the
  * live skills root by themselves. Suitable when SRE wants to keep promotion strictly manual.
  */
+/**
+ * 始终返回 {@link SkillPromotionGate.PromotionDecision.Defer}，仅能通过网关外部显式调用
+ * {@code HarnessAgent.promoteSkill(...)} 完成技能晋升。
+ *
+ * <p>这是最保守的默认策略：代理自身行为无法主动将技能发布至正式技能根目录。
+ * 适合运维团队要求晋升流程严格人工管控的场景。
+ */
 public class RejectAllGate implements SkillPromotionGate {
 
     private final Duration retryAfter;

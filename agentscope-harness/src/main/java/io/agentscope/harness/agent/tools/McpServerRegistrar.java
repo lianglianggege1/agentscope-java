@@ -35,6 +35,16 @@ import org.slf4j.LoggerFactory;
  * <p>Failures during a single server's setup are caught and logged; remaining servers still
  * register so that one bad entry never aborts the agent's bootstrap.
  */
+/**
+ * 将 {@code workspace/tools.json} 内 {@code mcpServers} 下声明的MCP服务端注册至 {@link Toolkit}。
+ *
+ * <p>每条配置项根据 {@code transport} 类型（{@code stdio}/{@code sse}/{@code http}）
+ * 通过 {@link McpClientBuilder} 构建为 {@link McpClientWrapper}，
+ * 随后经由 {@link Toolkit#registration()} 完成注册，使各服务端配置的 {@code enableTools} 白名单生效。
+ *
+ * <p>单个服务端初始化失败会被捕获并记录日志；其余服务端仍正常注册，
+ * 避免单条错误配置导致整个智能体启动流程中断。
+ */
 public final class McpServerRegistrar {
 
     private static final Logger log = LoggerFactory.getLogger(McpServerRegistrar.class);
@@ -45,6 +55,11 @@ public final class McpServerRegistrar {
      * Registers every entry in {@code servers} into {@code toolkit}. Synchronous: each server is
      * built and registered before the next is attempted. {@code servers} may be {@code null} or
      * empty (no-op).
+     */
+    /**
+     * 将 {@code servers} 中的所有配置项注册至 {@code toolkit}。同步执行：
+     * 完成当前服务端的构建与注册后，才会尝试处理下一项。
+     * {@code servers} 可为 {@code null} 或空集合（此时无任何操作）。
      */
     public static void register(Toolkit toolkit, Map<String, McpServerConfig> servers) {
         if (toolkit == null || servers == null || servers.isEmpty()) {

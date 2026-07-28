@@ -55,6 +55,20 @@ import org.slf4j.LoggerFactory;
  * that are not agent-created. This avoids polluting telemetry for bundled / hub-installed /
  * user-authored skills, matching the hermes-agent {@code skill_usage._mutate} behavior.
  */
+/**
+ * 用于存储各技能使用情况与来源信息的Sidecar遥测存储。
+ *
+ * <p>持久保存若干 {@link SkillUsageRecord} 实例（一技能一条记录），统一存放在
+ * {@code <workspace>/skills/.usage.json} 单一JSON文件中。读写操作经由 {@link AbstractFilesystem}
+ * 执行，并使用 {@link RuntimeContext#empty()} ——遥测数据作用域为代理实例而非用户，因此刻意绕过用户命名空间隔离。
+ *
+ * <p><b>并发说明</b>：通过 {@link ReentrantLock} 串行进程内的读-改-写流程。
+ * 针对 {@code LocalFilesystem} 的跨进程安全，后续版本将在同级目录新增 {@code .usage.json.lock} 文件，
+ * 借助 {@link java.nio.channels.FileLock} 实现；若是 {@code RemoteFilesystem}，则需要基于KV的CAS机制。两项均标记为待实现。
+ *
+ * <p><b>来源准入规则</b>：计数器更新方法（bumpView/bumpUse/bumpPatch）会直接忽略非代理创建的技能。
+ * 避免对内置、平台安装、用户自研技能产生冗余遥测数据，行为对齐 hermes-agent 的 {@code skill_usage._mutate}。
+ */
 public class SkillUsageStore {
 
     private static final Logger log = LoggerFactory.getLogger(SkillUsageStore.class);
@@ -94,6 +108,7 @@ public class SkillUsageStore {
     // ---------------------------------------------------------------------
 
     /** Load the entire sidecar map. Returns an empty map on missing / unreadable / corrupt. */
+    /** 加载完整Sidecar映射表。文件不存在、无法读取或损坏时返回空Map。 */
     public Map<String, SkillUsageRecord> load() {
         try {
             ReadResult rr = filesystem.read(RuntimeContext.empty(), relativePath, 0, 0);
@@ -115,6 +130,7 @@ public class SkillUsageStore {
     }
 
     /** Persist the entire sidecar map atomically (full rewrite). Best-effort on failure. */
+    /** 原子持久化完整Sidecar映射（全量重写）。写入失败时尽最大努力保证数据一致性。 */
     public void save(Map<String, SkillUsageRecord> data) {
         try {
             String json = JSON.writeValueAsString(data != null ? data : Map.of());
@@ -129,6 +145,7 @@ public class SkillUsageStore {
     }
 
     /** Read a single record by name. */
+    /** 根据技能名称读取单条记录。 */
     public Optional<SkillUsageRecord> get(String name) {
         if (name == null || name.isBlank()) {
             return Optional.empty();
@@ -139,6 +156,10 @@ public class SkillUsageStore {
     /**
      * Apply {@code mutator} to the record for {@code name} under the in-process lock. Creates a
      * fresh {@link SkillUsageRecord#defaults()} record if none exists.
+     */
+    /**
+     * 在进程锁保护下，对指定名称对应的记录执行 {@code mutator} 修改逻辑。
+     * 若无对应记录，则新建一条 {@link SkillUsageRecord#defaults()} 默认记录。
      */
     private void mutate(String name, UnaryOperator<SkillUsageRecord> mutator) {
         if (name == null || name.isBlank()) {
@@ -237,6 +258,10 @@ public class SkillUsageStore {
      * createdBy} (i.e. the agent has explicitly tracked this skill). Skipping unknown / external
      * skills keeps the sidecar focused on agent-authored procedural memory.
      */
+    /**
+     * 仅当存在指定名称的记录，且 {@code createdBy} 不为空时，才执行 {@code mutator} 修改逻辑
+     *（即该技能已由代理显式纳入追踪）。跳过未知/外部技能，确保Sidecar仅聚焦代理生成的过程记忆。
+     */
     private void bumpIfAgentTracked(String name, UnaryOperator<SkillUsageRecord> mutator) {
         if (name == null || name.isBlank()) {
             return;
@@ -265,6 +290,7 @@ public class SkillUsageStore {
     // ---------------------------------------------------------------------
 
     /** Tag a freshly-created agent draft (called from {@code SkillManageTool.create}). */
+    /** 标记新创建的代理草稿技能（由 {@code SkillManageTool.create} 调用）。 */
     public void markAgentDraft(String name, String sessionId) {
         mutate(
                 name,
@@ -293,6 +319,10 @@ public class SkillUsageStore {
      * Mark a skill as a fully agent-created (i.e. promoted from draft). Used by
      * {@code SkillManageTool} when {@code autoPromote=true} (no staging) and by the future
      * promotion gate.
+     */
+    /**
+     * 将技能标记为正式代理创建技能（即从草稿晋升）。
+     * 当 {@code autoPromote=true}（无灰度阶段）时由 {@code SkillManageTool} 调用，同时供后续晋升管控流程使用。
      */
     public void markAgentCreated(String name, String reviewerId, List<String> environments) {
         mutate(
@@ -364,6 +394,7 @@ public class SkillUsageStore {
     }
 
     /** Drop the record entirely. Called when a skill is archived / deleted permanently. */
+    /** 彻底移除对应记录。技能归档或永久删除时调用。 */
     public void forget(String name) {
         mutate(name, rec -> null);
     }
@@ -373,6 +404,7 @@ public class SkillUsageStore {
     // ---------------------------------------------------------------------
 
     /** All records whose {@code createdBy} is non-null (i.e. agent-authored, draft or live). */
+    /** 获取所有 {@code createdBy} 不为空的记录（即代理生成技能，包含草稿与正式上线版本）。 */
     public List<Map.Entry<String, SkillUsageRecord>> agentCreatedReport() {
         Map<String, SkillUsageRecord> all = load();
         List<Map.Entry<String, SkillUsageRecord>> out = new ArrayList<>();

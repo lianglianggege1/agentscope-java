@@ -44,6 +44,13 @@ public interface AgentSkillRepository extends AutoCloseable {
      * @return The skill matching the name
      * @throws IllegalArgumentException if name or version is invalid
      */
+    /**
+     * 根据技能名称获取技能。
+     *
+     * @param name 技能名称
+     * @return 匹配该名称的技能
+     * @throws IllegalArgumentException 名称或版本无效时抛出
+     */
     AgentSkill getSkill(String name);
 
     /**
@@ -53,12 +60,24 @@ public interface AgentSkillRepository extends AutoCloseable {
      *
      * @return List of all skill IDs (never null, may be empty)
      */
+    /**
+     * 列出仓库中所有可用的技能ID。
+     *
+     * <p>每个技能ID遵循格式 {@code name_version_source}。
+     *
+     * @return 全部技能ID列表（永不返回null，允许为空）
+     */
     List<String> getAllSkillNames();
 
     /**
      * Gets all skills from the repository.
      *
      * @return List of all skills (never null, may be empty)
+     */
+    /**
+     * 从仓库中获取所有技能。
+     *
+     * @return 全部技能列表（永不返回null，允许为空）
      */
     List<AgentSkill> getAllSkills();
 
@@ -73,6 +92,16 @@ public interface AgentSkillRepository extends AutoCloseable {
      * @param force Whether to force save even if the skill already exists
      * @return {@code true} if save succeeded, {@code false} otherwise
      */
+    /**
+     * 在仓库中保存或更新技能。
+     *
+     * <p>若已存在同名技能，则执行更新操作；否则新建技能。
+     * <p>传入技能列表为空时返回false。
+     *
+     * @param skills 待保存的技能集合
+     * @param force 是否强制保存，即便技能已存在
+     * @return 保存成功返回 {@code true}，否则返回 {@code false}
+     */
     boolean save(List<AgentSkill> skills, boolean force);
 
     /**
@@ -80,6 +109,12 @@ public interface AgentSkillRepository extends AutoCloseable {
      *
      * @param skillName The skill name (never null)
      * @return {@code true} if deletion succeeded, {@code false} if skill not found
+     */
+    /**
+     * 根据技能名称删除技能。
+     *
+     * @param skillName 技能名称（永不为null）
+     * @return 删除成功返回 {@code true}；未找到对应技能则返回 {@code false}
      */
     boolean delete(String skillName);
 
@@ -98,6 +133,13 @@ public interface AgentSkillRepository extends AutoCloseable {
      *
      * @return Repository information (never null)
      */
+    /**
+     * 获取当前仓库的元数据信息。
+     *
+     * <p>信息包含仓库类型、存储位置以及其他元数据。
+     *
+     * @return 仓库信息（永不返回null）
+     */
     AgentSkillRepositoryInfo getRepositoryInfo();
 
     /**
@@ -107,12 +149,24 @@ public interface AgentSkillRepository extends AutoCloseable {
      *
      * @return The source identifier (never null)
      */
+    /**
+     * 获取该仓库的来源标识。
+     *
+     * <p>来源标识遵循格式 {@code repositoryType_location}。
+     *
+     * @return 来源标识（永不返回null）
+     */
     String getSource();
 
     /**
      * Sets the writeable flag for this repository.
      *
      * @param writeable Whether the repository supports write operations
+     */
+    /**
+     * 设置该仓库的可写标识。
+     *
+     * @param writeable 仓库是否支持写入操作
      */
     void setWriteable(boolean writeable);
 
@@ -121,6 +175,11 @@ public interface AgentSkillRepository extends AutoCloseable {
      *
      * @return {@code true} if writable, {@code false} otherwise
      */
+    /**
+     * 检查该仓库是否支持写入操作。
+     *
+     * @return 支持写入返回 {@code true}，否则返回 {@code false}
+     */
     boolean isWriteable();
 
     /**
@@ -128,6 +187,11 @@ public interface AgentSkillRepository extends AutoCloseable {
      *
      * <p>Implementations should override this method if they need to release resources
      * such as network connections, file handles, or caches.
+     */
+    /**
+     * 释放当前仓库占用的所有资源。
+     *
+     * <p>若实现类需要释放网络连接、文件句柄、缓存等资源，应当重写此方法。
      */
     @Override
     default void close() {

@@ -70,6 +70,9 @@ class SkillAuditLogTest {
         assertEquals("a", promotes.get(0).target());
     }
 
+    /**
+     * 并发多次追加场景：保留全部内容
+     */
     @Test
     void multipleAppendsConcurrently_preserveAll() throws Exception {
         Runnable writer =

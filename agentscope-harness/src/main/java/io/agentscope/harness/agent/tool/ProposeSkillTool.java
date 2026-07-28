@@ -37,6 +37,15 @@ import reactor.core.publisher.Mono;
  * upload in the same call. Useful when the agent has just discovered a reusable approach and
  * wants to commit it without authoring the full SKILL.md text.
  */
+/**
+ * 便捷工具，允许智能体单次调用创建全新技能：名称、描述、正文及可选脚本。
+ * 内部等价执行 {@code SkillManageTool.create} + 多次 {@code skill_manage write_file*}，
+ * 保障标准暂存、校验、扫描流程正常生效。
+ *
+ * <p>相较于 {@code skill_manage(action="create")}，本工具特性：正文与前置元数据分开入参
+ *（无需智能体手动编写YAML），支持在同一次调用中传入待上传脚本列表。
+ * 适用于智能体梳理出可复用方案后，无需完整编写SKILL.md文本即可提交技能。
+ */
 public class ProposeSkillTool implements AgentTool {
 
     private static final Logger log = LoggerFactory.getLogger(ProposeSkillTool.class);

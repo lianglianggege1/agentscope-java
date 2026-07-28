@@ -24,6 +24,11 @@ import java.util.Set;
  * SRE pin a small set of agent-authored skills for an internal beta channel without
  * generally exposing every promoted skill.
  */
+/**
+ * 仅当代理创建技能的名称存在于白名单中时才对外可见。
+ * 便于运维团队选定少量代理创建技能开放内部灰度通道，避免所有已上线技能全部对外暴露。
+ */
+
 public class AllowListFilter extends AbstractAgentCreatedFilter {
 
     private final Set<String> allow;

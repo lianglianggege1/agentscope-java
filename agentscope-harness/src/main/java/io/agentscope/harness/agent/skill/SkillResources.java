@@ -30,6 +30,16 @@ import java.util.Optional;
  * {@code "scripts/run.py"}). Absolute paths and path traversal sequences ({@code ".."}) are
  * rejected by implementations.
  */
+/**
+ * 单个技能的惰性资源访问器。
+ *
+ * <p>将“存在哪些资源”与“如何获取资源内容”进行解耦，
+ * 使得基于 {@code AbstractFilesystem} 实现的仓库可以按需响应 {@code load_skill_through_path} 请求，
+ * 无需在技能注册阶段将所有资源的全部字节预加载至内存。
+ *
+ * <p>所有路径均相对于技能根目录（例如 {@code "references/guide.md"}、{@code "scripts/run.py"}）。
+ * 实现类需要拒绝绝对路径以及路径穿越序列（{@code ".."}）。
+ */
 public interface SkillResources {
 
     /**
@@ -38,6 +48,12 @@ public interface SkillResources {
      * @param relativePath path relative to the skill root
      * @return content, or empty if the resource does not exist or read fails
      */
+    /**
+     * 以UTF-8编码读取文本资源。
+     *
+     * @param relativePath 相对于技能根目录的路径
+     * @return 资源内容；资源不存在或读取失败时返回空字符串
+     */
     Optional<String> read(String relativePath);
 
     /**
@@ -45,6 +61,12 @@ public interface SkillResources {
      *
      * @param relativePath path relative to the skill root
      * @return content, or empty if the resource does not exist or read fails
+     */
+    /**
+     * 读取二进制资源。
+     *
+     * @param relativePath 相对于技能根目录的路径
+     * @return 资源内容；资源不存在或读取失败时返回空
      */
     Optional<byte[]> readBinary(String relativePath);
 
@@ -56,12 +78,24 @@ public interface SkillResources {
      *
      * @return unmodifiable list of relative paths; never {@code null}
      */
+    /**
+     * 列出该访问器可提供服务的全部资源相对路径。
+     *
+     * <p>由 {@code SkillLoadTool} 使用，当请求路径未找到时，生成友好的“可用资源”清单。
+     *
+     * @return 不可修改的相对路径列表；永不返回 {@code null}
+     */
     List<String> list();
 
     /**
      * Returns a no-op accessor that reports no resources.
      *
      * @return shared empty instance
+     */
+    /**
+     * 返回一个无操作访问器，该访问器标识不存在任何资源。
+     *
+     * @return 共享的空实例
      */
     static SkillResources empty() {
         return EmptySkillResources.INSTANCE;

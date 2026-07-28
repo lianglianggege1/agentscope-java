@@ -33,6 +33,17 @@ import io.agentscope.harness.agent.skill.SkillResources;
  *                      repository whose contents are not present on any filesystem the shell
  *                      can reach
  */
+/**
+ * {@link AgentSkill} 的单次调用包装类，承载仅运行框架所需、不属于核心数据模型的元数据。
+ *
+ * @param skill         底层技能实例（不可为 null）
+ * @param lazyResources 资源延迟访问器，当源仓库实现
+ *                      {@link io.agentscope.harness.agent.skill.LazyResourceCapable} 时生效；
+ *                      若仅能使用内存中 {@code skill.resources} 映射，则为 {@code null}
+ * @param filesRoot     执行该技能脚本时 Shell 使用的绝对根路径；若无 Shell 工具可为 {@code null}
+ *                     （此时提示词中将移除 {@code <files-root>}）；或是技能来源于仓库，仓库内容不在 Shell
+ *                      可访问文件系统上时也为 {@code null}
+ */
 @SuppressWarnings("deprecation")
 public record HarnessSkillEntry(AgentSkill skill, SkillResources lazyResources, String filesRoot) {
 

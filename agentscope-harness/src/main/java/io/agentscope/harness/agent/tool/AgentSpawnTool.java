@@ -1306,6 +1306,10 @@ public class AgentSpawnTool {
      * Derives a deterministic 12-char hex hash from (parentSessionId, agentId, label). Same inputs
      * always produce the same key, enabling subagent state recovery across parent calls.
      */
+    /**
+     * 根据(parentSessionId、agentId、label)生成固定12位十六进制哈希值。
+     * 相同输入始终产出相同键值，支持父会话多次调用时恢复子智能体状态。
+     */
     static String deterministicHash(String parentSessionId, String agentId, String label) {
         String parent = parentSessionId != null ? parentSessionId : "anon";
         return label != null

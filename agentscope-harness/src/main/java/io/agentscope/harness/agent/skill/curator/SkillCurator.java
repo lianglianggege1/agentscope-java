@@ -55,6 +55,25 @@ import org.slf4j.LoggerFactory;
  *   <li>{@code DRAFT} state is owned by the promotion gate, not the curator.</li>
  * </ul>
  */
+/**
+ * 后台技能维护调度器。对齐 hermes-agent 中 {@code agent/curator.py} 的生命周期逻辑：
+ * <ul>
+ *   <li>纯函数 {@code applyAutomaticTransitions}：遍历所有代理托管技能，依据 Sidecar 最新活跃时间戳，
+ *       将技能状态按 {@code ACTIVE → STALE → ARCHIVED} 自动流转；固定锁定技能与草稿技能会被跳过。</li>
+ *       状态流转：ACTIVE（活跃） → STALE（失效/陈旧） → ARCHIVED（归档）
+ *   <li>大模型汇总扫描：生成包含待合并候选技能的 Markdown 报告；
+ *       默认处于 {@code DRY_RUN_ONLY}（仅试运行）模式，不会调用 {@code skill_manage}，仅输出报告。
+ *       {@code LIVE} 模式预留至后续版本（需要配套 {@code Model} 以及独立分支的 {@code ReActAgent}；当前实现仅开放试运行报告生成能力）。</li>
+ * </ul>
+ *
+ * <p>强制约束：
+ * <ul>
+ *   <li>仅处理 {@code createdBy != null} 的 Sidecar 条目（即代理创建的技能）。</li>
+ *   <li>已锁定技能跳过全部自动状态流转逻辑。</li>
+ *   <li>永不执行删除操作，仅做归档处理。</li>
+ *   <li>{@code DRAFT}（草稿）状态由晋升网关管控，不归本调度器管理。</li>
+ * </ul>
+ */
 public class SkillCurator {
 
     private static final Logger log = LoggerFactory.getLogger(SkillCurator.class);
@@ -142,6 +161,11 @@ public class SkillCurator {
      * paused, last_run_at older than {@code intervalHours}. First-run behaviour seeds
      * last_run_at without firing — a fresh deployment doesn't get LLM'd until at least one
      * interval has elapsed.
+     */
+    /**
+     * 空闲间隔触发网关。满足以下全部条件时返回 true，代表调度器应当立即执行：功能已启用、未暂停，
+     * 且上一次执行时间早于 {@code intervalHours} 指定间隔。首次启动时仅初始化上次执行时间，不触发任务；
+     * 新部署实例至少等待一个完整间隔后才会执行大模型相关处理。
      */
     public boolean shouldRunNow(Instant now) {
         if (!config.enabled() || isPaused()) {
@@ -234,6 +258,14 @@ public class SkillCurator {
      * {@code null} without writing.
      *
      * @return path of the report relative to the workspace, or {@code null} when disabled
+     */
+    /**
+     * 生成便于人工阅读的 Markdown 报告，将所有代理创建的技能按通用名称前缀分组罗列。
+     * 本方法为基于大模型的汇总合并扫描的占位实现：提示词与大模型调用依赖额外模型能力，推迟至后续版本实现。
+     * 在 {@code DRY_RUN_ONLY} 或 {@code LIVE} 模式下，报告将写入
+     * {@code skills/.curator_reports/<ts>/REPORT.md}；{@code DISABLED} 模式直接返回 {@code null}，不生成文件。
+     *
+     * @return 相对于工作目录的报告路径；功能禁用时返回 {@code null}
      */
     public String runUmbrellaDryRunReport(Instant now) {
         if (config.umbrellaPassMode() == SkillCuratorConfig.UmbrellaPassMode.DISABLED) {

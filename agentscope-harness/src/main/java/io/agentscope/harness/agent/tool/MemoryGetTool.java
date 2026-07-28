@@ -26,6 +26,10 @@ import java.util.List;
  * Tool for reading specific lines from memory files, typically used after
  * {@link MemorySearchTool} to fetch surrounding context.
  */
+/**
+ * 用于从记忆文件读取指定行的工具，通常配合 {@link MemorySearchTool} 使用，
+ * 获取检索结果周边上下文。
+ */
 public class MemoryGetTool {
 
     private final WorkspaceManager workspaceManager;
@@ -34,6 +38,25 @@ public class MemoryGetTool {
         this.workspaceManager = workspaceManager;
     }
 
+    /*
+    @Tool(
+            name = "memory_get",
+            readOnly = true,
+            description =
+                    "读取记忆文件指定行。配合 memory_search 使用，获取匹配行附近完整上下文。"
+                            + "路径为工作空间相对路径。")
+    public String memoryGet(
+            RuntimeContext runtimeContext,
+            @ToolParam(
+                            name = "path",
+                            description =
+                                    "记忆文件相对路径（示例：MEMORY.md 或 memory/2026-04-01.md）")
+                    String path,
+            @ToolParam(name = "startLine", description = "起始行号（从1开始，闭区间）")
+                    int startLine,
+            @ToolParam(name = "endLine", description = "结束行号（从1开始，闭区间）")
+                    int endLine) {}
+     */
     @Tool(
             name = "memory_get",
             readOnly = true,

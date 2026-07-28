@@ -45,6 +45,14 @@ import org.slf4j.LoggerFactory;
  * collector outages and gives operators a queryable record without standing up a metrics
  * stack. {@code agent.queryAudit(predicate)} reads back every entry from the latest day file.
  */
+/**
+ * 技能自学习流程的追加式审计日志。每一次 {@code skill_manage} 写入操作、晋升决策、Curator 状态变更，
+ * 都会以单行 JSON 格式写入 {@code workspace/skills/.audit/YYYY-MM-DD.jsonl}。
+ *
+ * <p>该审计日志独立于 OTel / 链路追踪（其他代码路径会同步输出链路数据）。
+ * 磁盘上的 JSONL 文件用于故障恢复与问题溯源：不受 OTel 采集器故障影响，运维人员无需搭建指标平台即可查询操作记录。
+ * {@code agent.queryAudit(predicate)} 可读取当日日志文件内所有审计条目。
+ */
 public class SkillAuditLog {
 
     private static final Logger log = LoggerFactory.getLogger(SkillAuditLog.class);
@@ -141,6 +149,10 @@ public class SkillAuditLog {
      * Read the audit log for a given day, parse every line into {@link Entry}, then filter via
      * the predicate. Pass {@code null} for {@code dayUtc} to query "today".
      */
+    /**
+     * 读取指定日期的审计日志，将每行文本解析为 {@link Entry} 对象，再通过断言条件进行过滤。
+     * {@code dayUtc} 传入 {@code null} 时代表查询当日日志。
+     */
     public List<Entry> query(String dayUtc, Predicate<Entry> filter) {
         if (filesystem == null) {
             return List.of();
@@ -174,6 +186,7 @@ public class SkillAuditLog {
         }
     }
 
+    // /** 用于快速构建通用 {@code skill_manage} 类型审计条目对象的构建器。 */
     /** Convenience builder for the common {@code skill_manage} entry shape. */
     public static Entry manageEntry(
             String actor, String name, String action, String draftOrMain, String verdict) {
@@ -183,6 +196,7 @@ public class SkillAuditLog {
                 Instant.now(), actor, "manage", name, action, verdict, null, null, ctx, null);
     }
 
+    /** 用于快速构建 {@code promote} 类型审计条目的构建器。 */
     /** Convenience builder for the {@code promote} audit entry. */
     public static Entry promoteEntry(
             String reviewer,
@@ -207,6 +221,7 @@ public class SkillAuditLog {
                 extra);
     }
 
+    /** 用于快速构建 {@code curator.run} 审计条目的构建器。 */
     /** Convenience builder for {@code curator.run}. */
     public static Entry curatorEntry(SkillCurator.CuratorRunReport report, String mode) {
         Map<String, Object> extra = new LinkedHashMap<>();

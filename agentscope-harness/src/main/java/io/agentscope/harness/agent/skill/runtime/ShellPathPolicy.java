@@ -35,6 +35,19 @@ import java.nio.file.Path;
  *       absolute host workspace root.
  * </ul>
  */
+/**
+ * 根据技能的 {@link StageResult} 与当前Shell运行模式，解析在 {@code <available_skills>}
+ * 与 {@code load_skill_through_path} 返回结果中输出的绝对 {@code filesRoot} 路径。
+ *
+ * <p>策略支持三种运行模式：
+ *
+ * <ul>
+ *   <li>{@link Mode#NO_SHELL} — 未注册 {@code ShellExecuteTool}。所有技能均返回 {@code null}，
+ *       提示词中将移除 {@code <files-root>} 以及完整代码执行指令区块。
+ *   <li>{@link Mode#SANDBOX} — 基于沙箱的文件系统。路径使用沙箱内部前缀（{@code /workspace/}）。
+ *   <li>{@link Mode#LOCAL_WITH_SHELL} — {@code LocalFilesystemWithShell}。路径使用宿主机工作区绝对根路径。
+ * </ul>
+ */
 public final class ShellPathPolicy {
 
     public enum Mode {
@@ -56,11 +69,13 @@ public final class ShellPathPolicy {
     }
 
     /** No shell is available; every {@code filesRoot} resolves to {@code null}. */
+    /** 无可用Shell；所有 {@code filesRoot} 均解析为 {@code null}。 */
     public static ShellPathPolicy noShell() {
         return new ShellPathPolicy(Mode.NO_SHELL, null, null);
     }
 
     /** Sandbox mode — paths under the default {@code /workspace/} prefix. */
+    /** 沙箱模式 — 路径使用默认 {@code /workspace/} 前缀。 */
     public static ShellPathPolicy sandbox() {
         return sandbox(SANDBOX_WORKSPACE_PREFIX);
     }
@@ -71,6 +86,12 @@ public final class ShellPathPolicy {
      *
      * @param workspacePrefix absolute path of the workspace root inside the sandbox
      */
+    /**
+     * 带自定义工作区前缀的沙箱模式。当沙箱后端将工作区挂载至非默认路径时使用
+     *（例如 AgentRun 场景下的 {@code /home/agentscope/workspace}）。
+     *
+     * @param workspacePrefix 沙箱内部工作区根目录绝对路径
+     */
     public static ShellPathPolicy sandbox(String workspacePrefix) {
         return new ShellPathPolicy(
                 Mode.SANDBOX,
@@ -79,6 +100,7 @@ public final class ShellPathPolicy {
     }
 
     /** Local-with-shell mode — paths absolute on the host. */
+    /** 本地带Shell模式 — 路径为宿主机上的绝对路径。 */
     public static ShellPathPolicy localWithShell(Path workspaceRoot) {
         if (workspaceRoot == null) {
             throw new IllegalArgumentException("workspaceRoot required for LOCAL_WITH_SHELL");
@@ -96,6 +118,12 @@ public final class ShellPathPolicy {
      *
      * @param skillName the skill's {@code name}
      * @param stage     staging outcome from {@link MarketplaceStager#stage}
+     */
+    /**
+     * 返回指定技能对应的绝对 {@code filesRoot}；若无可用Shell或该技能不存在Shell可访问载体时返回 {@code null}。
+     *
+     * @param skillName 技能名称
+     * @param stage      由 {@link MarketplaceStager#stage} 得到的暂存结果
      */
     public String resolve(String skillName, StageResult stage) {
         if (mode == Mode.NO_SHELL || stage == null || stage instanceof StageResult.None) {

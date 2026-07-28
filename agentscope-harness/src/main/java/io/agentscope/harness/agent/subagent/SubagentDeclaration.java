@@ -273,6 +273,10 @@ public final class SubagentDeclaration {
      * Used for internal subagents (e.g. compaction, summary, title) that the orchestrator should
      * not directly delegate to.
      */
+    /**
+     * 该子智能体声明是否对大模型隐藏，不在可用子智能体列表中展示。
+     * 用于内部子智能体（如信息压缩、摘要生成、标题生成等），编排器不应直接向其下发任务。
+     */
     public boolean isHidden() {
         return hidden;
     }
@@ -282,6 +286,11 @@ public final class SubagentDeclaration {
      * the spawn key is derived deterministically from (parentSessionId, agentId, label), enabling
      * state recovery after process restarts. When {@code false} (default), a random UUID is used.
      */
+    /**
+     * 子智能体会话状态是否在父会话多次调用间持久保留。
+     * 设为 {@code true} 时，派生键由(parentSessionId、agentId、label)确定性生成，
+     * 进程重启后可恢复状态。若为 {@code false}（默认），则使用随机UUID。
+     */
     public boolean isPersistSession() {
         return persistSession;
     }
@@ -290,6 +299,11 @@ public final class SubagentDeclaration {
      * Whether the subagent inherits parent DENY permission rules. When {@code true} (default),
      * all DENY rules from the parent's permission context are propagated to the child's permission
      * engine at spawn time, preventing the child from circumventing parent-level restrictions.
+     */
+    /**
+     * 子智能体是否继承父级黑名单权限规则。
+     * 设为 {@code true}（默认值）时，父权限上下文中所有黑名单规则会在创建子智能体时同步至子权限引擎，
+     * 避免子智能体绕过父级权限限制。
      */
     public boolean isInheritParentPermissions() {
         return inheritParentPermissions;
@@ -331,6 +345,10 @@ public final class SubagentDeclaration {
     /**
      * Optional tool allowlist. When non-empty, only inherited parent tools whose names are listed
      * remain on the subagent's inherited toolkit. Empty means inherit all parent tools.
+     */
+    /**
+     * 可选工具白名单。非空时，子智能体仅继承名单内命名的父级工具。
+     * 为空则继承父智能体全部工具。
      */
     public List<String> getTools() {
         return tools;

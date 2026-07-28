@@ -24,6 +24,10 @@ import reactor.core.publisher.Mono;
  * Nacos config item, …). {@code NotifyAndWaitGate} fires its sinks once per draft submission;
  * sinks are best-effort and never block the gate.
  */
+/**
+ * 将 {@link SkillCandidate} 元数据推送至外部系统（Slack Webhook、工单服务、Nacos 配置项等）。
+ * {@code NotifyAndWaitGate} 在每次草稿提交时触发各个输出接收器；接收器采用尽力投递策略，不会阻塞网关流程。
+ */
 public interface NotificationSink {
 
     Mono<Void> notify(SkillCandidate candidate);

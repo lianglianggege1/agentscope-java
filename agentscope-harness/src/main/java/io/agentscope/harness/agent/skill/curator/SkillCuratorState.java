@@ -24,6 +24,10 @@ import java.time.Instant;
  * Persistent state for {@link SkillCurator} — kept in {@code skills/.curator_state.json}.
  * Records the last run timestamp, run count, paused flag, and a brief human-readable summary.
  */
+/**
+ * {@link SkillCurator} 的持久化状态，存储于 {@code skills/.curator_state.json}。
+ * 记录上一次执行时间戳、执行次数、暂停标识以及一段人工可读的简要摘要信息。
+ */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record SkillCuratorState(
         @JsonProperty("last_run_at") Instant lastRunAt,

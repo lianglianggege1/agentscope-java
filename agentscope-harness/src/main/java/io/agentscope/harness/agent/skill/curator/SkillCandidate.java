@@ -26,6 +26,13 @@ import java.util.List;
  * .codeExecution()} every {@code scripts/*} file gets uploaded into the sandbox and executed.
  * Reviewers must see the head + sha256 of every script file before saying "approve".
  */
+/**
+ * 草稿技能进入晋升评审流程时，传递给 {@link SkillPromotionGate} 的载体对象。
+ * 包含技能主体、配套文件、遥测记录以及晋升前安全扫描结果。
+ *
+ * <p>{@code scriptFiles} 为沙箱运行所需负载：在 {@code SkillBox.codeExecution()} 模式下，
+ * {@code scripts/*} 下所有文件都会上传至沙箱并执行。审核人员审批前必须核对每份脚本文件的文件头与SHA256摘要。
+ */
 public record SkillCandidate(
         String name,
         String description,

@@ -32,6 +32,14 @@ import org.slf4j.LoggerFactory;
  * first install. The tool instance holds the {@link AtomicReference} to the catalog, so swapping
  * the catalog from later rounds takes effect immediately without re-registering.
  */
+/**
+ * 聚合单次调用使用的 {@link SkillCatalog}、单例 {@link SkillLoadTool} 与 {@link SkillPromptBuilder}。
+ * {@link io.agentscope.harness.agent.middleware.HarnessSkillMiddleware} 持有该类实例，并在每轮
+ * {@code onSystemPrompt} 流程中更新技能目录。
+ *
+ * <p>{@code load_skill_through_path} 工具仅在首次安装时向工具集注册一次。工具实例内部持有指向
+ * 技能目录的 {@link AtomicReference}，后续轮次替换目录可立即生效，无需重新注册工具。
+ */
 public final class SkillRuntime {
 
     private static final Logger log = LoggerFactory.getLogger(SkillRuntime.class);
@@ -52,11 +60,13 @@ public final class SkillRuntime {
     }
 
     /** Snapshot accessor mainly for tests; not for runtime mutation. */
+    /** 快照访问器，主要用于测试；运行时请勿修改。 */
     public SkillCatalog currentCatalog() {
         return catalogRef.get();
     }
 
     /** Underlying tool instance. Use {@link #install(SkillCatalog, Toolkit)} for normal flow. */
+    /** 底层工具实例。常规流程请使用 {@link #install(SkillCatalog, Toolkit)}。 */
     public AgentTool loadTool() {
         return loadTool;
     }
@@ -66,6 +76,12 @@ public final class SkillRuntime {
      *
      * @param catalog the new snapshot; pass {@link SkillCatalog#empty()} to clear visibility
      * @param toolkit the toolkit to install onto; may be {@code null} (then only catalog is updated)
+     */
+    /**
+     * 更新当前技能目录，并确保加载工具已注册至工具集（幂等操作）。
+     *
+     * @param catalog 新快照；传入 {@link SkillCatalog#empty()} 可清空可见技能
+     * @param toolkit 待安装工具的工具集；允许为 {@code null}（仅更新目录，不处理工具注册）
      */
     public void install(SkillCatalog catalog, Toolkit toolkit) {
         catalogRef.set(catalog != null ? catalog : SkillCatalog.empty());

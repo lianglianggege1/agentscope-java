@@ -31,6 +31,13 @@ import java.util.List;
  * unconditionally. The expectation is that authoritative ops will set
  * {@code environments: [prod]} on the sidecar entry by hand once they've been audited.
  */
+/**
+ * 过滤器：仅当技能对应的Sidecar配置中 {@code environments} 列表包含当前环境（{@code prod}、{@code staging} 等）时放行该技能。
+ * 不同于灰度过滤器、白名单过滤器，本过滤器作用于**所有技能**（包含预置技能），保证代理创建技能与人工定制技能遵循统一的部署环境管控逻辑。
+ *
+ * <p>无Sidecar配置项的人工定制技能会无条件放行。
+ * 规范要求：人工审核完成后，运维人员需手动在Sidecar条目配置 {@code environments: [prod]}。
+ */
 @SuppressWarnings("deprecation")
 public class EnvironmentFilter implements SkillVisibilityFilter {
 

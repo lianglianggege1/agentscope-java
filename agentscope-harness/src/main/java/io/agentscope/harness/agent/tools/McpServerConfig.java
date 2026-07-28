@@ -37,6 +37,20 @@ import java.util.Map;
  *   <li>{@code http} — streamable HTTP, same fields as {@code sse}.
  * </ul>
  */
+/**
+ * {@code tools.json} 中 {@code mcpServers.<name>} 下的单条MCP服务端配置。
+ *
+ * <p>结构对齐标准MCP客户端配置格式，便于工作空间在AgentScope与其他支持MCP的工具间迁移，仅需少量修改。
+ * 字段语义直接映射至 {@link io.agentscope.core.tool.mcp.McpClientBuilder}。
+ *
+ * <p>{@code transport} 作为区分传输模式的标识：
+ *
+ * <ul>
+ *   <li>{@code stdio} — 使用 {@link #command}、{@link #args}、{@link #env}。
+ *   <li>{@code sse} — 使用 {@link #url}、{@link #headers}、{@link #queryParams}。
+ *   <li>{@code http} — 流式HTTP传输，所需字段与 {@code sse} 一致。
+ * </ul>
+ */
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class McpServerConfig {

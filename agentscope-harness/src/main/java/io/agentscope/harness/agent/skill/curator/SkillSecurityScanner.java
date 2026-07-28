@@ -43,36 +43,57 @@ import java.util.regex.Pattern;
  * run inside whatever sandbox the host configured (see {@code ShellExecuteTool}); the scanner
  * is here to catch the obvious mistakes during authoring, NOT to replace the sandbox.
  */
+/**
+ * 用于扫描 SKILL.md 及技能配套文件的静态分析检测器。移植自 hermes-agent
+ * 的 {@code tools/skills_guard.py} 正则规则库，并整合信任等级 × 判定结果的安装策略。
+ *
+ * <p>检测类别（每个类别包含一条或多条正则规则）：
+ * <ul>
+ *   <li>{@link Category#EXFILTRATION} — 通过 curl/wget POST 实施数据外泄</li>
+ *   <li>{@link Category#INJECTION} — Markdown 内存在提示词注入特征</li>
+ *   <li>{@link Category#DESTRUCTIVE} — {@code rm -rf /}、{@code mkfs}、{@code dd of=/dev} 等破坏性指令</li>
+ *   <li>{@link Category#PERSISTENCE} — 篡改 crontab / systemd / Shell 启动脚本实现持久驻留</li>
+ *   <li>{@link Category#NETWORK} — 监听套接字 / 反向 Shell</li>
+ *   <li>{@link Category#OBFUSCATION} — base64 解码执行 bash、eval $(curl …) 等混淆执行手段</li>
+ * </ul>
+ *
+ * <p>扫描结果返回 {@link Verdict}（SAFE / CAUTION / DANGEROUS）以及风险项清单。
+ * 调用方（例如 {@code SkillManageTool}、{@code HarnessAgent.promoteSkill}）通过
+ * {@link #shouldAllow(TrustLevel, Verdict)}，结合判定结果与来源可信度决定是否允许安装技能。
+ *
+ * <p>该组件仅为 Java 侧简易检测手段，**不作为安全边界**。技能始终运行在宿主配置的沙箱内
+ *（参见 {@code ShellExecuteTool}）；此检测器用于在编写阶段拦截明显风险，**不能替代沙箱防护**。
+ */
 public final class SkillSecurityScanner {
 
     public enum Severity {
-        LOW,
-        MEDIUM,
-        HIGH,
-        CRITICAL
+        LOW,        // 低风险
+        MEDIUM,     // 中风险
+        HIGH,       // 高风险
+        CRITICAL    // 严重风险
     }
 
     public enum Category {
-        EXFILTRATION,
-        INJECTION,
-        DESTRUCTIVE,
-        PERSISTENCE,
-        NETWORK,
-        OBFUSCATION
+        EXFILTRATION,  // 数据窃取
+        INJECTION,     // 注入攻击
+        DESTRUCTIVE,   // 破坏性操作
+        PERSISTENCE,   // 持久化威胁
+        NETWORK,       // 网络风险
+        OBFUSCATION    // 代码混淆
     }
 
     public enum Verdict {
-        SAFE,
-        CAUTION,
-        DANGEROUS
+        SAFE,       // 安全
+        CAUTION,    // 需留意
+        DANGEROUS   // 危险
     }
 
     /** Where the skill came from. */
     public enum TrustLevel {
-        BUILTIN,
-        TRUSTED,
-        COMMUNITY,
-        AGENT_CREATED
+        BUILTIN,        // 内置技能
+        TRUSTED,        // 可信技能
+        COMMUNITY,      // 社区技能
+        AGENT_CREATED   // 代理自主创建技能
     }
 
     public record Finding(
@@ -99,7 +120,7 @@ public final class SkillSecurityScanner {
     private static List<Rule> buildRules() {
         List<Rule> rules = new ArrayList<>();
 
-        // EXFILTRATION ----------------------------------------------------
+        // EXFILTRATION /** 数据外泄：通过 curl/wget POST 向外窃取传输数据 */ ----------------------------------------------------
         rules.add(
                 new Rule(
                         "exfil-curl-post",
@@ -122,7 +143,7 @@ public final class SkillSecurityScanner {
                         Pattern.compile("\\b(cat|tar|gzip)\\s+[^\\n]*\\|\\s*nc\\s"),
                         "piping local data into netcat — exfiltration"));
 
-        // INJECTION -------------------------------------------------------
+        // INJECTION /** 注入风险：Markdown 中存在提示词注入特征 */ -------------------------------------------------------
         rules.add(
                 new Rule(
                         "inj-ignore-prev",
@@ -146,7 +167,7 @@ public final class SkillSecurityScanner {
                         Pattern.compile("(?i)\\b(DAN|jailbreak|developer\\s+mode)\\b"),
                         "prompt-injection marker: jailbreak vocabulary"));
 
-        // DESTRUCTIVE -----------------------------------------------------
+        // DESTRUCTIVE /** 破坏性风险：rm -rf /、mkfs、dd of=/dev 等高危销毁指令 */ -----------------------------------------------------
         rules.add(
                 new Rule(
                         "dest-rm-rf-root",
@@ -176,7 +197,7 @@ public final class SkillSecurityScanner {
                         Pattern.compile(">\\s*/dev/(sd|nvme|hd|xvd)[a-z0-9]*"),
                         "shell redirect to a raw disk device"));
 
-        // PERSISTENCE -----------------------------------------------------
+        // PERSISTENCE /** 持久化风险：篡改 crontab / systemd / Shell 启动脚本实现驻留 */ -----------------------------------------------------
         rules.add(
                 new Rule(
                         "pers-crontab-install",
@@ -201,7 +222,7 @@ public final class SkillSecurityScanner {
                         Pattern.compile("echo\\s+[^\\n]*>>\\s+~?/?(\\.bashrc|\\.zshrc|\\.profile)"),
                         "writes shell-rc — persistence"));
 
-        // NETWORK ---------------------------------------------------------
+        // NETWORK /** 网络风险：监听套接字、反向Shell等恶意网络行为 */ ---------------------------------------------------------
         rules.add(
                 new Rule(
                         "net-reverse-shell-bash",
@@ -259,6 +280,10 @@ public final class SkillSecurityScanner {
      * relative path → content (matching {@code AgentSkill.getResources()}). Returns
      * the most severe verdict across all files.
      */
+    /**
+     * 扫描完整技能：包含 SKILL.md 及所有配套文件。{@code resources} 为相对路径→文件内容映射
+     *（与 {@code AgentSkill.getResources()} 返回结构一致）。返回所有文件中判定等级最高的风险结论。
+     */
     public static ScanResult scan(String skillName, String skillMd, Map<String, String> resources) {
         List<Finding> all = new ArrayList<>();
         if (skillMd != null) {
@@ -277,6 +302,7 @@ public final class SkillSecurityScanner {
     }
 
     /** Scan a single file (used after {@code write_file} / {@code patch}). */
+    /** 扫描单个文件（在 {@code write_file} / {@code patch} 操作后调用）。 */
     public static ScanResult scanSingleFile(String relPath, String content) {
         List<Finding> findings = scanText(relPath, content);
         Verdict verdict = verdictFor(findings);
@@ -289,6 +315,12 @@ public final class SkillSecurityScanner {
      *
      * @return {@code true} if writing the skill should proceed; {@code false} if it must be
      *     blocked / rolled back.
+     */
+    /**
+     * 根据（信任等级 × 风险判定）映射得到安装决策。逻辑与 hermes
+     * {@code tools/skills_guard.py::INSTALL_POLICY} 保持一致。
+     *
+     * @return {@code true} 允许写入技能；{@code false} 需阻断并执行回滚
      */
     public static boolean shouldAllow(TrustLevel trust, Verdict verdict) {
         return switch (trust) {

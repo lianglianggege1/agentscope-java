@@ -39,6 +39,20 @@ import java.util.List;
  *   <li>{@code "agent"} — agent-created skill that has been promoted to the live skills root</li>
  * </ul>
  */
+/**
+ * 单技能运行遥测数据以及企业场景审计字段。以独立JSON对象持久存储于工作区Sidecar文件
+ * {@code skills/.usage.json}（每条记录对应一个技能，以技能名称作为键）。
+ *
+ * <p>字段命名刻意对齐 hermes-agent 中 {@code tools/skill_usage.py} 的Sidecar结构
+ *（通过 {@link JsonProperty} 序列化为下划线命名），便于用户跨环境迁移技能时，两套体系共用遥测文件。
+ *
+ * <p>{@code createdBy} 来源标识说明：
+ * <ul>
+ *   <li>{@code null} — 用户编写/平台安装/已有存量技能（不纳入自动运维管理与灰度准入管控）</li>
+ *   <li>{@code "agent-draft"} — 由代理通过 {@code skill_manage} 创建，尚未完成晋升的草稿技能</li>
+ *   <li>{@code "agent"} — 代理创建、且已晋升至正式技能目录的上线技能</li>
+ * </ul>
+ */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record SkillUsageRecord(
         @JsonProperty("created_by") String createdBy,
@@ -69,6 +83,7 @@ public record SkillUsageRecord(
     }
 
     /** Default record for a newly-tracked skill (just appeared on disk). */
+    /** 新纳入追踪的技能默认记录（文件刚被检测到时使用）。 */
     public static SkillUsageRecord defaults() {
         return new SkillUsageRecord(
                 null,
@@ -89,6 +104,7 @@ public record SkillUsageRecord(
     }
 
     /** Default record for a freshly created agent draft. */
+    /** 全新创建的代理草稿技能默认记录。 */
     public static SkillUsageRecord newAgentDraft(String sessionId) {
         return new SkillUsageRecord(
                 "agent-draft",
@@ -109,6 +125,7 @@ public record SkillUsageRecord(
     }
 
     /** Jackson constructor for tolerant decoding (missing fields default to null/0/false). */
+    /** Jackson 反序列化构造方法，支持容错解析（缺失字段默认置为 null/0/false）。 */
     @JsonCreator
     public static SkillUsageRecord ofJson(
             @JsonProperty("created_by") String createdBy,
@@ -145,6 +162,7 @@ public record SkillUsageRecord(
     }
 
     /** Latest of {@code last_used_at}, {@code last_viewed_at}, {@code last_patched_at}. */
+    /** {@code last_used_at}、{@code last_viewed_at}、{@code last_patched_at} 中的最新时间。 */
     @JsonIgnore
     public Instant latestActivityAt() {
         Instant latest = null;

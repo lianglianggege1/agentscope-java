@@ -23,6 +23,10 @@ import java.util.List;
  * Chains multiple {@link SkillVisibilityFilter}s with AND semantics: the output is the
  * intersection of every filter's output, applied in order.
  */
+/**
+ * 将多个 {@link SkillVisibilityFilter} 以逻辑与语义串联执行：
+ * 输出结果为所有过滤器筛选结果的交集，并按顺序依次应用。
+ */
 @SuppressWarnings("deprecation")
 public class CompositeFilter implements SkillVisibilityFilter {
 
