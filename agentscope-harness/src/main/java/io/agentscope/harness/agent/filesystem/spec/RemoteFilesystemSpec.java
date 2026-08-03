@@ -124,6 +124,13 @@ public class RemoteFilesystemSpec {
      * the store is injected automatically during build. Without a distributed store,
      * an {@link IllegalStateException} is thrown at build time.
      */
+    /**
+     * 创建远程文件系统描述符，将存储实例解析委托至
+     * {@link io.agentscope.harness.agent.DistributedStore#baseStore()}。
+     *
+     * <p>配合 {@code HarnessAgent.builder().distributedStore(store)} 使用时，
+     * 构建阶段会自动注入存储实例。若未提供分布式存储，构建时将抛出 {@link IllegalStateException}。
+     */
     public RemoteFilesystemSpec() {
         this.store = null;
     }
@@ -138,6 +145,7 @@ public class RemoteFilesystemSpec {
     /**
      * Returns whether the store has been set (either via constructor or injection).
      */
+    /** 返回存储实例是否已完成设置（通过构造器传入或依赖注入）。 */
     public boolean hasStore() {
         return store != null;
     }
@@ -145,6 +153,7 @@ public class RemoteFilesystemSpec {
     /**
      * Injects the store if not already set. Called by the builder during auto-wiring.
      */
+    /** 若存储实例尚未设置，则执行注入。由构建器在自动装配阶段调用。 */
     public void injectStoreIfAbsent(BaseStore store) {
         if (this.store == null) {
             this.store = store;
@@ -156,6 +165,10 @@ public class RemoteFilesystemSpec {
      *
      * <p>Examples: {@code knowledge/}, {@code prompts/}.
      */
+    /** 新增一条工作空间相对路径前缀，路由至共享存储。
+     *
+     * <p>示例：{@code knowledge/}、{@code prompts/}。
+     */
     public RemoteFilesystemSpec addSharedPrefix(String prefix) {
         if (prefix != null && !prefix.isBlank()) {
             extraSharedPrefixes.add(normalizePrefix(prefix));
@@ -166,6 +179,7 @@ public class RemoteFilesystemSpec {
     /**
      * Sets the fallback user identifier when runtime {@code userId} is absent/blank.
      */
+    /** 设置运行时 {@code userId} 缺失或为空时所使用的兜底用户标识。 */
     public RemoteFilesystemSpec anonymousUserId(String userId) {
         if (userId == null || userId.isBlank()) {
             throw new IllegalArgumentException("anonymous user id must not be blank");
@@ -183,6 +197,15 @@ public class RemoteFilesystemSpec {
      * @param scope isolation scope
      * @return this spec
      */
+    /**
+     * 设置隔离范围，用于控制共享文件对应的存储命名空间。
+     *
+     * <p>与沙箱 {@link io.agentscope.harness.agent.sandbox.SandboxContext} 的隔离语义保持一致。
+     * 默认值为 {@link IsolationScope#USER}。
+     *
+     * @param scope 隔离范围
+     * @return 当前描述符实例
+     */
     public RemoteFilesystemSpec isolationScope(IsolationScope scope) {
         if (scope == null) {
             throw new IllegalArgumentException("isolation scope must not be null");
@@ -198,6 +221,10 @@ public class RemoteFilesystemSpec {
     /**
      * Sets the workspace index for accelerating remote filesystem reads (ls/glob/exists/grep).
      * If not set, the remote filesystem falls back to full store scans.
+     */
+    /**
+     * 设置用于加速远程文件系统读取操作（ls/glob/exists/grep）的工作空间索引。
+     * 若未配置，远程文件系统将降级为全量存储扫描。
      */
     public RemoteFilesystemSpec workspaceIndex(WorkspaceIndex index) {
         this.workspaceIndex = index;
@@ -227,6 +254,24 @@ public class RemoteFilesystemSpec {
      *       against the overlay, which is satisfied by either layer.
      * </ul>
      */
+    /**
+     *
+     * <ul>
+     *   <li>默认后端：{@link LocalFilesystem}（不支持Shell），按用户划分命名空间
+     *   <li>共享路径前缀路由（{@code memory/}、{@code skills/}、{@code subagents/}、
+     *       {@code knowledge/}、{@code plans/}、{@code agents/<id>/sessions/}、
+     *       {@code agents/<id>/tasks/}，以及通过 {@code addSharedPrefix} 添加的额外路径）：
+     *       使用 {@link OverlayFilesystem} 封装；**上层**为 {@link RemoteFilesystem}（按用户隔离，持久化至 {@link BaseStore}），
+     *       **底层**是只读 {@link LocalFilesystem}，根目录指向 {@code workspace.resolve(<routeDir>)}。
+     *       因此 {@code <workspace>/skills/}、{@code <workspace>/subagents/} 等目录下的模板文件可作为基线内容被读取；
+     *       用户产生的修改通过写时复制机制存入远程存储，后续读取时覆盖模板内容。
+     *   <li>{@code AGENTS.md}、{@code MEMORY.md}、{@code tools.json} 精确文件路由：
+     *       使用 {@link OverlayFilesystem} 封装；**上层**为根路径 {@link RemoteFilesystem}，
+     *       **底层**为工作空间根目录下的只读 {@link LocalFilesystem}，工作空间根目录的模板文件作为基线可用。
+     *       在遍历/通配查询目录树时，{@link CompositeFilesystem} 不会递归遍历精确文件路由；
+     *       仅对联合文件系统执行一次 {@code exists} 判断，两层任意一层存在文件即可命中。
+     * </ul>
+     */
     public AbstractFilesystem toFilesystem(
             Path workspace, String agentId, NamespaceFactory localNamespaceFactory) {
         if (store == null) {
@@ -240,6 +285,9 @@ public class RemoteFilesystemSpec {
         // Read-only workspace-root template view for the exact-file overlays below. The lower
         // technically exposes the entire workspace, but CompositeFilesystem does not recurse into
         // exact-file routes (it does single-key exists/read), so the over-exposure is unreachable.
+        // 供下方精确文件联合层使用、基于工作空间根目录的只读模板视图。底层文件系统
+        // 理论上可访问整个工作空间，但CompositeFilesystem不会递归遍历精确文件路由
+        //（仅执行单路径存在性检查与读取操作），因此不会访问到超出预期的文件。
         LocalFilesystem workspaceTemplate = new LocalFilesystem(workspace, true, 10, null);
 
         Map<String, AbstractFilesystem> routes = new LinkedHashMap<>();
@@ -283,6 +331,11 @@ public class RemoteFilesystemSpec {
      * visible as the baseline. {@code virtualMode=true} on the lower so it reports paths anchored
      * to its own root, which is what {@link CompositeFilesystem}'s route remapping expects.
      */
+    /**
+     * 为工作空间路径前缀路由构建 {@link OverlayFilesystem}。上层为依托 {@link BaseStore}、按用户隔离的 {@link RemoteFilesystem}；
+     * 底层是以 {@code localTemplateDir} 为根目录的只读 {@link LocalFilesystem}，提供模板基线内容。
+     * 底层启用 {@code virtualMode=true}，使其返回路径基于自身根目录，契合 {@link CompositeFilesystem} 的路由重映射逻辑。
+     */
     private OverlayFilesystem overlayRoute(
             Path localTemplateDir, String routeSegment, String agentId) {
         RemoteFilesystem upper = remoteForRoute(routeSegment, agentId);
@@ -295,6 +348,11 @@ public class RemoteFilesystemSpec {
      * The upper layer is the per-user {@link RemoteFilesystem} on the {@code root} namespace
      * segment; the lower layer is the shared workspace-root {@link LocalFilesystem} so the
      * scaffolded template file ({@code workspace/<filename>}) is visible as the baseline.
+     */
+    /**
+     * 为精确文件路由（例如 {@code AGENTS.md}）构建 {@link OverlayFilesystem}。
+     * 上层为根命名空间段下、按用户隔离的 {@link RemoteFilesystem}；
+     * 底层是共享的工作空间根目录 {@link LocalFilesystem}，以此加载工作目录下对应的模板文件（{@code workspace/<filename>}）作为基线内容。
      */
     private OverlayFilesystem exactFileOverlay(
             String routeSegment, String agentId, LocalFilesystem workspaceTemplate) {

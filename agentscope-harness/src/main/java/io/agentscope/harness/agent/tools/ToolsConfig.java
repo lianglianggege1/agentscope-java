@@ -55,14 +55,17 @@ import java.util.Map;
 public class ToolsConfig {
 
     /** When non-empty, only tools whose name is in this list are exposed to the model. */
+    /** 当列表非空时，仅向模型暴露名称存在于此列表内的工具。 */
     @JsonProperty("allow")
     private List<String> allow;
 
     /** Tools whose name appears here are removed regardless of {@link #allow}. */
+    /** 名称出现在此列表中的工具将被移除，优先级高于 {@link #allow} 白名单。 */
     @JsonProperty("deny")
     private List<String> deny;
 
     /** Map of MCP server identifier to its connection / tool-allowlist configuration. */
+    /** MCP服务标识至连接配置、工具白名单配置的映射。 */
     @JsonProperty("mcpServers")
     private Map<String, McpServerConfig> mcpServers;
 

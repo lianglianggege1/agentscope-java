@@ -36,6 +36,10 @@ import org.junit.jupiter.api.io.TempDir;
  * entirely through {@link io.agentscope.harness.agent.filesystem.AbstractFilesystem}, making it
  * backend-agnostic.
  */
+/**
+ * 校验 {@link MemoryConsolidator} 读取每日台账、写入水位标记与 MEMORY.md 的操作
+ * 全部经由 {@link io.agentscope.harness.agent.filesystem.AbstractFilesystem} 执行，实现后端无关性。
+ */
 class MemoryConsolidatorFilesystemTest {
 
     private static void seedStoreFile(

@@ -53,9 +53,44 @@ import reactor.core.publisher.Mono;
  *       read-only context here.</li>
  * </ul>
  */
+/**
+ * 管理记忆落盘操作：从会话窗口提取长期记忆，并追加写入当日的每日记忆账本。
+ *
+ * <p><b>双层记忆模型</b>（当前类仅负责第一层）：
+ * <ul>
+ *   <li>{@code memory/YYYY-MM-DD.md} — 仅支持追加写入的每日账本。每次压缩落盘都会在此追加带时间戳的片段。仅由当前类执行写入。</li>
+ *   <li>{@code MEMORY.md} — 全局整理、去重、容量受限的长期记忆。仅由 {@link MemoryConsolidator} 周期性写入。本组件将其视为只读上下文。</li>
+ * </ul>
+ */
 public class MemoryFlushManager {
 
     private static final Logger log = LoggerFactory.getLogger(MemoryFlushManager.class);
+
+    /*
+     记忆提取环节的默认提示词。对外公开，调用方在构建
+     {@link io.agentscope.harness.agent.memory.MemoryConfig} 时可进行扩展
+    （例如追加项目专属约束）。
+    public static final String DEFAULT_FLUSH_PROMPT =
+        """
+        你是记忆提取助手。分析下方对话内容，提取需要留存至后续会话的重要事实、决策、偏好与上下文信息。
+
+        仅以Markdown无序列表形式输出提取出的记忆内容。每条内容为简洁且独立完整的信息；存在日期、人名、具体细节时一并保留。
+
+        若无值得记忆的内容，严格输出：NO_REPLY
+
+        提取准则：
+        - 提取用户偏好、个人信息、项目相关决议
+        - 记录关键技术决策及其背后理由
+        - 记下所有承诺、截止时间与待执行事项
+        - 留存人员协作信息（分工、团队架构）
+        - 忽略常规问候、工具调用、临时状态信息
+
+        重要写入规则（目标文件为追加模式）：
+        - 你写入的是**当日每日记忆账本（memory/YYYY-MM-DD.md）**，而非MEMORY.md。每日账本仅支持追加，你的输出会新增至已有记录末尾。
+        - MEMORY.md 是经过整理的长期记忆文件，仅作为只读上下文提供参考。不要重复记录MEMORY.md或今日已存在的条目；后续独立的整合任务会定期将新增账本内容合并至MEMORY.md。
+        - 每条记录保持独立完整，支持单独检索。
+        """;
+     */
 
     /**
      * Default prompt for the memory extraction step. Exposed publicly so callers can extend
@@ -103,6 +138,10 @@ public class MemoryFlushManager {
      * @param flushPrompt SYSTEM prompt for the extraction LLM call. {@code null} falls back to
      *     {@link #DEFAULT_FLUSH_PROMPT}.
      */
+    /**
+     * @param flushPrompt 记忆提取大模型调用使用的系统提示词。传入 {@code null}
+     *     将使用 {@link #DEFAULT_FLUSH_PROMPT}。
+     */
     public MemoryFlushManager(WorkspaceManager workspaceManager, Model model, String flushPrompt) {
         this.workspaceManager = workspaceManager;
         this.model = model;
@@ -114,6 +153,12 @@ public class MemoryFlushManager {
      *
      * <p>Provides existing MEMORY.md and today's daily file content to the extraction LLM
      * so it can effectively deduplicate and avoid re-extracting known facts.
+     */
+    /**
+     * 调用模型从会话消息中提取长期记忆并写入磁盘。
+     *
+     * <p>会将当前 MEMORY.md 与当日每日账本内容一并提供给记忆提取大模型，
+     * 以此实现有效去重，避免重复提取已记录信息。
      */
     public Mono<Void> flushMemories(RuntimeContext rc, List<Msg> messages) {
         String conversationText = serializeMessages(messages);
@@ -191,6 +236,10 @@ public class MemoryFlushManager {
      * session are offloaded. Used by the compaction layer to embed the archive location in the
      * summary message so the agent can retrieve full history if needed.
      */
+    /**
+     * 返回会话JSONL文件的字符串路径，指定智能体与会话的消息将转储至该文件。
+     * 压缩层使用该路径，将归档位置嵌入摘要消息，以便智能体在需要时读取完整历史记录。
+     */
     public String resolveOffloadPath(RuntimeContext rc, String agentId, String sessionId) {
         try {
             Path p = workspaceManager.resolveSessionContextFile(rc, agentId, sessionId);
@@ -207,6 +256,9 @@ public class MemoryFlushManager {
 
     /**
      * Offloads raw messages to the JSONL session tree.
+     */
+    /**
+     * 将原始消息转储至JSONL会话目录树。
      */
     public void offloadMessages(
             RuntimeContext rc, List<Msg> messages, String agentId, String sessionId) {
@@ -244,6 +296,8 @@ public class MemoryFlushManager {
             tree.load();
             // Sync from remote before appending so that entries written by a previous replica
             // (cross-machine handoff) are included in the merged file pushed to remote.
+            // 追加数据前先从远端同步，确保上一副本（跨机器交接场景）写入的条目
+            // 能够纳入合并后的文件并推送至远端。
             tree.syncFromRemote();
 
             List<SessionEntry> existingEntries = new ArrayList<>(tree.getAllEntries());
@@ -258,6 +312,8 @@ public class MemoryFlushManager {
 
             // The caller passes the full conversation on every turn. Use the stable Msg IDs
             // to keep the session JSONL append-only and idempotent across repeated offloads.
+            // 调用方每一轮都会传入完整对话。依靠稳定的消息ID，
+            // 保障会话JSONL文件仅支持追加写入，且多次转储操作具备幂等性。
             for (Msg msg : messages) {
                 if (msg.getRole() == null || isSessionContextMessage(msg)) {
                     continue;
@@ -295,6 +351,11 @@ public class MemoryFlushManager {
      * For TOOL messages, returns the first ToolResultBlock's id.
      * For ASSISTANT messages with tool calls, returns the first ToolUseBlock's id.
      */
+    /**
+     * 从消息中提取具有代表性的工具调用ID（如有）。
+     * 若为工具消息，返回首个工具结果块的ID。
+     * 若为携带工具调用的助手消息，返回首个工具调用块的ID。
+     */
     private static String extractToolCallId(Msg msg) {
         for (ContentBlock block : msg.getContent()) {
             if (block instanceof ToolResultBlock tr && tr.getId() != null) {
@@ -317,6 +378,12 @@ public class MemoryFlushManager {
      * <p>MEMORY.md is intentionally <b>NOT</b> touched here — it is owned by
      * {@link MemoryConsolidator}, which periodically merges the daily ledgers into a
      * curated, size-bounded MEMORY.md.
+     */
+    /**
+     * 将提取出的条目追加至当日记忆台账。
+     *
+     * <p>此处刻意不操作 MEMORY.md 文件，该文件由 {@link MemoryConsolidator} 统一管理；
+     * 记忆整合器会定期合并各日台账，生成经过整理、容量受控的 MEMORY.md。
      */
     private void writeMemoryFiles(RuntimeContext rc, String content) {
         String today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
@@ -349,6 +416,12 @@ public class MemoryFlushManager {
      * The injected {@code <session_context>} user message is skipped as it contains only
      * environment metadata, not real conversation content.
      */
+    /**
+     * 将所有消息序列化为文本形式，供记忆抽取模型使用。
+     * 包含用户、助手及工具消息。助手工具调用块与工具结果块会被精简渲染，
+     * 使模型能够从工具交互内容中提取记忆。
+     * 注入的{@code <session_context>}用户消息将被跳过，因其仅包含环境元数据，不含真实对话内容。
+     */
     private String serializeMessages(List<Msg> messages) {
         return messages.stream()
                 .filter(m -> m.getRole() != null && m.getRole() != MsgRole.SYSTEM)
@@ -377,6 +450,10 @@ public class MemoryFlushManager {
     /**
      * Renders all content blocks of a message into a single text string.
      * Returns null if no renderable content is found.
+     */
+    /**
+     * 将消息内所有内容块渲染为单个文本字符串。
+     * 若无可渲染内容，则返回 null。
      */
     private String renderContentBlocks(Msg msg) {
         List<ContentBlock> blocks = msg.getContent();

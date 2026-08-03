@@ -22,6 +22,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
+// 明天这一块快速的了解一下 然后就去看memory里面的 长期和短期
 /**
  * One MCP server entry under {@code mcpServers.<name>} in {@code tools.json}.
  *

@@ -38,6 +38,7 @@ import java.util.Map;
 public record StoreItem(String key, Map<String, Object> value, long version) {
 
     /** Back-compat constructor for code that does not yet supply a version. */
+    /** 兼容旧版本的构造器，用于尚未传入版本号的代码。 */
     public StoreItem(String key, Map<String, Object> value) {
         this(key, value, 0L);
     }

@@ -30,6 +30,15 @@ import java.time.ZonedDateTime;
  *   <li><b>Idle timeout:</b> AgentStateStore resets after inactivity exceeding a threshold</li>
  * </ul>
  */
+/**
+ * 评估会话是否仍处于“新鲜状态”，或是应当重置。
+ *
+ * <p>参考 agentscope-claw 的会话新鲜度评估器。支持两种重置策略：
+ * <ul>
+ *   <li><b>每日重置：</b>智能体状态存储在每日指定时点后执行重置</li>
+ *   <li><b>空闲超时：</b>闲置时长超过阈值后重置智能体状态存储</li>
+ * </ul>
+ */
 public class SessionFreshnessEvaluator {
 
     private final int dailyResetHour;
@@ -39,6 +48,10 @@ public class SessionFreshnessEvaluator {
     /**
      * Creates a freshness evaluator with default settings:
      * daily reset at 4 AM, idle timeout of 2 hours, system timezone.
+     */
+    /**
+     * 使用默认配置创建新鲜度评估器：
+     * 每日凌晨4点重置，空闲超时时长2小时，采用系统时区。
      */
     public SessionFreshnessEvaluator() {
         this(4, Duration.ofHours(2), ZoneId.systemDefault());
@@ -55,6 +68,12 @@ public class SessionFreshnessEvaluator {
      *
      * @param lastActivityAt the timestamp of the last activity in the session
      * @return true if the session should be reset
+     */
+    /**
+     * 判断会话是否已失效，需要执行重置。
+     *
+     * @param lastActivityAt 会话最后一次活动的时间戳
+     * @return 需要重置会话则返回 true
      */
     public boolean isStale(Instant lastActivityAt) {
         if (lastActivityAt == null) {

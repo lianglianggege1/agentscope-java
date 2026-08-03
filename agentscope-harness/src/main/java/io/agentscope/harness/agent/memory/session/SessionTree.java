@@ -65,12 +65,40 @@ import org.slf4j.LoggerFactory;
  * (typically after the first assistant message). This avoids partial session files from
  * failed/short interactions.
  */
+/**
+ * 管理仅追加写入的JSONL会话树（参考pi-mono设计）。
+ *
+ * <p>会话文件为JSONL格式，每行是序列化后的{@link SessionEntry}对象。
+ * 条目通过{@code id}/{@code parentId}关联形成树形结构。配套的{@code .log.jsonl}文件
+ * 保存完整历史记录，便于检索（源自pi-mono mom的双文件架构）。
+ *
+ * <h2>文件布局</h2>
+ * <pre>
+ *   agents/{agentId}/sessions/{sessionId}.jsonl      — 大模型上下文（经过压缩）
+ *   agents/{agentId}/sessions/{sessionId}.log.jsonl   — 完整历史（仅追加，永不压缩）
+ * </pre>
+ *
+ * <h2>持久化模型</h2>
+ * 本地文件作为工作副本；远端{@link AbstractFilesystem}（配置启用时）
+ * 用于跨副本数据镜像。每次调用{@link #load()}时，拉取远端数据并与本地文件合并，
+ * 使当前实例能够读取其他机器写入的条目。
+ * 每次调用{@link #flush()}时，待落地条目同步追加至本地文件，
+ * 随后异步镜像至远端文件系统（发后即忘、尽力投递）。
+ *
+ * <h2>延迟持久化</h2>
+ * 条目先缓存于内存，首次调用{@link #flush()}（通常在首条助手消息生成后）才写入磁盘。
+ * 避免交互异常或提前终止产生残缺会话文件。
+ */
 public class SessionTree {
 
     /**
      * Captured at construction time (or via {@link #setRuntimeContext}); used as the
      * {@code RuntimeContext} for all remote filesystem operations so that namespace-aware stores
      * resolve to the writer's namespace even when invoked from the async mirror thread.
+     */
+    /**
+     * 在构造时（或通过 {@link #setRuntimeContext}）捕获，作为所有远端文件系统操作的 {@code RuntimeContext}。
+     * 以此确保具备命名空间感知的存储能够解析至写入方所属命名空间，即便操作由异步镜像线程发起。
      */
     private volatile RuntimeContext fsRc = RuntimeContext.empty();
 
@@ -79,6 +107,10 @@ public class SessionTree {
     /**
      * Daemon executor used for fire-and-forget remote mirrors so that flush() never blocks callers
      * on remote I/O. A single thread is intentional: serialises uploads for the same session.
+     */
+    /**
+     * 用于执行发后即忘式远端镜像同步的守护线程执行器，保证 flush() 不会因远端IO阻塞调用方。
+     * 刻意采用单线程：对同一会话的上传操作串行执行。
      */
     private static final ExecutorService MIRROR_EXECUTOR =
             Executors.newSingleThreadExecutor(
@@ -113,6 +145,14 @@ public class SessionTree {
      * @param filesystem   {@link AbstractFilesystem} used for remote read/write; may be
      *                     {@code null} to disable remote mirroring (local-only mode)
      */
+    /**
+     * 创建由指定文件系统提供远端镜像能力的会话树实例。
+     *
+     * @param contextFile  {@code .jsonl}上下文文件路径（面向大模型，经过压缩）
+     * @param workspaceRoot 智能体工作空间根目录；用于生成工作空间相对路径
+     * @param filesystem   用于远端读写的{@link AbstractFilesystem}；可传入{@code null}
+     *                     关闭远端镜像功能（本地运行模式）
+     */
     public SessionTree(Path contextFile, Path workspaceRoot, AbstractFilesystem filesystem) {
         this(contextFile, workspaceRoot, filesystem, null, null);
     }
@@ -136,6 +176,18 @@ public class SessionTree {
      *                             prefix (e.g. {@code agents/X/sessions/Y.jsonl}); when non-null,
      *                             used for filesystem mirror/restore instead of computing via
      *                             {@link #toWorkspaceRelative(Path)}
+     */
+    /**
+     * 创建会话树实例，可选启用尽力型工作空间索引能力。
+     *
+     * @param contextFile          {@code .jsonl}上下文文件路径
+     * @param workspaceRoot        智能体工作空间根目录
+     * @param filesystem           远端文件系统；允许传入 {@code null}
+     * @param index                尽力型工作空间索引；允许传入 {@code null}
+     * @param contextRelativePath  上下文文件相对于工作空间的路径，**不含命名空间前缀**
+     *                             （例如 {@code agents/X/sessions/Y.jsonl}）；非空时，
+     *                             文件系统镜像/还原操作将直接使用该路径，不再通过
+     *                             {@link #toWorkspaceRelative(Path)} 计算生成
      */
     public SessionTree(
             Path contextFile,
@@ -171,6 +223,14 @@ public class SessionTree {
      * @param rc the runtime context to bind; {@code null} resets to empty
      * @return this tree, for fluent chaining
      */
+    /**
+     * 为此会话树绑定 {@link RuntimeContext}，后续所有远端文件系统读写操作
+     *（包括异步镜像任务）都会传递调用方身份至具备命名空间感知的存储组件。
+     * 若从未设置，默认使用 {@link RuntimeContext#empty()}。
+     *
+     * @param rc 待绑定的运行时上下文；传入 {@code null} 则重置为空上下文
+     * @return 当前会话树实例，支持流式链式调用
+     */
     public SessionTree setRuntimeContext(RuntimeContext rc) {
         this.fsRc = rc != null ? rc : RuntimeContext.empty();
         return this;
@@ -185,6 +245,15 @@ public class SessionTree {
      * {@link #syncFromRemote()} after this method.
      *
      * <p>Safe to call multiple times; only loads once.
+     */
+    /**
+     * 从本地上下文文件加载已有条目至内存会话树。
+     *
+     * <p>该操作**仅访问本地、无网络请求**。若本地文件不存在，则会话树初始为空。
+     * 如果需要额外拉取远端文件系统数据并执行合并（例如跨机器交接后的写入前置操作），
+     * 请在调用本方法后执行 {@link #syncFromRemote()}。
+     *
+     * <p>支持多次调用；实际仅执行一次加载。
      */
     public void load() {
         if (loaded) {
@@ -227,6 +296,20 @@ public class SessionTree {
      *
      * <p>{@link #load()} must be called before this method.
      */
+    /**
+     * 拉取远端上下文文件，并将本地尚未存在的条目进行合并。
+     *
+     * <p>远端视为权威基准：优先载入远端条目，再追加仅存在于本地（已写入但尚未同步）的条目。
+     * 若远端包含本地缺失的条目，则使用合并后内容覆盖本地文件，并将新增条目追加至本地日志文件。
+     *
+     * <p>该操作**涉及网络请求**，仅在需要跨机器数据一致性时调用（常见于写入链路，
+     * 例如 {@link io.agentscope.harness.agent.memory.MemoryFlushManager}）。
+     * 只读查询场景应仅使用 {@link #load()}，保证访问为本地快速操作。
+     *
+     * <p>未配置远端文件系统或远端读取失败时，该方法无实际动作（异常仅记录警告日志）。
+     *
+     * <p>调用本方法前必须先执行 {@link #load()}。
+     */
     public void syncFromRemote() {
         if (filesystem == null || workspaceRoot == null) {
             return;
@@ -247,6 +330,7 @@ public class SessionTree {
         }
 
         // Rebuild merged list: remote base + local-only extras at the end.
+        // 重构合并条目列表：远端基准条目在前，仅本地新增条目追加至末尾。
         Set<String> remoteIds =
                 remoteEntries.stream()
                         .map(SessionEntry::getId)
@@ -262,10 +346,12 @@ public class SessionTree {
         appendToFile(logFile, remoteNewEntries);
 
         // Update in-memory state with the newly discovered remote entries.
+        // 使用新拉取到的远端条目更新内存状态。
         for (SessionEntry entry : remoteNewEntries) {
             entriesById.put(entry.getId(), entry);
         }
         // Re-build appendOrder to match the merged order (remote base first).
+        // 重建追加顺序，与合并序列保持一致（远端基准条目优先）。
         appendOrder.clear();
         appendOrder.addAll(merged);
         for (SessionEntry entry : remoteNewEntries) {
@@ -287,6 +373,11 @@ public class SessionTree {
      *
      * @return the entry (for chaining)
      */
+    /**
+     * 向内存会话树追加一条条目。该条目将在下一次调用 {@link #flush()} 时持久化至磁盘。
+     *
+     * @return 当前条目（支持链式调用）
+     */
     public SessionEntry append(SessionEntry entry) {
         entriesById.put(entry.getId(), entry);
         appendOrder.add(entry);
@@ -307,6 +398,11 @@ public class SessionTree {
      * <p>The remote mirror is fire-and-forget: failures are logged as warnings and do not affect
      * the return of this method. The local write is always the primary guarantee.
      */
+    /**
+     * 将所有待落地条目同步写入本地上下文文件与本地日志文件，随后调度异步任务尽力同步镜像至远端文件系统。
+     *
+     * <p>远端镜像采用发后即忘模式：同步失败仅记录警告日志，不会影响本方法返回。本地写入作为首要数据保障。
+     */
     public void flush() {
         if (pendingWrites.isEmpty()) {
             return;
@@ -324,6 +420,9 @@ public class SessionTree {
     /**
      * Returns whether {@link #flush()} has been called at least once.
      */
+    /**
+     * 返回 {@link #flush()} 是否至少被调用过一次。
+     */
     public boolean isFlushed() {
         return flushed;
     }
@@ -336,6 +435,15 @@ public class SessionTree {
      *   <li>If compaction has occurred, starts with the summary entry, then all entries
      *       from {@code firstKeptEntryId} onward</li>
      *   <li>If no compaction, returns all message entries in order</li>
+     * </ul>
+     */
+    /**
+     * 基于会话树构建对大模型可见的上下文。
+     *
+     * <p>返回大模型能够读取的条目集合：
+     * <ul>
+     *   <li>若已执行压缩：以摘要条目作为起始，随后展示 {@code firstKeptEntryId} 及之后的所有条目</li>
+     *   <li>若无压缩操作：按顺序返回全部消息条目</li>
      * </ul>
      */
     public List<SessionEntry> buildContext() {
@@ -372,12 +480,18 @@ public class SessionTree {
     /**
      * Returns all entries in append order (full history).
      */
+    /**
+     * 按追加顺序返回全部条目（完整历史记录）。
+     */
     public List<SessionEntry> getAllEntries() {
         return Collections.unmodifiableList(appendOrder);
     }
 
     /**
      * Returns only message entries in append order.
+     */
+    /**
+     * 按追加顺序仅返回消息类型条目。
      */
     public List<SessionEntry.MessageEntry> getMessageEntries() {
         return appendOrder.stream()
@@ -404,6 +518,12 @@ public class SessionTree {
      * agent was inactive.
      *
      * @return the number of new entries synced
+     */
+    /**
+     * 同步日志文件中尚未存在于上下文文件的条目。
+     * 用于处理智能体休眠期间追加至日志文件的离线消息。
+     *
+     * @return 已同步的新增条目数量
      */
     public int syncFromLog() {
         restoreFromMirror(logFile);
@@ -456,20 +576,28 @@ public class SessionTree {
      * filesystem. Uses a daemon single-thread executor to serialise uploads and avoid
      * blocking the caller on remote I/O.
      */
+    /**
+     * 调度异步尽力同步任务，将两份会话文件镜像至远端文件系统。
+     * 采用守护单线程执行器串行处理上传任务，避免远端IO阻塞调用方。
+     */
     private void scheduleMirror() {
         if (filesystem == null || workspaceRoot == null) {
             return;
         }
-        MIRROR_EXECUTOR.execute(
-                () -> {
+//        MIRROR_EXECUTOR.execute(
+//                () -> {
                     mirrorToFilesystem(contextFile, resolveRelativePath(contextFile));
                     mirrorToFilesystem(logFile, resolveRelativePath(logFile));
-                });
+//                });
     }
 
     /**
      * Fetches the remote copy of {@code file} and parses it as JSONL session entries.
      * Returns an empty list if no filesystem is configured or the remote read fails.
+     */
+    /**
+     * 拉取 {@code file} 的远端副本并解析为JSONL会话条目。
+     * 未配置文件系统或远端读取失败时返回空列表。
      */
     private List<SessionEntry> pullRemoteEntries(Path file) {
         if (filesystem == null || workspaceRoot == null) {
@@ -490,6 +618,10 @@ public class SessionTree {
      * Reads and parses the local copy of {@code file} as JSONL session entries.
      * Returns an empty list if the file does not exist or cannot be read.
      */
+    /**
+     * 读取并解析 {@code file} 本地副本，转换为JSONL会话条目。
+     * 文件不存在或读取失败时返回空列表。
+     */
     private List<SessionEntry> readLocalEntries(Path file) {
         if (!Files.isRegularFile(file)) {
             return List.of();
@@ -508,6 +640,9 @@ public class SessionTree {
     }
 
     /** Parses a JSONL string into a list of {@link SessionEntry} objects, skipping bad lines. */
+    /**
+     * 将JSONL字符串解析为 {@link SessionEntry} 对象列表，跳过格式异常行。
+     */
     private List<SessionEntry> parseJsonlEntries(String content) {
         List<SessionEntry> result = new ArrayList<>();
         for (String line : content.split("\n", -1)) {
@@ -525,6 +660,9 @@ public class SessionTree {
     }
 
     /** Overwrites {@code file} with the serialised form of {@code entries} (TRUNCATE + WRITE). */
+    /**
+     * 使用条目序列化内容覆盖写入 {@code file}（先清空文件，再写入数据）。
+     */
     private void overwriteFile(Path file, List<SessionEntry> entries) {
         try {
             if (file.getParent() != null) {
@@ -573,6 +711,9 @@ public class SessionTree {
      * Uploads {@code file} to the remote filesystem (full-file upload). Only called from the
      * mirror executor thread; failures are logged as warnings.
      */
+    /**
+     * 将 {@code file} 完整上传至远端文件系统。仅由镜像执行线程调用；上传失败仅记录警告日志。
+     */
     private void mirrorToFilesystem(Path file, String relativePath) {
         if (filesystem == null || workspaceRoot == null || !Files.isRegularFile(file)) {
             return;
@@ -595,6 +736,10 @@ public class SessionTree {
     /**
      * Restores {@code file} from the remote filesystem mirror when the local file is absent.
      * Used by {@link #syncFromLog()} to ensure the log file is available locally before reading.
+     */
+    /**
+     * 本地文件缺失时，从远端文件镜像恢复 {@code file}。
+     * 由 {@link #syncFromLog()} 调用，确保读取前本地存在日志文件。
      */
     private void restoreFromMirror(Path file) {
         if (filesystem == null || workspaceRoot == null || Files.isRegularFile(file)) {

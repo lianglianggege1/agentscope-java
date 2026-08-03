@@ -64,6 +64,11 @@ public final class ToolsConfigLoader {
      * {@link Optional#empty()} when the file is missing, blank, unreadable (e.g. sandbox
      * filesystem accessed before its call context exists), or unparseable.
      */
+    /**
+     * 读取由 {@code wsManager} 管理的工作目录下相对路径的 {@code tools.json}。
+     * 当文件缺失、内容为空、无法读取（例如沙箱文件系统在调用上下文初始化前被访问）
+     * 或解析失败时，返回 {@link Optional#empty()}。
+     */
     public static Optional<ToolsConfig> load(WorkspaceManager wsManager) {
         if (wsManager == null) {
             return Optional.empty();
@@ -102,6 +107,11 @@ public final class ToolsConfigLoader {
      * Replaces {@code ${VAR}} occurrences in {@code raw} with {@link System#getenv} values. Unset
      * variables resolve to an empty string and are logged at WARN. Useful so that headers like
      * {@code "Authorization": "Bearer ${GITHUB_TOKEN}"} can stay out of the workspace file.
+     */
+    /**
+     * 将文本 {@code raw} 中的 {@code ${VAR}} 占位符替换为 {@link System#getenv} 获取的环境变量值。
+     * 未定义的变量将解析为空字符串，并输出 WARN 级别日志。
+     * 适用于将诸如 {@code "Authorization": "Bearer ${GITHUB_TOKEN}"} 这类密钥配置脱离工作目录文件存储。
      */
     static String substituteEnv(String raw) {
         Matcher m = ENV_VAR.matcher(raw);

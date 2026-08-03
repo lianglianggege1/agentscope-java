@@ -45,27 +45,58 @@ import java.util.Objects;
  * <p>All fields have sensible defaults; {@link #defaults()} returns a config equivalent
  * to the harness's historical behavior so adopting this class is a no-op upgrade.
  */
+/**
+ * 长期记忆流水线统一配置（包含持久落盘、整合、维护流程）。
+ * 上下文摘要流水线请搭配 {@link CompactionConfig} 使用。
+ *
+ * <p>运行框架包含三类由大模型驱动的记忆操作，各自独立配置提示词与触发规则：
+ *
+ * <ol>
+ *   <li><b>持久落盘(Flush)</b> — 从会话窗口提取长期记忆，写入当日记忆账本
+ *       ({@code memory/YYYY-MM-DD.md})。提示词：{@link #flushPrompt()}，
+ *       默认值 {@link MemoryFlushManager#DEFAULT_FLUSH_PROMPT}。触发规则：
+ *       {@link #flushTrigger()}。</li>
+ *   <li><b>记忆整合(Consolidation)</b> — 周期性合并每日账本，生成整理后的
+ *       {@code MEMORY.md}。提示词：{@link #consolidationPrompt()}，默认值
+ *       {@link MemoryConsolidator#DEFAULT_CONSOLIDATION_PROMPT}。执行间隔：
+ *       {@link #consolidationMinGap()}。</li>
+ *   <li><b>会话精简摘要(Compaction summary)</b> — 在推理前将前置会话浓缩为
+ *       单条摘要消息。提示词位于 {@link CompactionConfig#getSummaryPrompt()}；
+ *       通过 {@code .compaction(CompactionConfig...)} 配置，不在当前类设置。</li>
+ * </ol>
+ *
+ * <p>所有配置项均提供合理默认值；{@link #defaults()} 返回的配置与框架原有行为保持一致，
+ * 接入本类可实现无感知升级。
+ */
 public final class MemoryConfig {
 
     /** Default {@code consolidationMaxTokens}. */
+    /** 默认 {@code consolidationMaxTokens} 参数值。 */
     public static final int DEFAULT_CONSOLIDATION_MAX_TOKENS = 4_000;
 
     /** Default {@code consolidationMinGap} — matches {@code MemoryMaintenanceMiddleware}. */
+    /** 默认 {@code consolidationMinGap}，与 {@code MemoryMaintenanceMiddleware} 保持一致。 */
     public static final Duration DEFAULT_CONSOLIDATION_MIN_GAP = Duration.ofMinutes(30);
 
     /** Default retention before a daily ledger is archived. */
+    /** 每日记忆账本归档前的默认保留时长。 */
     public static final int DEFAULT_DAILY_FILE_RETENTION_DAYS = 90;
 
     /** Default retention before a session JSONL log is pruned. */
+    /** 会话JSONL日志清理前的默认保留时长。 */
     public static final int DEFAULT_SESSION_RETENTION_DAYS = 180;
 
     /** Strategy for the per-call flush hook. See {@link FlushTrigger}. */
+    /** 单次会话记忆落盘钩子触发策略，参见 {@link FlushTrigger}。 */
     public enum FlushMode {
         /** Flush after every agent call. */
+        /** 每次智能体调用完成后执行记忆落盘。 */
         ALWAYS,
         /** Disable per-call flush entirely (offload still runs). */
+        /** 完全关闭单次调用记忆落盘（后台离线任务仍正常执行）。 */
         NEVER,
         /** Flush at most once per {@link FlushTrigger#minGap()}. */
+        /** 每个时间间隔内最多执行一次记忆落盘，间隔由 {@link FlushTrigger#minGap()} 指定。 */
         THROTTLED
     }
 
@@ -74,6 +105,11 @@ public final class MemoryConfig {
      *
      * <p>{@code throttled(Duration.ZERO)} normalises to {@link #always()} so callers do not
      * need a special branch for the degenerate case.
+     */
+    /**
+     * {@link io.agentscope.harness.agent.middleware.MemoryFlushMiddleware} 的触发策略。
+     *
+     * <p>当 {@code throttled(Duration.ZERO)} 时将等价归一为 {@link #always()}，调用方无需针对该边界场景编写特殊分支逻辑。
      */
     public static final class FlushTrigger {
 
@@ -163,6 +199,10 @@ public final class MemoryConfig {
      * Optional model override for memory operations (flush + consolidation).
      * {@code null} means use the agent's primary model.
      */
+    /**
+     * 记忆相关操作（落盘、整合）可选的模型覆盖配置。
+     * 若为 {@code null}，则使用智能体主模型。
+     */
     public Model model() {
         return model;
     }
@@ -170,6 +210,10 @@ public final class MemoryConfig {
     /**
      * Override for the flush prompt. {@code null} means use
      * {@link MemoryFlushManager#DEFAULT_FLUSH_PROMPT}.
+     */
+    /**
+     * 记忆落盘提示词覆盖配置。若为 {@code null}，
+     * 将使用 {@link MemoryFlushManager#DEFAULT_FLUSH_PROMPT}。
      */
     public String flushPrompt() {
         return flushPrompt;
@@ -181,6 +225,13 @@ public final class MemoryConfig {
      *
      * <p>Custom prompts must contain exactly two {@code %d} placeholders (max-tokens and
      * max-chars, in that order). The Builder enforces this at construction time.
+     */
+    /**
+     * 记忆整合提示词覆盖配置。若为 {@code null}，
+     * 将使用 {@link MemoryConsolidator#DEFAULT_CONSOLIDATION_PROMPT}。
+     *
+     * <p>自定义提示词必须包含恰好两个 {@code %d} 占位符（顺序依次为最大Token数、最大字符数）。
+     * 构建器会在实例创建阶段校验该约束。
      */
     public String consolidationPrompt() {
         return consolidationPrompt;
@@ -207,6 +258,7 @@ public final class MemoryConfig {
     }
 
     /** Returns a config equivalent to the harness's historical defaults. */
+    /** 返回与框架原有默认行为保持一致的配置实例。 */
     public static MemoryConfig defaults() {
         return new Builder().build();
     }
@@ -231,6 +283,11 @@ public final class MemoryConfig {
          * allowing a lighter/cheaper model than the agent's primary reasoning model.
          * When not set, the agent's primary model is used.
          */
+        /**
+         * 为记忆操作（落盘、整合）设置独立模型，
+         * 可选用比智能体主推理模型更轻量、低成本的模型。
+         * 如不配置，则使用智能体主模型。
+         */
         public Builder model(Model model) {
             this.model = model;
             return this;
@@ -239,6 +296,12 @@ public final class MemoryConfig {
         /**
          * Sets a dedicated model for memory operations by model id string
          * (e.g. {@code "openai:gpt-4.1-mini"}).
+         *
+         * @see ModelRegistry#resolve(String)
+         */
+        /**
+         * 通过模型标识字符串为记忆操作设置独立模型
+         *（例如 {@code "openai:gpt-4.1-mini"}）。
          *
          * @see ModelRegistry#resolve(String)
          */
@@ -251,6 +314,10 @@ public final class MemoryConfig {
          * Overrides the prompt used by {@link MemoryFlushManager#flushMemories}.
          * {@code null} restores the default. The text is passed verbatim as a SYSTEM
          * message — it does not need any placeholders.
+         */
+        /**
+         * 覆盖 {@link MemoryFlushManager#flushMemories} 使用的提示词。
+         * 设置为 {@code null} 将恢复默认提示词。文本会直接作为系统消息传入，无需占位符。
          */
         public Builder flushPrompt(String flushPrompt) {
             this.flushPrompt = flushPrompt;
@@ -265,6 +332,13 @@ public final class MemoryConfig {
          *
          * @throws IllegalArgumentException if the prompt does not contain exactly two
          *     {@code %d} placeholders
+         */
+        /**
+         * 覆盖 {@link MemoryConsolidator#consolidate} 使用的提示词。该提示词通过 {@link String#format}
+         * 渲染，接收两个整型参数（最大token数量、最大字符数量），因此自定义提示词必须恰好包含两个
+         * {@code %d} 占位符。设置为 {@code null} 将恢复默认提示词。
+         *
+         * @throws IllegalArgumentException 当提示词不含恰好两个 {@code %d} 占位符时抛出
          */
         public Builder consolidationPrompt(String consolidationPrompt) {
             if (consolidationPrompt != null) {
@@ -281,6 +355,7 @@ public final class MemoryConfig {
         }
 
         /** Token budget passed to the consolidation prompt. Must be positive. */
+        /** 传入记忆整合提示词的Token配额，必须大于0。 */
         public Builder consolidationMaxTokens(int consolidationMaxTokens) {
             if (consolidationMaxTokens <= 0) {
                 throw new IllegalArgumentException(
@@ -291,6 +366,7 @@ public final class MemoryConfig {
         }
 
         /** Minimum gap between two consolidation/maintenance runs. Must not be null. */
+        /** 两次记忆整合/维护任务之间的最小间隔，禁止为null。 */
         public Builder consolidationMinGap(Duration consolidationMinGap) {
             if (consolidationMinGap == null) {
                 throw new IllegalArgumentException("consolidationMinGap must not be null");
@@ -303,6 +379,7 @@ public final class MemoryConfig {
         }
 
         /** Days before a daily ledger is moved to {@code memory/archive/}. */
+        /** 每日记忆账本迁移至 {@code memory/archive/} 前的保留天数。 */
         public Builder dailyFileRetentionDays(int dailyFileRetentionDays) {
             if (dailyFileRetentionDays <= 0) {
                 throw new IllegalArgumentException(
@@ -313,6 +390,7 @@ public final class MemoryConfig {
         }
 
         /** Days before a session JSONL log is pruned. */
+        /** 会话JSONL日志被清理前的保留天数。 */
         public Builder sessionRetentionDays(int sessionRetentionDays) {
             if (sessionRetentionDays <= 0) {
                 throw new IllegalArgumentException(
@@ -323,6 +401,7 @@ public final class MemoryConfig {
         }
 
         /** Trigger policy for the per-call flush hook. Must not be null. */
+        /** 单次调用记忆落盘钩子的触发策略，禁止为null。 */
         public Builder flushTrigger(FlushTrigger flushTrigger) {
             if (flushTrigger == null) {
                 throw new IllegalArgumentException("flushTrigger must not be null");

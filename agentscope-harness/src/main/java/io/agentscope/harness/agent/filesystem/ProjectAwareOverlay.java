@@ -77,6 +77,12 @@ public class ProjectAwareOverlay extends OverlayFilesystem implements AbstractSa
      * @param projectFs writable project filesystem for non-workspace writes
      * @param workspaceRoot absolute path of the workspace, used to classify absolute paths
      */
+    /**
+     * @param upper 支持Shell的工作空间文件系统（可读写，工作空间根目录）
+     * @param lower 只读项目文件系统（联合文件系统降级层）
+     * @param projectFs 可写入的项目文件系统，用于工作空间以外的数据写入
+     * @param workspaceRoot 工作空间绝对路径，用于区分各类绝对路径归属
+     */
     public ProjectAwareOverlay(
             AbstractSandboxFilesystem upper,
             AbstractFilesystem lower,

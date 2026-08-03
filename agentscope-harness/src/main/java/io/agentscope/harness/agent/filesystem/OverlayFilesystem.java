@@ -81,6 +81,12 @@ public class OverlayFilesystem implements AbstractFilesystem {
      * @param upper the user-specific layer (read/write); takes precedence on conflicts
      * @param lower the shared layer (read-only from the overlay's perspective)
      */
+    /**
+     * 创建一个分层联合文件系统。
+     *
+     * @param upper 用户专属上层目录（可读写）；存在同名文件时优先生效
+     * @param lower 共享底层目录（对联合文件系统只读）
+     */
     public OverlayFilesystem(AbstractFilesystem upper, AbstractFilesystem lower) {
         if (upper == null) {
             throw new IllegalArgumentException("upper layer must not be null");
@@ -93,11 +99,13 @@ public class OverlayFilesystem implements AbstractFilesystem {
     }
 
     /** Returns the upper (writable) layer. */
+    /** 返回上层可读写层。 */
     public AbstractFilesystem upper() {
         return upper;
     }
 
     /** Returns the lower (shared) layer. */
+    /** 返回底层共享只读层。 */
     public AbstractFilesystem lower() {
         return lower;
     }
@@ -118,6 +126,20 @@ public class OverlayFilesystem implements AbstractFilesystem {
      * @param lower shared layer (read-only from the overlay's perspective)
      * @return overlay; either plain or shell-aware depending on {@code upper}
      */
+    /**
+     * 构建联合文件系统；若上层文件系统支持Shell执行，则自动开放该能力。
+     *
+     * 若 {@code upper} 属于 {@link AbstractSandboxFilesystem} 实例，返回具备Shell能力的子类实现；
+     * 否则返回基础 {@link OverlayFilesystem}。
+     *
+     * <p>当上层文件系统可能具备Shell执行能力（例如 {@link io.agentscope.harness.agent.filesystem.local.LocalFilesystemWithShell}）时，
+     * 优先使用该工厂方法而非构造器。如此一来，{@code ReActAgent.Builder} 等调用方
+     * 针对 {@code instanceof AbstractSandboxFilesystem} 的类型判断，在经过联合文件系统封装后依旧有效。
+     *
+     * @param upper 用户专属上层目录（可读写）；存在同名文件时优先生效
+     * @param lower 共享底层目录（对联合文件系统只读）
+     * @return 联合文件系统实例；根据上层文件系统类型，区分基础版本与支持Shell的版本
+     */
     public static AbstractFilesystem of(AbstractFilesystem upper, AbstractFilesystem lower) {
         if (upper instanceof AbstractSandboxFilesystem shellUpper) {
             return new ShellAwareOverlay(shellUpper, lower);
@@ -129,6 +151,10 @@ public class OverlayFilesystem implements AbstractFilesystem {
      * Overlay subtype that delegates shell {@link #execute} and {@link #id} to a shell-capable
      * upper store. Filesystem operations inherit the standard overlay semantics from
      * {@link OverlayFilesystem}.
+     */
+    /**
+     * 联合文件系统子类，将Shell的 {@link #execute} 与 {@link #id} 委托给具备Shell能力的上层存储；
+     * 文件操作沿用 {@link OverlayFilesystem} 标准联合文件系统语义。
      */
     private static final class ShellAwareOverlay extends OverlayFilesystem
             implements AbstractSandboxFilesystem {
@@ -308,11 +334,13 @@ public class OverlayFilesystem implements AbstractFilesystem {
     }
 
     /** Returns the user-specific (read/write) layer. */
+    /** 返回用户专属的可读写分层。 */
     public AbstractFilesystem getUpper() {
         return upper;
     }
 
     /** Returns the shared (read-only-through-this-overlay) layer. */
+    /** 返回共享分层（在当前联合文件系统视角下为只读）。 */
     public AbstractFilesystem getLower() {
         return lower;
     }

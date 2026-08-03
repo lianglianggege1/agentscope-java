@@ -54,12 +54,56 @@ import reactor.core.publisher.Mono;
  * {@link WorkspaceManager}, so this class is backend-agnostic (works with Local,
  * Sandbox, and Remote filesystems without any direct {@code java.nio.file.Files} usage).
  */
+/**
+ * 基于大模型将每日记忆账本整合为经过梳理的 {@code MEMORY.md}。
+ *
+ * <p>该组件实现双层记忆模型的第二层：
+ * <ul>
+ *   <li><b>第一层——每日账本</b>：由 {@link MemoryFlushManager} 写入 {@code memory/YYYY-MM-DD.md} 文件，仅支持追加写入，每次压缩落盘对应一个独立片段。</li>
+ *   <li><b>第二层——梳理后的 MEMORY.md</b>：由当前类管理。定期读取自上次整合水位线之后发生变更的每日账本与现有 MEMORY.md，调用大模型执行合并、去重、精简，最终覆盖写入全新 MEMORY.md。</li>
+ * </ul>
+ *
+ * <p>状态文件 {@code memory/.consolidation_state} 用于记录上一次整合成功的时间戳。修改时间早于或等于该时间戳的每日账本将会被跳过，以此降低Token消耗，同时避免使用过期内容重复覆写 MEMORY.md。
+ *
+ * <p>所有文件读写均通过 {@link WorkspaceManager} 获取的 {@link AbstractFilesystem} 执行，因此该组件与存储后端解耦（可原生兼容本地文件系统、沙箱文件系统与远程文件系统，不直接调用 {@code java.nio.file.Files}）。
+ */
 public class MemoryConsolidator {
 
     private static final Logger log = LoggerFactory.getLogger(MemoryConsolidator.class);
 
     /** Hidden state file inside {@code memory/} tracking the last consolidation Instant. */
+    /**
+     * 存放于 {@code memory/} 目录下的隐藏状态文件，用于记录上一次记忆整合操作的时间戳。
+     */
     public static final String STATE_FILE = ".consolidation_state";
+
+
+    /**
+     * 记忆整合步骤的默认提示词。对外公开，调用方在构建
+     * {@link io.agentscope.harness.agent.memory.MemoryConfig} 时可进行扩展
+     *（例如追加项目专属约束）。该提示词包含恰好两个 {@code %d} 占位符
+     *（最大Token数量、最大字符数量），将在调用时填充数值。
+     */
+    /*
+    public static final String DEFAULT_CONSOLIDATION_PROMPT =
+            """
+            你是记忆整合助手，负责维护经过整理的长期记忆文件 MEMORY.md。你的任务是将新增的每日账本条目合并至 MEMORY.md，保证内容精简、无重复、高信息密度。
+
+            你将接收两份输入：
+            1. 当前 MEMORY.md 内容（已整理的现有长期记忆）。
+            2. 自上次整合之后新增追加的每日账本记录。
+
+            规则：
+            - MEMORY.md 作为跨日期、跨会话知识的唯一可信来源，保持内容稳定、权威。
+            - 每日账本条目属于流水式落盘日志，内容可能杂乱、与MEMORY.md重复或条目间互相冗余。仅保留具备长效复用价值的信息。
+            - 去重：若新增条目描述的内容已存在于 MEMORY.md，则丢弃该条目。
+            - 合并关联信息：将同一主题的多条记录整合为结构连贯的段落，并设置清晰的标题。
+            - 当新信息能够覆盖旧内容时，更新或删除过期信息。
+            - 输出总内容不得超过 %d 个Token（约 %d 个字符）；裁剪内容时，优先保留近期、高频引用的信息。
+
+            直接输出完整新版 MEMORY.md 全部内容（不要仅输出差异片段），使用Markdown格式。
+            """;
+            */
 
     /**
      * Default prompt for the consolidation step. Exposed publicly so callers can extend
@@ -111,6 +155,10 @@ public class MemoryConsolidator {
      *     exactly two {@code %d} placeholders (max-tokens, max-chars). {@code null} falls back
      *     to {@link #DEFAULT_CONSOLIDATION_PROMPT}.
      */
+    /**
+     * @param consolidationPrompt 记忆整合大模型调用所使用的提示词模板。必须恰好包含两个 {@code %d} 占位符
+     *     （最大Token数量、最大字符数量）。传入 {@code null} 时将使用 {@link #DEFAULT_CONSOLIDATION_PROMPT}。
+     */
     public MemoryConsolidator(
             WorkspaceManager workspaceManager,
             Model model,
@@ -129,6 +177,12 @@ public class MemoryConsolidator {
      * advances the watermark on success.
      *
      * <p>If no daily files have been touched since the last run, this is a no-op.
+     */
+    /**
+     * 执行记忆整合：读取在上次水位时间之后发生变更的每日账本文件与当前 MEMORY.md，
+     * 调用大模型完成内容合并，覆写 MEMORY.md；执行成功后更新整合水位时间。
+     *
+     * <p>若自上次运行后没有任何每日账本文件发生变更，则本次调用不执行任何操作。
      */
     public Mono<Void> consolidate(RuntimeContext rc) {
         Instant watermark = readWatermark(rc);
@@ -203,6 +257,12 @@ public class MemoryConsolidator {
      * <p>All I/O is done through the {@link AbstractFilesystem} so this works equally well
      * with Local, Sandbox, and Store stores.
      */
+    /**
+     * 读取修改时间严格晚于指定水位时间的每日记忆文件。
+     * 若水位时间为 {@link Instant#EPOCH}，则返回全部每日记忆文件（首次执行场景）。
+     *
+     * <p>所有IO操作均通过 {@link AbstractFilesystem} 完成，因此可统一兼容本地、沙箱以及远程存储。
+     */
     private String readDailyEntries(RuntimeContext rc, Instant watermark) {
         AbstractFilesystem fs = workspaceManager.getFilesystem();
         if (fs == null) {
@@ -254,6 +314,7 @@ public class MemoryConsolidator {
     }
 
     /** Extracts the file name (last path segment) from a path string. */
+    /** 从路径字符串中提取文件名（路径最后一段）。 */
     private static String fileName(String path) {
         if (path == null || path.isEmpty()) {
             return "";
@@ -267,6 +328,10 @@ public class MemoryConsolidator {
      * Converts an absolute filesystem path (e.g. {@code /memory/2025-01-01.md}) to a
      * workspace-relative path ({@code memory/2025-01-01.md}) for use with
      * {@link WorkspaceManager#readManagedWorkspaceFileUtf8}.
+     */
+    /**
+     * 将绝对文件路径（例如 {@code /memory/2025-01-01.md}）转换为工作区相对路径
+     *（{@code memory/2025-01-01.md}），供 {@link WorkspaceManager#readManagedWorkspaceFileUtf8} 使用。
      */
     private static String toRelative(String path) {
         if (path == null) {
@@ -282,6 +347,9 @@ public class MemoryConsolidator {
     static final String STATE_REL_PATH = "memory/" + STATE_FILE;
 
     /** Reads the last consolidation Instant, or {@link Instant#EPOCH} if none recorded. */
+    /**
+     * 读取上一次记忆整合的时间戳；若无记录则返回 {@link Instant#EPOCH}。
+     */
     Instant readWatermark(RuntimeContext rc) {
         try {
             String value = workspaceManager.readManagedWorkspaceFileUtf8(rc, STATE_REL_PATH);

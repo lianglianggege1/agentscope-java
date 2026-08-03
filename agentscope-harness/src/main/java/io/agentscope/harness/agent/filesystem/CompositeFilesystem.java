@@ -93,6 +93,13 @@ public class CompositeFilesystem implements AbstractFilesystem {
      * @param routes map of path prefixes to stores; prefixes must start with {@code "/"}
      *     and should end with {@code "/"} (e.g. {@code "/memories/"})
      */
+    /**
+     * 创建具备默认后端与基于路径前缀路由的组合文件系统。
+     *
+     * @param defaultBackend 不匹配任何路由的路径所使用的后端存储
+     * @param routes 路径前缀至存储实例的映射；前缀必须以 {@code "/"} 开头，
+     *     且建议以 {@code "/"} 结尾（例如 {@code "/memories/"}）
+     */
     public CompositeFilesystem(
             AbstractFilesystem defaultBackend, Map<String, AbstractFilesystem> routes) {
         if (defaultBackend == null) {
@@ -123,6 +130,9 @@ public class CompositeFilesystem implements AbstractFilesystem {
         // (the convention used by {@code WorkspaceManager.writeUtf8WorkspaceRelative}) and route
         // to the same store. The original {@code entry.prefix()} is preserved in the
         // {@link RouteResult} so path remapping output stays in the prefix's stored form.
+        // 匹配前去除两侧路径开头的斜杠以统一规范化，调用方既可传入 "/skills/foo"（遵循 {@link AbstractFilesystem} 规范），
+        // 也可传入 "skills/foo"（{@code WorkspaceManager.writeUtf8WorkspaceRelative} 使用的格式），二者将路由至同一存储。
+        // {@link RouteResult} 内部保留原始的 {@code entry.prefix()}，保证路径重映射输出维持前缀的原始存储格式。
         String matchPath = stripLeadingSlash(path);
         for (RouteEntry entry : sortedRoutes) {
             String canonicalPrefix = stripLeadingSlash(entry.prefix());

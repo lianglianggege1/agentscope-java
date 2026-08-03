@@ -38,21 +38,42 @@ import java.util.Map;
  *   <li>Message structure: Role, name, and formatting overhead
  * </ul>
  */
+/**
+ * 用于估算消息Token数量的工具类。
+ *
+ * <p>该类提供方法，估算消息送入大模型时占用的输入Token数量。
+ * 采用基于字符的近似算法，对中英文文本均具备较好的估算效果。
+ *
+ * <p>Token估算策略：
+ * <ul>
+ *   <li>文本内容：大约每2~4个字符折算1个Token（随语言变化）
+ *   <li>工具调用：包含工具名称、参数以及结构开销
+ *   <li>工具结果：包含输出内容以及结构开销
+ *   <li>消息结构：角色、名称以及格式开销
+ * </ul>
+ */
 public class TokenCounterUtil {
 
     // Token estimation ratios
     // For English: ~1 token per 4 characters
     // For Chinese: ~1 token per 1-2 characters
     // Using a conservative ratio that works for mixed content
+    // Token估算系数
+    // 英文：约每4个字符1个Token
+    // 中文：约每1~2个字符1个Token
+    // 采用保守系数，适配混合语种内容
     private static final double CHARS_PER_TOKEN = 2.5;
 
     // Overhead tokens for message structure (role, name, formatting)
+    // 消息结构额外开销Token（角色、名称、格式信息）
     private static final int MESSAGE_OVERHEAD = 5;
 
     // Overhead tokens for tool call structure
+    // 工具调用结构额外开销Token
     private static final int TOOL_CALL_OVERHEAD = 10;
 
     // Overhead tokens for tool result structure
+    // 工具结果结构额外开销Token
     private static final int TOOL_RESULT_OVERHEAD = 8;
 
     /**
@@ -67,6 +88,19 @@ public class TokenCounterUtil {
      *
      * @param messages the list of messages to estimate tokens for
      * @return estimated number of input tokens
+     */
+    /**
+     * 计算消息列表预估总输入Token数量。
+     *
+     * <p>本方法按如下方式估算Token：
+     * <ul>
+     *   <li>提取消息内全部文本内容
+     *   <li>统计工具调用与工具结果中的字符数量
+     *   <li>为每条消息与内容块追加结构开销Token
+     * </ul>
+     *
+     * @param messages 待估算Token的消息列表
+     * @return 预估输入Token总数
      */
     public static int calculateToken(List<Msg> messages) {
         if (messages == null || messages.isEmpty()) {
@@ -88,6 +122,12 @@ public class TokenCounterUtil {
      * @param msg the message to estimate
      * @return estimated number of tokens for this message
      */
+    /**
+     * 估算单条消息的Token数量。
+     *
+     * @param msg 待估算的消息
+     * @return 该消息预估Token数量
+     */
     private static int estimateMessageTokens(Msg msg) {
         if (msg == null) {
             return 0;
@@ -96,6 +136,7 @@ public class TokenCounterUtil {
         int tokens = MESSAGE_OVERHEAD;
 
         // Add overhead for role and name
+        // 追加角色与名称对应的额外开销Token
         if (msg.getRole() != null) {
             tokens += estimateTextTokens(msg.getRole().name());
         }
@@ -104,6 +145,7 @@ public class TokenCounterUtil {
         }
 
         // Estimate tokens for content blocks
+        // 估算各内容块对应的Token数量
         List<ContentBlock> content = msg.getContent();
         if (content != null) {
             for (ContentBlock block : content) {
@@ -119,6 +161,12 @@ public class TokenCounterUtil {
      *
      * @param block the content block to estimate
      * @return estimated number of tokens for this block
+     */
+    /**
+     * 估算单个内容块的Token数量。
+     *
+     * @param block 待估算的内容块
+     * @return 该内容块预估Token数量
      */
     private static int estimateContentBlockTokens(ContentBlock block) {
         if (block == null) {
@@ -142,6 +190,12 @@ public class TokenCounterUtil {
      *
      * @param toolUseBlock the tool use block to estimate
      * @return estimated number of tokens
+     */
+    /**
+     * 估算工具调用块的Token数量。
+     *
+     * @param toolUseBlock 待估算的工具调用块
+     * @return 预估Token数量
      */
     private static int estimateToolUseBlockTokens(ToolUseBlock toolUseBlock) {
         int tokens = TOOL_CALL_OVERHEAD;
@@ -178,6 +232,12 @@ public class TokenCounterUtil {
      * @param toolResultBlock the tool result block to estimate
      * @return estimated number of tokens
      */
+    /**
+     * 估算工具结果块的Token数量。
+     *
+     * @param toolResultBlock 待估算的工具结果块
+     * @return 预估Token数量
+     */
     private static int estimateToolResultBlockTokens(ToolResultBlock toolResultBlock) {
         int tokens = TOOL_RESULT_OVERHEAD;
 
@@ -211,6 +271,14 @@ public class TokenCounterUtil {
      * @param text the text to estimate
      * @return estimated number of tokens
      */
+    /**
+     * 估算文本内容对应的Token数量。
+     *
+     * <p>采用基于字符的近似算法，对中英文文本均可实现较合理的估算。
+     *
+     * @param text 待估算文本
+     * @return 预估Token数量
+     */
     private static int estimateTextTokens(String text) {
         if (text == null || text.isEmpty()) {
             return 0;
@@ -228,6 +296,14 @@ public class TokenCounterUtil {
      *
      * @param map the map to estimate
      * @return estimated JSON string length
+     */
+    /**
+     * 估算Map转为JSON字符串后的长度，用于Token统计。
+     *
+     * <p>采用简化估算方式，统计键与字符串类型值的字符数量。
+     *
+     * @param map 待估算的映射对象
+     * @return JSON字符串预估长度
      */
     private static String estimateMapAsJson(Map<String, Object> map) {
         if (map == null || map.isEmpty()) {

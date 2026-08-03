@@ -36,6 +36,19 @@ import java.util.UUID;
  *   <li>{@link SummaryEntry} — holds a compaction summary</li>
  * </ul>
  */
+/**
+ * 所有会话树条目基类（参考 pi-mono 设计的 JSONL 会话模型）。
+ *
+ * <p>每条条目拥有唯一 {@code id} 与 {@code parentId}，共同构成树形结构。
+ * 条目按顺序追加写入会话JSONL文件，永不执行删除操作。
+ *
+ * <p>条目类型：
+ * <ul>
+ *   <li>{@link MessageEntry} — 封装单条大模型消息（用户/助手/工具/系统消息）</li>
+ *   <li>{@link CompactionEntry} — 标记一次压缩事件（非破坏性）</li>
+ *   <li>{@link SummaryEntry} — 存储压缩摘要信息</li>
+ * </ul>
+ */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonSubTypes({
     @JsonSubTypes.Type(value = SessionEntry.MessageEntry.class, name = "message"),
@@ -70,6 +83,9 @@ public abstract sealed class SessionEntry
 
     /**
      * A message entry wrapping a single message in the conversation.
+     */
+    /**
+     * 消息条目，封装对话中的单条消息。
      */
     public static final class MessageEntry extends SessionEntry {
 
@@ -113,6 +129,11 @@ public abstract sealed class SessionEntry
      * all entries before {@code firstKeptEntryId} are considered compacted (not visible
      * to the LLM) but remain in the file for full history replay.
      */
+    /**
+     * 非破坏性压缩标记。记录首个保留条目的ID：
+     * {@code firstKeptEntryId} 之前的所有条目视为已压缩（对大模型不可见），
+     * 但仍保存在文件中，支持完整历史回放。
+     */
     public static final class CompactionEntry extends SessionEntry {
 
         private final String firstKeptEntryId;
@@ -141,6 +162,9 @@ public abstract sealed class SessionEntry
 
     /**
      * Holds the text of a compaction summary (the condensed version of compacted messages).
+     */
+    /**
+     * 存储压缩摘要文本（即已压缩消息的精简版本）。
      */
     public static final class SummaryEntry extends SessionEntry {
 
