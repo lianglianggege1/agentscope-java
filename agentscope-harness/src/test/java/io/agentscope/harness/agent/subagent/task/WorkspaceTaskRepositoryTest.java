@@ -369,7 +369,7 @@ class WorkspaceTaskRepositoryTest {
     //  Terminal status not overridden
     // ------------------------------------------------------------------
 
-     //    listTasks 不会使用 RUNNING 状态覆盖工作区中已有的 COMPLETED 终态。
+    //    listTasks 不会使用 RUNNING 状态覆盖工作区中已有的 COMPLETED 终态。
     @Test
     @DisplayName("listTasks does not override COMPLETED workspace status with RUNNING")
     void listTasks_terminalStatusNotOverridden() throws Exception {

@@ -54,16 +54,63 @@ public class SandboxManager {
 
     private static final Logger log = LoggerFactory.getLogger(SandboxManager.class);
 
+    /** Sandbox client used to resume from state or create new sandboxes. */
+    /**
+     * 沙箱客户端，用于从状态恢复沙箱或新建沙箱。
+     */
     private final SandboxClient<?> client;
+
+    /** Per-session store for serialized {@link SandboxState}; null when stateless. */
+    /**
+     * 按会话维度的 {@link SandboxState} 序列化存储；可能为 null（无状态场景）。
+     */
     private final SessionSandboxStateStore stateStore;
+
+    /** Owning agent id; used as a fallback isolation-key component when no session is present. */
+    /**
+     * 所属代理的 id；当没有会话信息时，用作隔离 key 的兜底维度。
+     */
     private final String agentId;
+
+    /** Execution guard used to serialize sandbox work for a given isolation scope. */
+    /**
+     * 沙箱执行隔离器，用于在同一隔离维度上串行化沙箱相关工作。
+     */
     private final SandboxExecutionGuard executionGuard;
 
+    /**
+     * Construct a SandboxManager with no execution guard.
+     * @param client sandbox client
+     * @param stateStore per-session state store
+     * @param agentId owning agent id
+     */
+    /**
+     * 构造一个不带执行隔离器的 SandboxManager。
+     *
+     * @param client 沙箱客户端
+     * @param stateStore 按会话维度的状态存储
+     * @param agentId 所属代理 id
+     */
     public SandboxManager(
             SandboxClient<?> client, SessionSandboxStateStore stateStore, String agentId) {
         this(client, stateStore, agentId, SandboxExecutionGuard.noop());
     }
 
+    /**
+     * Construct a SandboxManager with a custom execution guard.
+     * @param client sandbox client
+     * @param stateStore per-session state store
+     * @param agentId owning agent id
+     * @param executionGuard execution guard (null falls back to a no-op)
+     */
+    /**
+     * 构造一个带自定义执行隔离器的 SandboxManager。
+     *
+     * @param client 沙箱客户端
+     * @param stateStore 按会话维度的状态存储
+     * @param agentId 所属代理 id
+     * @param executionGuard 执行隔离器（传入 null 时回退到 no-op）
+     */
     public SandboxManager(
             SandboxClient<?> client,
             SessionSandboxStateStore stateStore,
@@ -76,9 +123,35 @@ public class SandboxManager {
                 executionGuard != null ? executionGuard : SandboxExecutionGuard.noop();
     }
 
+    /**
+     * Acquire (or reuse) a {@link Sandbox} for the current call, honoring the priority chain
+     * documented at class level.
+     *
+     * <p>For Priorities 3/4 a {@link SandboxLease} is taken from {@link SandboxExecutionGuard}
+     * before sandbox resume/create when an isolation scope is resolvable. The lease is bundled
+     * into the returned {@link SandboxAcquireResult} and must be released by the caller after
+     * {@link #release} runs, so the entire call window stays guarded.
+     *
+     * @param sandboxContext per-call sandbox configuration (may carry an external sandbox/state)
+     * @param runtimeContext per-call runtime context used to derive the isolation scope
+     * @return acquisition result containing the sandbox and (for harness-managed paths) the lease
+     * @throws Exception if sandbox client operations or guard entry fail
+     */
+    /**
+     * 为本次调用获取（或复用）一个 {@link Sandbox}，遵循类级 javadoc 中描述的优先级链。
+     *
+     * <p>对于优先级 3/4，当存在可解析的隔离维度时，会在恢复/新建沙箱前向 {@link SandboxExecutionGuard}
+     * 申请一个 {@link SandboxLease}。租约会被打包进返回的 {@link SandboxAcquireResult}，
+     * 调用方需在 {@link #release} 之后释放，从而保证整个调用周期均处于隔离保护下。
+     *
+     * @param sandboxContext 本次调用的沙箱配置（可携带外部沙箱/外部状态）
+     * @param runtimeContext 本次调用的运行时上下文，用于推导隔离维度
+     * @return 包含沙箱实例（以及 harness 托管路径下的租约）的获取结果
+     * @throws Exception 沙箱客户端操作或隔离器申请失败时抛出
+     */
     public SandboxAcquireResult acquire(
             SandboxContext sandboxContext, RuntimeContext runtimeContext) throws Exception {
-        // Priority 1: user-supplied sandbox — guard does not apply
+        // 优先级 1：调用方已自带 sandbox，绕开隔离器（外部资源由调用方自行管理）
         if (sandboxContext.getExternalSandbox() != null) {
             Sandbox external = sandboxContext.getExternalSandbox();
             log.debug(
@@ -87,7 +160,7 @@ public class SandboxManager {
             return SandboxAcquireResult.userManaged(external);
         }
 
-        // Priority 2: user-supplied state — guard does not apply
+        // 优先级 2：调用方提供外部状态，按该状态恢复沙箱，同样绕开隔离器
         if (sandboxContext.getExternalSandboxState() != null) {
             Sandbox sandbox = client.resume(sandboxContext.getExternalSandboxState());
             log.debug(
@@ -96,7 +169,7 @@ public class SandboxManager {
             return SandboxAcquireResult.selfManaged(sandbox);
         }
 
-        // Priority 3 / 4: harness-managed — apply guard when a scope key is present
+        // 优先级 3/4：harness 托管路径；存在隔离维度时先申请隔离器租约
         Optional<SandboxIsolationKey> scopeKey =
                 SandboxIsolationKey.resolve(
                         sandboxContext.getIsolationScope(), runtimeContext, agentId);
@@ -104,10 +177,12 @@ public class SandboxManager {
         SandboxLease lease = SandboxLease.noop();
         if (scopeKey.isPresent()) {
             log.debug("[sandbox] Acquiring execution guard for scope {}", scopeKey.get());
+            // 进入隔离区：保证同一 scope 下并发调用串行化访问底层沙箱
             lease = executionGuard.tryEnter(scopeKey.get());
         }
 
         try {
+            // 优先级 3：尝试从持久化状态恢复（仅在有 scopeKey 时才查询 store）
             if (scopeKey.isPresent()) {
                 try {
                     Optional<String> stateJson = stateStore.load(scopeKey.get());
@@ -120,6 +195,7 @@ public class SandboxManager {
                         return SandboxAcquireResult.selfManaged(sandbox, lease);
                     }
                 } catch (Exception e) {
+                    // 读取历史状态失败时降级为新建沙箱，避免阻断调用
                     log.warn(
                             "[sandbox] Failed to load persisted state for scope {}, falling through"
                                     + " to fresh create: {}",
@@ -129,12 +205,16 @@ public class SandboxManager {
                 }
             }
 
+            // 优先级 4：新建沙箱
             log.debug("[sandbox] Priority 4: creating new sandbox");
+            // 用户未指定工作区规格时使用默认值，避免传 null 到客户端
             WorkspaceSpec spec =
                     sandboxContext.getWorkspaceSpec() != null
                             ? sandboxContext.getWorkspaceSpec().copy()
                             : new WorkspaceSpec();
 
+            // 创建路径需要 SandboxClient<SandboxClientOptions> 的具体类型签名；
+            // 这里 cast 是安全的（acquire 始终由框架自身驱动，client 实际就是该类型）
             @SuppressWarnings("unchecked")
             SandboxClient<SandboxClientOptions> typedClient =
                     (SandboxClient<SandboxClientOptions>) client;
@@ -146,12 +226,35 @@ public class SandboxManager {
             return SandboxAcquireResult.selfManaged(sandbox, lease);
 
         } catch (Exception e) {
-            // Guard must be released if acquire fails — the caller won't see the result
+            // 获取失败时显式释放租约：调用方不会看到 result，租约需要在这里兜底关闭
             lease.close();
             throw e;
         }
     }
 
+    /**
+     * Release a previously acquired sandbox.
+     *
+     * <p>For user-managed sandboxes (Priority 1) this is a no-op: the harness does not own the
+     * lifecycle and must not stop/shutdown the externally supplied container. Only sandbox owned
+     * by the harness (Priorities 2/3/4) is stopped and shutdown.
+     *
+     * <p>Failures from {@link Sandbox#stop()} or {@link Sandbox#shutdown()} are logged but do
+     * not propagate, so a single misbehaving sandbox cannot break the call teardown.
+     *
+     * @param result the acquisition result returned by {@link #acquire}; null is a no-op
+     */
+    /**
+     * 释放先前获取到的沙箱。
+     *
+     * <p>对于用户托管的沙箱（优先级 1）该方法为 no-op：harness 不持有其生命周期，不得
+     * stop/shutdown 外部传入的容器。仅当沙箱由 harness 自身持有（优先级 2/3/4）时才执行停止与关闭。
+     *
+     * <p>{@link Sandbox#stop()} 或 {@link Sandbox#shutdown()} 抛出的异常仅记录日志并不上抛，
+     * 避免单个沙箱异常破坏整个调用收尾流程。
+     *
+     * @param result {@link #acquire} 返回的获取结果；传入 null 时为 no-op
+     */
     public void release(SandboxAcquireResult result) {
         if (result == null) {
             return;
@@ -161,10 +264,9 @@ public class SandboxManager {
             return;
         }
 
-        // User-managed sandboxes (Priority 1) are owned by the caller — the harness must not
-        // stop/snapshot or shutdown them, since the caller relies on the sandbox staying alive
-        // across multiple acquire/release cycles (e.g. a registry that reuses one container per
-        // user across the browser path and successive agent turns).
+        // 用户托管的沙箱（优先级 1）由调用方持有生命周期——harness 不得 stop/snapshot/shutdown，
+        // 因为调用方依赖该沙箱在多次 acquire/release 之间持续存活
+        // （例如跨浏览器路径与多轮对话复用同一容器的注册中心场景）。
         if (!result.isSelfManaged()) {
             return;
         }
@@ -172,6 +274,7 @@ public class SandboxManager {
         try {
             sandbox.stop();
         } catch (Exception e) {
+            // stop 失败不应中断后续 shutdown；记录日志后继续清理
             log.warn("[sandbox] Sandbox stop failed: {}", e.getMessage(), e);
         }
 
@@ -182,6 +285,32 @@ public class SandboxManager {
         }
     }
 
+    /**
+     * Persist the current sandbox state into the per-session store, so the next acquire for the
+     * same isolation scope can resume (Priority 3) instead of creating a fresh sandbox.
+     *
+     * <p>User-managed sandboxes (Priority 1) are skipped: the registry that supplied them owns
+     * its own snapshot policy, and double-tracking the state through our store would conflict.
+     *
+     * <p>Failures are logged but never propagated: a failed persist must not break the call.
+     *
+     * @param result acquisition result from {@link #acquire}; null is a no-op
+     * @param sandboxContext sandbox context providing the isolation scope
+     * @param runtimeContext runtime context used to derive the scope key
+     */
+    /**
+     * 将当前沙箱状态持久化到 per-session 存储，使同一隔离维度的下一次 acquire 能够走"恢复"
+     *（优先级 3）路径，而不是创建全新沙箱。
+     *
+     * <p>用户托管的沙箱（优先级 1）会被跳过：调用方已经自带 snapshot 策略，
+     * 我们再写一遍存储会导致状态双轨并可能与调用方策略冲突。
+     *
+     * <p>任何异常仅记日志并不上抛：持久化失败不能影响本次调用的正常返回。
+     *
+     * @param result {@link #acquire} 返回的获取结果；传入 null 时为 no-op
+     * @param sandboxContext 用于推导隔离维度的沙箱上下文
+     * @param runtimeContext 用于推导 scope key 的运行时上下文
+     */
     public void persistState(
             SandboxAcquireResult result,
             SandboxContext sandboxContext,
@@ -189,9 +318,8 @@ public class SandboxManager {
         if (result == null || result.getSandbox() == null) {
             return;
         }
-        // User-managed sandboxes carry their own persistence story (the registry owns the
-        // lifecycle). Writing through the harness state store would double-track state and
-        // could conflict with the caller's snapshot policy.
+        // 用户托管沙箱自带持久化策略（注册中心自行管理生命周期）：
+        // 通过 harness 状态存储再写一遍会导致双轨，且可能与调用方的 snapshot 策略冲突。
         if (!result.isSelfManaged()) {
             return;
         }
@@ -218,10 +346,29 @@ public class SandboxManager {
                     scopeKey.get(),
                     state.getSessionId());
         } catch (Exception e) {
+            // 持久化失败仅记日志，避免中断当前调用
             log.warn("[sandbox] Failed to persist sandbox state: {}", e.getMessage(), e);
         }
     }
 
+    /**
+     * Delete the persisted sandbox state for the given isolation scope, so the next acquire will
+     * take the create-fresh path (Priority 4) instead of resuming.
+     *
+     * <p>Typically invoked when a session ends or the caller wants to force a clean slate. A
+     * missing scope key or a failed delete is logged but does not propagate.
+     *
+     * @param sandboxContext sandbox context providing the isolation scope (may be null)
+     * @param runtimeContext runtime context used to derive the scope key
+     */
+    /**
+     * 删除指定隔离维度下的持久化沙箱状态，使下一次 acquire 走"新建"路径（优先级 4）而不是恢复。
+     *
+     * <p>通常在会话结束或调用方希望强制重建时调用。缺少 scope key 或删除失败仅记日志，不上抛。
+     *
+     * @param sandboxContext 用于推导隔离维度的沙箱上下文（可为 null）
+     * @param runtimeContext 用于推导 scope key 的运行时上下文
+     */
     public void clearState(SandboxContext sandboxContext, RuntimeContext runtimeContext) {
         Optional<SandboxIsolationKey> scopeKey =
                 SandboxIsolationKey.resolve(
@@ -235,6 +382,7 @@ public class SandboxManager {
         try {
             stateStore.delete(scopeKey.get());
         } catch (Exception e) {
+            // 清理失败不影响调用流程，仅记日志
             log.warn("[sandbox] Failed to clear sandbox state: {}", e.getMessage(), e);
         }
     }

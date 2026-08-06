@@ -89,18 +89,75 @@ import reactor.core.scheduler.Schedulers;
  * });
  * }</pre>
  */
+/**
+ * AgentScope 框架中所有代理（Agent）的抽象基类。
+ *
+ * <p>该类集中提供代理所需的通用基础设施：Hook 接入、MsgHub 订阅管理、中断处理、Tracing
+ * 以及通过 StateModule 进行状态管理。基类本身不负责记忆（Memory），记忆由具体的代理实现
+ * （如 {@code ReActAgent}）自行管理。
+ *
+ * <p>设计原则：
+ * <ul>
+ *   <li>AgentBase 只提供基础设施（hooks、订阅、中断、状态），不承载任何业务域逻辑</li>
+ *   <li>记忆管理下沉到真正需要的具体代理中（例如 {@code ReActAgent}）</li>
+ *   <li>状态管理遵循 {@link io.agentscope.core.state.StateModule} 接口约定</li>
+ *   <li>中断机制基于响应式模式：子类在合适检查点调用 {@code checkInterruptedAsync()}，
+ *       中断异常沿 Mono 链向上传播</li>
+ *   <li>Observe 模式：允许代理接收消息但不产生回复</li>
+ * </ul>
+ *
+ * <p><b>线程安全：</b>
+ * 同一个代理实例并非为并发执行设计。单一实例不应被多个线程同时调用
+ *（例如并发触发 {@code call()} 或 {@code stream()}）。hooks 列表在流式执行期间会被修改，
+ * 没有任何同步保护，仅在单线程执行同一实例的语境下安全。
+ *
+ * <p><b>中断机制示例：</b>
+ * <pre>{@code
+ * // 外部触发中断
+ * agent.interrupt(userMsg);
+ *
+ * // 代理内部 Mono 链上的检查点：
+ * return checkInterruptedAsync()
+ *     .then(doWork())
+ *     .flatMap(result -> checkInterruptedAsync().thenReturn(result));
+ *
+ * // AgentBase.call() 捕获中断异常：
+ * .onErrorResume(error -> {
+ *     if (error instanceof InterruptedException) {
+ *         return handleInterrupt(context, msg);
+ *     }
+ *     ...
+ * });
+ * }</pre>
+ */
 @SuppressWarnings("deprecation")
 public abstract class AgentBase implements Agent {
 
     private final String agentId;
     private final String name;
     private final String description;
+    /** Hooks owned by this agent instance (mutable; modified during streaming). */
+    /**
+     * 该代理实例自身持有的 Hook 列表（在流式执行期间会被动态修改）。
+     */
     private final List<Hook> hooks;
+    /** Process-wide system hooks (shared by every agent instance). */
+    /**
+     * 进程级系统 Hook，被所有代理实例共享（例如 tracing、metrics 等横切关注点）。
+     */
     private static final List<Hook> systemHooks = new CopyOnWriteArrayList<>();
+    /** Per-MsgHub subscribers; populated when an agent joins a MsgHub. */
+    /**
+     * 按 MsgHub 维度组织的订阅者列表，代理加入 MsgHub 时填充。
+     */
     private final Map<String, List<AgentBase>> hubSubscribers = new ConcurrentHashMap<>();
 
     private static final Comparator<Hook> HOOK_COMPARATOR = Comparator.comparingInt(Hook::priority);
 
+    /** RuntimeContext-aware hooks; populated lazily as such hooks register. */
+    /**
+     * 实现 {@link RuntimeContextAware} 的 Hook 子集，单独跟踪以便按需绑定运行时上下文。
+     */
     private final CopyOnWriteArrayList<RuntimeContextAware> runtimeContextAwareHooks =
             new CopyOnWriteArrayList<>();
 
@@ -110,12 +167,23 @@ public abstract class AgentBase implements Agent {
      * key run one-at-a-time (FIFO) while different keys run concurrently. See {@link
      * #callSerializationKey(RuntimeContext)} and {@link #serializeOnKey(Object, Mono)}.
      */
+    /**
+     * 按 key 维度的调用序列化队列尾部信号。每个 key 对应最近一次入队调用的完成信号；
+     * 同一个 key 的下一次调用需串接在该信号之后，因此共享 key 的调用按 FIFO 顺序串行执行，
+     * 不同 key 之间则可并发。详见 {@link #callSerializationKey(RuntimeContext)} 与
+     * {@link #serializeOnKey(Object, Mono)}。
+     */
     private final ConcurrentHashMap<Object, Mono<Void>> callGates = new ConcurrentHashMap<>();
 
     /**
      * Constructor for AgentBase.
      *
      * @param name Agent name
+     */
+    /**
+     * 仅指定代理名称的构造器（描述为空、Hook 列表为空）。
+     *
+     * @param name 代理名称
      */
     public AgentBase(String name) {
         this(name, null, List.of());
@@ -127,12 +195,21 @@ public abstract class AgentBase implements Agent {
      * @param name Agent name
      * @param description Agent description
      */
+    /**
+     * 指定名称和描述的构造器（Hook 列表为空）。
+     *
+     * @param name 代理名称
+     * @param description 代理描述
+     */
     public AgentBase(String name, String description) {
         this(name, description, List.of());
     }
 
     /**
      * @deprecated Use {@link #AgentBase(String, String, List)} instead.
+     */
+    /**
+     * @deprecated 请改用 {@link #AgentBase(String, String, List)}。
      */
     @Deprecated
     public AgentBase(String name, String description, boolean checkRunning, List<Hook> hooks) {
@@ -145,6 +222,13 @@ public abstract class AgentBase implements Agent {
      * @param name Agent name
      * @param description Agent description
      * @param hooks List of hooks for monitoring/intercepting execution
+     */
+    /**
+     * 指定名称、描述和 Hook 列表的构造器（核心入口）。
+     *
+     * @param name 代理名称
+     * @param description 代理描述
+     * @param hooks 监控/拦截执行过程的 Hook 列表
      */
     public AgentBase(String name, String description, List<Hook> hooks) {
         this.agentId = UUID.randomUUID().toString();
@@ -174,6 +258,9 @@ public abstract class AgentBase implements Agent {
     }
 
     /** @deprecated No longer enforced; per-session serialization handles concurrency. */
+    /**
+     * @deprecated 已不再强制；并发由 per-session 序列化机制处理。
+     */
     @Deprecated
     public final boolean isCheckRunning() {
         return false;
@@ -186,6 +273,14 @@ public abstract class AgentBase implements Agent {
      *
      * @param msgs Input messages
      * @return Response message
+     */
+    /**
+     * 处理输入消息列表并生成回复（带 Hook 生命周期管理）。
+     *
+     * <p>在启用 telemetry 后将捕获 tracing 数据。
+     *
+     * @param msgs 输入消息列表
+     * @return 响应消息的 Mono
      */
     @Override
     public final Mono<Msg> call(List<Msg> msgs) {
@@ -208,6 +303,19 @@ public abstract class AgentBase implements Agent {
      *                 variant)
      * @return response message
      */
+    /**
+     * 每次 {@code call()} 重载都会调用的扩展点，便于子类将整个调用包裹在额外中间件中
+     *（如 {@code ReActAgent} 中的 {@code onAgent} 链）。
+     *
+     * <p>默认实现会把 {@code context} 写入 Reactor Context（非 null 时），并直接委派给
+     * {@link #runLifecycle}。覆盖该方法的子类最终必须执行 {@code runLifecycle(msgs, doCallFn)}
+     * 以运行标准生命周期（关闭守卫、序列化门控、pre/post Hook、tracing）。
+     *
+     * @param msgs 输入消息列表
+     * @param context 调用方提供的 per-call {@link RuntimeContext}，可为 {@code null}
+     * @param doCallFn 具体调用实现（{@link #doCall} 或其结构化输出变体）
+     * @return 响应消息
+     */
     protected Mono<Msg> callInternal(
             List<Msg> msgs, RuntimeContext context, Function<List<Msg>, Mono<Msg>> doCallFn) {
         Mono<Msg> lifecycle = runLifecycle(msgs, doCallFn);
@@ -222,6 +330,12 @@ public abstract class AgentBase implements Agent {
      * {@code CallExecution}) read it back from the Context in {@link #doCall} / {@link
      * #handleInterrupt} so concurrent calls on one instance never share mutable per-call state.
      */
+    /**
+     * Reactor Context 的 key：承载 {@link #beforeAgentExecution(List, RuntimeContext)} 返回的
+     * per-call scope 对象。维护 per-call 状态的代理（如 {@code ReActAgent} 的 {@code CallExecution}）
+     * 在 {@link #doCall} 与 {@link #handleInterrupt} 中通过该 key 读回 scope，
+     * 从而保证同一实例上的并发调用互不污染 per-call 可变状态。
+     */
     public static final String CALL_SCOPE_KEY = "io.agentscope.core.agent.AgentBase.callScope";
 
     /**
@@ -229,6 +343,12 @@ public abstract class AgentBase implements Agent {
      * {@code call(msgs, context)} / {@code stream(..., context)} / {@code streamEvents(msgs,
      * context)} overloads via {@code contextWrite}, and read back here at call entry so the RC flows
      * per-subscription (concurrency-safe) instead of through a shared instance field.
+     */
+    /**
+     * Reactor Context 的 key：承载调用方提供的 per-call {@link RuntimeContext}。
+     * 由 {@code call(msgs, context)} / {@code stream(..., context)} / {@code streamEvents(msgs, context)}
+     * 等重载通过 {@code contextWrite} 写入，并在调用入口处读回，使 RC 沿订阅链传递
+     *（天然并发安全），而不再依赖共享实例字段。
      */
     public static final String RUNTIME_CONTEXT_KEY =
             "io.agentscope.core.agent.AgentBase.runtimeContext";
@@ -240,6 +360,14 @@ public abstract class AgentBase implements Agent {
      * concurrent calls — keying shutdown tracking by agent id would otherwise collapse concurrent
      * calls into a single entry.
      */
+    /**
+     * Reactor Context 的 key：承载本次调用的优雅关闭 {@code requestId}
+     *（由 {@link GracefulShutdownManager#registerRequest} 签发）。
+     * 沿订阅链传递，使 shutdown 中断/保存只作用于正在执行的这一次调用，即使同一代理实例
+     * 服务多个并发调用也能精确命中。
+     * 注意：若按 agent id 作为 shutdown 跟踪 key，会把同一实例上的并发调用折叠到同一记录中，
+     * 造成误中断，因此这里使用 per-call 的 requestId。
+     */
     public static final String SHUTDOWN_REQUEST_ID_KEY =
             "io.agentscope.core.agent.AgentBase.shutdownRequestId";
 
@@ -250,6 +378,12 @@ public abstract class AgentBase implements Agent {
      * that scope on the Reactor Context, and run the preCall → doCall → postCall chain with error
      * handling, releasing execution on terminate.
      */
+    /**
+     * 共享的 {@code call()} 生命周期：获取执行权后（包裹在 {@code deferContextual} 中以使调用方
+     * 传入的 {@link RuntimeContext} 按订阅粒度读取）执行 {@link #beforeAgentExecution(List, RuntimeContext)}
+     * 获取本次调用的 per-call scope，将该 scope 挂载到 Reactor Context，然后串接
+     * preCall → doCall → postCall 链路并附带错误处理，终止时释放执行权。
+     */
     protected Mono<Msg> runLifecycle(List<Msg> msgs, Function<List<Msg>, Mono<Msg>> doCallFn) {
         return Mono.using(
                 this::acquireExecution,
@@ -259,19 +393,16 @@ public abstract class AgentBase implements Agent {
                                     RuntimeContext rc =
                                             (RuntimeContext)
                                                     cv.getOrDefault(RUNTIME_CONTEXT_KEY, null);
-                                    // Track this call as a distinct shutdown request (keyed by its
-                                    // own requestId, not the shared agent id) so concurrent calls
-                                    // on
-                                    // one instance are interrupted/saved/unregistered
-                                    // independently.
+                                    // 单独为本调用签发一个 shutdown requestId（而非共享的 agent id），
+                                    // 这样同一实例上的并发调用可以独立地中断/保存/注销。
                                     String requestId =
                                             GracefulShutdownManager.getInstance()
                                                     .registerRequest(this);
+                                    // 取出本次调用的序列化 key（null 表示无需串行化）
                                     Object gateKey = callSerializationKey(rc);
-                                    // Build the per-call lifecycle lazily so it only runs once the
-                                    // serialization gate (if any) admits this call:
-                                    // beforeAgentExecution resolves/loads the session slot and must
-                                    // not race a concurrent same-session call.
+                                    // 延迟构造 per-call 生命周期，确保仅在序列化门控允许之后才执行：
+                                    // beforeAgentExecution 会解析/加载会话槽位，必须避免与同一会话的
+                                    // 并发调用产生竞态。
                                     Mono<Msg> lifecycle =
                                             Mono.defer(
                                                     () ->
@@ -281,6 +412,7 @@ public abstract class AgentBase implements Agent {
                                             gateKey == null
                                                     ? lifecycle
                                                     : serializeOnKey(gateKey, lifecycle);
+                                    // 把 shutdown requestId 挂到 Reactor Context，供 doCall 内部取用
                                     return gated.contextWrite(
                                                     c ->
                                                             requestId == null || requestId.isEmpty()
@@ -288,6 +420,7 @@ public abstract class AgentBase implements Agent {
                                                                     : c.put(
                                                                             SHUTDOWN_REQUEST_ID_KEY,
                                                                             requestId))
+                                            // 任意终止信号都要注销 shutdown request，防止泄漏
                                             .doFinally(
                                                     sig ->
                                                             GracefulShutdownManager.getInstance()
@@ -303,10 +436,12 @@ public abstract class AgentBase implements Agent {
             Function<List<Msg>, Mono<Msg>> doCallFn,
             String requestId) {
         Object scope = beforeAgentExecution(msgs, rc);
-        // Bind this call's resolved per-session state to the tracked shutdown request so graceful
-        // shutdown interrupts / saves the exact (userId, sessionId) session rather than the agent's
-        // no-arg "most-recently-active" accessors.
+        // 将本次调用解析出的 per-session 状态绑定到 shutdown request，
+        // 使优雅关闭能精确中断/保存指定的 (userId, sessionId) 会话，
+        // 而不是命中代理的无参 "最近一次活动" 访问器。
         GracefulShutdownManager.getInstance().bindRequestState(requestId, stateForCall(scope));
+        // 主体链路：preCall → doCall → postCall，外层用 TracerRegistry 包一层用于追踪，
+        // 出错时通过 createErrorHandler 走专门的恢复路径
         Mono<Msg> body =
                 TracerRegistry.get()
                         .callAgent(
@@ -319,6 +454,7 @@ public abstract class AgentBase implements Agent {
                                                 .onErrorResume(
                                                         createErrorHandler(
                                                                 msgs.toArray(new Msg[0]))));
+        // 把 scope 挂到 Reactor Context，doCall/handleInterrupt 内部按需取用
         return scope == null ? body : body.contextWrite(c -> c.put(CALL_SCOPE_KEY, scope));
     }
 
@@ -332,6 +468,15 @@ public abstract class AgentBase implements Agent {
      * @param rc the caller-supplied per-call {@link RuntimeContext} (may be {@code null})
      * @return the serialization key, or {@code null} to run without serialization
      */
+    /**
+     * 返回用于并发调用序列化的 key：拥有相同非 null key 的调用按 FIFO 顺序串行执行，
+     * 不同 key（或 null key）的调用之间并发。默认返回 {@code null}（不串行化）。
+     * {@code ReActAgent} 返回其 {@code (userId, sessionId)} 会话槽 key，使同一会话的调用不会
+     * 破坏共享会话状态，而不同会话之间可并行。
+     *
+     * @param rc 调用方提供的 per-call {@link RuntimeContext}（可为 {@code null}）
+     * @return 序列化 key；返回 {@code null} 表示无需串行化
+     */
     protected Object callSerializationKey(RuntimeContext rc) {
         return null;
     }
@@ -342,9 +487,15 @@ public abstract class AgentBase implements Agent {
      * the next same-key call waits on. Releases its slot on any terminal signal (complete, error, or
      * cancel) so a failed/cancelled call never blocks the queue.
      */
+    /**
+     * 将 {@code action} 与其它共享 {@code key} 的动作串行化：本调用需等待前一个相同 key 调用结束后
+     * 才能执行；执行完毕后自身成为该 key 队列的尾部，供下一次同 key 调用等待。
+     * 任意终止信号（complete/error/cancel）都会释放占位，避免失败/取消的调用阻塞队列。
+     */
     private <T> Mono<T> serializeOnKey(Object key, Mono<T> action) {
         return Mono.defer(
                 () -> {
+                    // release 作为本调用完成信号，写入 callGates 后下一次同 key 调用会串接在它之后
                     Sinks.Empty<Void> release = Sinks.empty();
                     Mono<Void> releaseMono = release.asMono();
                     @SuppressWarnings("unchecked")
@@ -352,9 +503,13 @@ public abstract class AgentBase implements Agent {
                     callGates.compute(
                             key,
                             (k, tail) -> {
+                                // 取出当前尾部（若有），本次调用需要在其之后执行
                                 prev[0] = tail == null ? Mono.empty() : tail;
+                                // 把自己的 release 信号注册为新的尾部
                                 return releaseMono;
                             });
+                    // 在前序调用结束后才开始本调用；
+                    // doFinally 释放尾部占位，确保取消/失败时不留死锁
                     return prev[0].onErrorComplete()
                             .then(action)
                             .doFinally(
@@ -374,6 +529,15 @@ public abstract class AgentBase implements Agent {
      * @param structuredOutputClass Class defining the structure of the output
      * @return Response message with structured data in metadata
      */
+    /**
+     * 处理多条输入消息并生成结构化输出（带 Hook 生命周期）。
+     *
+     * <p>启用 telemetry 后会捕获 tracing 数据。
+     *
+     * @param msgs 输入消息列表
+     * @param structuredOutputClass 定义输出结构的目标类
+     * @return 元数据中包含结构化数据的响应消息
+     */
     @Override
     public final Mono<Msg> call(List<Msg> msgs, Class<?> structuredOutputClass) {
         return callInternal(msgs, null, m -> doCall(m, structuredOutputClass));
@@ -388,6 +552,15 @@ public abstract class AgentBase implements Agent {
      * @param schema com.fasterxml.jackson.databind.JsonNode instance defining the structure of the output
      * @return Response message with structured data in metadata
      */
+    /**
+     * 处理多条输入消息并按 JSON schema 生成结构化输出（带 Hook 生命周期）。
+     *
+     * <p>启用 telemetry 后会捕获 tracing 数据。
+     *
+     * @param msgs 输入消息列表
+     * @param schema 定义输出结构的 {@code com.fasterxml.jackson.databind.JsonNode}
+     * @return 元数据中包含结构化数据的响应消息
+     */
     @Override
     public final Mono<Msg> call(List<Msg> msgs, JsonNode schema) {
         return callInternal(msgs, null, m -> doCall(m, schema));
@@ -400,6 +573,12 @@ public abstract class AgentBase implements Agent {
      * @param msgs Input messages
      * @return Response message
      */
+    /**
+     * 处理多条输入消息的内部实现：子类必须实现各自的业务逻辑。
+     *
+     * @param msgs 输入消息列表
+     * @return 响应消息
+     */
     protected abstract Mono<Msg> doCall(List<Msg> msgs);
 
     /**
@@ -410,6 +589,14 @@ public abstract class AgentBase implements Agent {
      * @param msgs Input messages
      * @param structuredOutputClass Class defining the structure
      * @return Response message with structured data in metadata
+     */
+    /**
+     * 处理多条输入消息并生成结构化输出的内部实现。
+     * 支持结构化输出的子类必须重写此方法，默认实现抛出 UnsupportedOperationException。
+     *
+     * @param msgs 输入消息列表
+     * @param structuredOutputClass 定义输出结构的目标类
+     * @return 元数据中包含结构化数据的响应消息
      */
     protected Mono<Msg> doCall(List<Msg> msgs, Class<?> structuredOutputClass) {
         return Mono.error(
@@ -426,45 +613,81 @@ public abstract class AgentBase implements Agent {
      * @param outputSchema com.fasterxml.jackson.databind.JsonNode instance defining the structure
      * @return Response message with structured data in metadata
      */
+    /**
+     * 处理多条输入消息并按 JSON schema 生成结构化输出的内部实现。
+     * 支持结构化输出的子类必须重写此方法，默认实现抛出 UnsupportedOperationException。
+     *
+     * @param msgs 输入消息列表
+     * @param outputSchema 定义输出结构的 {@code JsonNode}
+     * @return 元数据中包含结构化数据的响应消息
+     */
     protected Mono<Msg> doCall(List<Msg> msgs, JsonNode outputSchema) {
         return Mono.error(
                 new UnsupportedOperationException(
                         "Structured output not supported by " + outputSchema.asText()));
     }
 
+    /**
+     * Register a system-wide {@link Hook} that will run for every agent instance.
+     * 注册一个进程级系统 Hook，对所有代理实例生效。
+     *
+     * @param hook 系统 Hook 实例
+     */
     public static void addSystemHook(Hook hook) {
         systemHooks.add(hook);
     }
 
+    /**
+     * Unregister a previously-added system-wide {@link Hook}.
+     * 注销一个进程级系统 Hook。
+     *
+     * @param hook 待注销的系统 Hook 实例
+     */
     public static void removeSystemHook(Hook hook) {
         systemHooks.remove(hook);
     }
 
     /** @deprecated Subclasses should implement per-session interrupt via RuntimeContext. */
+    /**
+     * @deprecated 子类应通过 RuntimeContext 实现 per-session 中断。
+     */
     @Deprecated
     @Override
     public void interrupt() {}
 
     /** @deprecated Subclasses should implement per-session interrupt via RuntimeContext. */
+    /**
+     * @deprecated 子类应通过 RuntimeContext 实现 per-session 中断。
+     */
     @Deprecated
     @Override
     public void interrupt(Msg msg) {}
 
     /** @deprecated Subclasses should implement per-session interrupt via RuntimeContext. */
+    /**
+     * @deprecated 子类应通过 RuntimeContext 实现 per-session 中断。
+     */
     @Deprecated
     public void interrupt(InterruptSource source) {}
 
     /** @deprecated No longer needed; ReActAgent uses per-session InterruptControl. */
+    /**
+     * @deprecated 已不再需要；{@code ReActAgent} 使用 per-session InterruptControl。
+     */
     @Deprecated
     protected Mono<Void> checkInterruptedAsync() {
         return Mono.empty();
     }
 
     /** @deprecated No-op; per-session interrupt state is managed by AgentState.interruptControl(). */
+    /**
+     * @deprecated 空操作；per-session 中断状态由 AgentState.interruptControl() 管理。
+     */
     @Deprecated
     protected void resetInterruptFlag() {}
 
     private InterruptContext createInterruptContext() {
+        // 默认按 USER 来源构造中断上下文；子类如需自定义可重写本方法
         return InterruptContext.builder().source(InterruptSource.USER).build();
     }
 
@@ -475,12 +698,20 @@ public abstract class AgentBase implements Agent {
      *
      * @return this agent instance
      */
+    /**
+     * 为一次 {@code call()} 调用获取执行资源（{@link Mono#using} 的 {@code resourceSupplier}）。
+     * 通过该机制保证 {@link #releaseExecution} 必定在完成、错误或取消时被调用。
+     *
+     * @return 当前的代理实例
+     */
     private AgentBase acquireExecution() {
+        // 守卫：若进程已进入优雅关闭阶段，则拒绝接受新的请求
         GracefulShutdownManager.getInstance().ensureAcceptingRequests();
         return this;
     }
 
     private void releaseExecution(AgentBase resource) {
+        // 配对 beforeAgentExecution：清理 per-call 状态
         afterAgentExecution();
     }
 
@@ -492,23 +723,39 @@ public abstract class AgentBase implements Agent {
      * @param originalArgs Original arguments to pass to handleInterrupt
      * @return Function that handles errors appropriately
      */
+    /**
+     * 为 {@code call()} 系列方法构造统一的错误处理器。
+     * 对 {@link InterruptedException} 单独走 {@link #handleInterrupt} 恢复路径，
+     * 其它错误则先通知 Hook 再原样上抛。
+     *
+     * @param originalArgs 传递给 {@link #handleInterrupt} 的原始入参
+     * @return 处理错误的函数
+     */
     private Function<Throwable, Mono<Msg>> createErrorHandler(Msg... originalArgs) {
         return error -> {
+            // 中断异常（含被包装在 cause 中）走专门的中断恢复路径
             if (error instanceof InterruptedException
                     || (error.getCause() instanceof InterruptedException)) {
                 return handleInterrupt(createInterruptContext(), originalArgs);
             }
+            // 其它错误先广播给 ErrorEvent Hook，再继续上抛
             return notifyError(error).then(Mono.error(error));
         };
     }
 
     /** @deprecated No-op stub. */
+    /**
+     * @deprecated 空操作占位实现。
+     */
     @Deprecated
     protected AtomicBoolean getInterruptFlag() {
         return new AtomicBoolean(false);
     }
 
     /** @deprecated Returns USER. Per-session interrupt source is on AgentState.interruptControl(). */
+    /**
+     * @deprecated 固定返回 USER。Per-session 中断来源由 AgentState.interruptControl() 管理。
+     */
     @Deprecated
     protected InterruptSource getInterruptSource() {
         return InterruptSource.USER;
@@ -528,6 +775,20 @@ public abstract class AgentBase implements Agent {
      *
      * @param msg The message to observe
      * @return Mono that completes when observation is done
+     */
+    /**
+     * 观察（observe）一条消息但不产生回复。该机制允许代理接收来自其它代理或环境的消息而无须
+     * 显式响应，常见于多代理协作场景。
+     *
+     * <p>常见实现模式：
+     * <ul>
+     *   <li>无状态代理：无需观察时返回空实现即可</li>
+     *   <li>有状态代理：把消息写入记忆/上下文，供后续 call 使用</li>
+     *   <li>协作型代理：更新共享知识或触发副作用</li>
+     * </ul>
+     *
+     * @param msg 待观察的消息
+     * @return 观察完成时结束的 Mono
      */
     protected Mono<Void> doObserve(Msg msg) {
         return Mono.empty();
@@ -549,11 +810,30 @@ public abstract class AgentBase implements Agent {
      *     or List)
      * @return Recovery message to return to the user
      */
+    /**
+     * 处理执行过程中发生的中断。子类必须实现该方法以基于中断上下文提供恢复逻辑。
+     *
+     * <p>实现指引：
+     * <ul>
+     *   <li>简单代理：返回基本的中断确认消息即可</li>
+     *   <li>复杂代理：生成包含未完成操作或中间结果的摘要</li>
+     *   <li>有状态代理：返回前确保状态已被妥善保存</li>
+     * </ul>
+     *
+     * @param context 包含中断元数据的中断上下文
+     * @param originalArgs 调用方传给 {@code call()} 的原始入参（空、单条 Msg、或 List）
+     * @return 返回给用户的恢复消息
+     */
     protected abstract Mono<Msg> handleInterrupt(InterruptContext context, Msg... originalArgs);
 
     /**
      * Returns the agent's mutable runtime state, or {@code null} if this agent type does not
      * maintain an {@link AgentState}.
+     */
+    /**
+     * 返回代理的可变运行时状态；若本代理类型不维护 {@link AgentState} 则返回 {@code null}。
+     *
+     * @return 代理状态实例或 {@code null}
      */
     public AgentState getAgentState() {
         return null;
@@ -566,6 +846,15 @@ public abstract class AgentBase implements Agent {
      * the value is sourced from the agent's most-recently-activated scope, under concurrent calls
      * on one instance this reflects the latest call — middlewares/tools that need their own call's
      * context should read it from the per-subscription {@link RuntimeContext} they are handed.
+     */
+    /**
+     * 返回当前 per-call {@link RuntimeContext}；代理若不维护 per-call scope 则返回 {@code null}。
+     * 基类默认返回 {@code null}；维护 per-call 状态的代理（如 {@code ReActAgent}）覆盖此方法以
+     * 返回其活动 call scope 的上下文。
+     * 注意：该值来源于代理最近激活的 scope，在同一实例并发调用下会反映最近一次调用。
+     * 需要自身调用上下文的中间件/工具应直接使用它们收到的 per-subscription {@link RuntimeContext}。
+     *
+     * @return 当前的 per-call {@link RuntimeContext}，可能为 {@code null}
      */
     public RuntimeContext getRuntimeContext() {
         return null;
@@ -585,6 +874,16 @@ public abstract class AgentBase implements Agent {
      *     provided (read from the Reactor Context, so concurrency-safe)
      * @return this call's per-call scope object, or {@code null} if this agent type keeps none
      */
+    /**
+     * 在 {@code call()} / 流式调用开始时触发，发生在 {@link #acquireExecution} 之后、所有 Hook 之前。
+     * {@link io.agentscope.core.ReActAgent} 通过它从传入的 {@link RuntimeContext} 激活 per-call 会话槽，
+     * 并返回新建的 per-call scope 对象（该对象随后挂到 Reactor Context 的 {@link #CALL_SCOPE_KEY}）。
+     * 在此处返回 scope（而不是通过单独的访问器）避免了"构造后到捕获之间"的窗口被并发调用覆盖。
+     *
+     * @param msgs 调用方传给 {@code call()} 的消息列表
+     * @param rc 调用方提供的 per-call {@link RuntimeContext}；未提供时为 {@code null}（从 Reactor Context 读取，并发安全）
+     * @return 本次调用的 per-call scope 对象；本代理类型不维护 scope 时返回 {@code null}
+     */
     protected Object beforeAgentExecution(List<Msg> msgs, RuntimeContext rc) {
         return null;
     }
@@ -593,12 +892,21 @@ public abstract class AgentBase implements Agent {
      * Invoked in {@code Mono.using} cleanup, before clearing the running state. Pairs with {@link
      * #beforeAgentExecution(List, RuntimeContext)}. The default is a no-op.
      */
+    /**
+     * 在 {@code Mono.using} 的清理阶段触发，发生在清除运行状态之前；与
+     * {@link #beforeAgentExecution(List, RuntimeContext)} 配对使用。默认空操作。
+     */
     protected void afterAgentExecution() {}
 
     /**
      * Pushes {@code ctx} to all {@link RuntimeContextAware} hooks registered for this agent. The
      * per-call {@link RuntimeContext} itself is no longer stored on a shared instance field; it
      * lives on the agent's per-call scope (see {@link #getRuntimeContext()}).
+     */
+    /**
+     * 将 {@code ctx} 推送给本代理已注册的全部 {@link RuntimeContextAware} Hook。
+     * 注意：per-call {@link RuntimeContext} 已不再存放在共享实例字段上，而是存放在 per-call scope
+     * （参见 {@link #getRuntimeContext()}）。
      */
     protected void bindRuntimeContextToHooks(RuntimeContext ctx) {
         for (RuntimeContextAware h : runtimeContextAwareHooks) {
@@ -609,6 +917,9 @@ public abstract class AgentBase implements Agent {
     /**
      * Clears the {@link RuntimeContext} previously pushed to all {@link RuntimeContextAware} hooks.
      */
+    /**
+     * 清除先前推送给全部 {@link RuntimeContextAware} Hook 的 {@link RuntimeContext}。
+     */
     protected void unbindRuntimeContextFromHooks() {
         for (RuntimeContextAware h : runtimeContextAwareHooks) {
             h.setRuntimeContext(null);
@@ -616,6 +927,7 @@ public abstract class AgentBase implements Agent {
     }
 
     private void registerRuntimeContextHookIfNeeded(Hook hook) {
+        // Hook 若实现 RuntimeContextAware，则纳入 runtimeContextAwareHooks 以便后续按需绑定上下文
         if (hook instanceof RuntimeContextAware r && !runtimeContextAwareHooks.contains(r)) {
             runtimeContextAwareHooks.add(r);
         }
@@ -626,6 +938,12 @@ public abstract class AgentBase implements Agent {
      * Protected to allow subclasses to access hooks for custom notification logic.
      *
      * @return List of hooks
+     */
+    /**
+     * 获取本代理的 Hook 列表。
+     * 设为 protected 是允许子类访问 hooks 以实现自定义的通知逻辑。
+     *
+     * @return Hook 列表
      */
     public List<Hook> getHooks() {
         return hooks;
@@ -639,15 +957,24 @@ public abstract class AgentBase implements Agent {
      *
      * @param hook The hook to add
      */
+    /**
+     * 动态向本代理添加一个 Hook。
+     *
+     * <p>允许在代理执行期间动态添加 Hook，常用于结构化输出处理或其它短生命周期行为。
+     *
+     * @param hook 待添加的 Hook
+     */
     protected void addHook(Hook hook) {
         if (hook != null) {
             hooks.add(hook);
             registerRuntimeContextHookIfNeeded(hook);
+            // 新加入的 hook 需按优先级重新排序，保持执行顺序
             sortHooks();
         }
     }
 
     private void sortHooks() {
+        // 按 Hook.priority() 升序排序；同优先级维持注册顺序
         this.hooks.sort(HOOK_COMPARATOR);
     }
 
@@ -659,9 +986,17 @@ public abstract class AgentBase implements Agent {
      *
      * @param hook The hook to remove
      */
+    /**
+     * 动态从本代理移除一个 Hook。
+     *
+     * <p>当 Hook 不再被需要时应当移除，避免内存泄漏和意外的副作用。
+     *
+     * @param hook 待移除的 Hook
+     */
     protected void removeHook(Hook hook) {
         if (hook != null) {
             hooks.remove(hook);
+            // 同步清理 runtimeContextAwareHooks 中的引用，避免悬挂指针
             if (hook instanceof RuntimeContextAware r) {
                 runtimeContextAwareHooks.remove(r);
             }
@@ -673,6 +1008,12 @@ public abstract class AgentBase implements Agent {
      * Hooks with the same priority maintain registration order.
      *
      * @return Sorted list of hooks
+     */
+    /**
+     * 获取按优先级排序的 Hook 列表（数值越小优先级越高）。
+     * 同优先级的 Hook 维持注册顺序。
+     *
+     * @return 已排序的 Hook 列表
      */
     public List<Hook> getSortedHooks() {
         return hooks;
@@ -689,6 +1030,16 @@ public abstract class AgentBase implements Agent {
      *     reading a shared instance field
      * @return the seed system message, or {@code null} if none
      */
+    /**
+     * 返回注入到 {@link PreCallEvent} 中的初始系统消息（在 Hook 执行前生效）。
+     *
+     * <p>默认返回 {@code null}。子类（如 {@code ReActAgent}）覆盖该方法以根据配置的 {@code sysPrompt}
+     * 构造系统消息。
+     *
+     * @param callScope 调用入口处捕获的 per-call scope（可为 {@code null}）；允许子类解析本次调用的
+     *     {@link RuntimeContext}，避免直接读取共享实例字段
+     * @return 初始系统消息；无则返回 {@code null}
+     */
     protected Msg seedSystemMsg(Object callScope) {
         return null;
     }
@@ -701,6 +1052,14 @@ public abstract class AgentBase implements Agent {
      *
      * @param callScope the per-call scope captured at call entry (may be {@code null})
      * @return the state to snapshot, or {@code null} if none
+     */
+    /**
+     * 返回用于本次调用 pre-call 记忆快照的 {@link AgentState}。
+     * 默认读取代理级的 {@link #getAgentState()}；拥有 per-call scope 的子类（如 {@code ReActAgent}）
+     * 返回该 scope 的会话状态，使快照在并发场景下依然正确。
+     *
+     * @param callScope 调用入口处捕获的 per-call scope（可为 {@code null}）
+     * @return 用于快照的状态实例；无则返回 {@code null}
      */
     protected AgentState stateForCall(Object callScope) {
         return getAgentState();
@@ -716,6 +1075,15 @@ public abstract class AgentBase implements Agent {
      * @param systemMsg the system message produced by all PreCall hooks (may be null)
      * @param callScope the per-call scope captured at call entry (see {@link #beforeAgentExecution(List, RuntimeContext)});
      *     may be {@code null}
+     */
+    /**
+     * 在所有 {@link PreCallEvent} Hook 执行完毕后被调用，传入最终的 system message 值。
+     *
+     * <p>默认空操作。子类（如 {@code ReActAgent}）覆盖此方法以将系统消息持久化到 per-call 的
+     * {@code AtomicReference}，供后续事件（{@code PreReasoningEvent}、{@code PreSummaryEvent}）使用。
+     *
+     * @param systemMsg 由所有 PreCall Hook 产出的系统消息（可为 null）
+     * @param callScope 调用入口处捕获的 per-call scope（参见 {@link #beforeAgentExecution(List, RuntimeContext)}）；可为 {@code null}
      */
     protected void consumeSystemMsgAfterPreCall(Msg systemMsg, Object callScope) {}
 
@@ -736,8 +1104,23 @@ public abstract class AgentBase implements Agent {
      * @param callArgs messages passed by the caller to {@code call()}
      * @return Mono containing the new tail messages that {@code doCall} should add to memory
      */
+    /**
+     * 通知所有 Hook：代理即将开始执行（preCall Hook）。
+     *
+     * <p>事件中的 {@code inputMessages} 是完整视图：先放代理当前记忆的快照，再追加调用方传给
+     * {@code call()} 的 {@code callArgs}。Hook 可向尾部追加非 SYSTEM 消息。
+     * 通过 {@code setInputMessages} 注入 {@link MsgRole#SYSTEM} 消息是被禁止的，
+     * 本方法结尾会检查；如需注入系统消息请改用 {@link PreCallEvent#setSystemMessage}
+     * 或 {@link PreCallEvent#appendSystemContent}。
+     *
+     * <p>Hook 执行完成后，系统消息通过 {@link #consumeSystemMsgAfterPreCall(Msg, Object)} 移交；
+     * 仅尾部（快照边界之外的新增消息）会返回，供 {@code doCall} 写入记忆。
+     *
+     * @param callArgs 调用方传给 {@code call()} 的消息列表
+     * @return 携带 {@code doCall} 应写入记忆的新增尾部消息的 Mono
+     */
     private Mono<List<Msg>> notifyPreCall(List<Msg> callArgs, Object callScope) {
-        // Take a state snapshot before hooks run (pre-hook view), from this call's scope state.
+        // 在 Hook 执行前先取一次状态快照（pre-hook 视图），快照取自本次 scope 的状态
         List<Msg> snapshot = List.of();
         AgentState agentState = stateForCall(callScope);
         if (agentState != null) {
@@ -745,7 +1128,7 @@ public abstract class AgentBase implements Agent {
         }
         final int snapshotSize = snapshot.size();
 
-        // Build full input for hooks: snapshot + callArgs
+        // 构造 Hook 可见的完整输入：snapshot + callArgs
         List<Msg> fullInput = new ArrayList<>(snapshot);
         if (callArgs != null) {
             fullInput.addAll(callArgs);
@@ -755,16 +1138,17 @@ public abstract class AgentBase implements Agent {
         event.setSystemMessage(seedSystemMsg(callScope));
 
         Mono<PreCallEvent> result = Mono.just(event);
+        // 按优先级串行执行所有 Hook
         for (Hook hook : getSortedHooks()) {
             result = result.flatMap(hook::onEvent);
         }
 
         return result.map(
                 e -> {
-                    // Hand off the system message to the per-call state
+                    // 把最终系统消息转交给 per-call 状态
                     consumeSystemMsgAfterPreCall(e.getSystemMessage(), callScope);
 
-                    // Extract the tail: messages appended beyond the snapshot boundary
+                    // 取出 Hook 在快照边界之后追加的尾部消息
                     List<Msg> currentInput = e.getInputMessages();
                     List<Msg> tail;
                     if (currentInput == null || currentInput.size() <= snapshotSize) {
@@ -775,10 +1159,9 @@ public abstract class AgentBase implements Agent {
                                         currentInput.subList(snapshotSize, currentInput.size()));
                     }
 
-                    // Guard (ReActAgent only): hooks must not inject SYSTEM messages into the
-                    // tail, since the tail is persisted to memory and SYSTEM messages would
-                    // accumulate. Agents without memory (e.g. UserAgent) may legitimately
-                    // pass SYSTEM messages as call arguments.
+                    // 守卫（仅 ReActAgent）：Hook 不得向尾部注入 SYSTEM 消息，
+                    // 因为尾部会被持久化到记忆，SYSTEM 消息会不断累积。
+                    // 没有记忆的代理（如 UserAgent）允许合法地把 SYSTEM 消息作为 call 参数。
                     if (AgentBase.this instanceof io.agentscope.core.ReActAgent) {
                         for (Msg msg : tail) {
                             if (msg != null && msg.getRole() == MsgRole.SYSTEM) {
@@ -802,16 +1185,24 @@ public abstract class AgentBase implements Agent {
      * @param finalMsg Final message
      * @return Mono containing potentially modified final message
      */
+    /**
+     * 通知所有 Hook：代理调用已完成（postCall Hook）。
+     * Hook 通知完成后，再把消息广播给所有订阅者。
+     *
+     * @param finalMsg 最终消息
+     * @return 携带可能被 Hook 修改过的最终消息的 Mono
+     */
     private Mono<Msg> notifyPostCall(Msg finalMsg) {
         if (finalMsg == null) {
             return Mono.error(new IllegalStateException("Agent returned null message"));
         }
         PostCallEvent event = new PostCallEvent(this, finalMsg);
         Mono<PostCallEvent> result = Mono.just(event);
+        // 按优先级串行执行所有 Hook
         for (Hook hook : getSortedHooks()) {
             result = result.flatMap(hook::onEvent);
         }
-        // After hooks, broadcast to subscribers
+        // Hook 处理后再广播给 MsgHub 订阅者
         return result.map(PostCallEvent::getFinalMessage)
                 .flatMap(msg -> broadcastToSubscribers(msg).thenReturn(msg));
     }
@@ -821,6 +1212,12 @@ public abstract class AgentBase implements Agent {
      *
      * @param error The error
      * @return Mono that completes when all hooks are notified
+     */
+    /**
+     * 把错误广播给所有 ErrorEvent Hook。
+     *
+     * @param error 待通知的错误
+     * @return 全部 Hook 处理完毕后结束的 Mono
      */
     private Mono<Void> notifyError(Throwable error) {
         ErrorEvent event = new ErrorEvent(this, error);
@@ -834,6 +1231,12 @@ public abstract class AgentBase implements Agent {
      *
      * @param hubId MsgHub identifier
      */
+    /**
+     * 移除指定 MsgHub 的全部订阅者。
+     * 通常在 MsgHub 被销毁或重置时调用；调用后本代理不再从该 Hub 接收消息。
+     *
+     * @param hubId MsgHub 标识
+     */
     public void removeSubscribers(String hubId) {
         hubSubscribers.remove(hubId);
     }
@@ -846,7 +1249,15 @@ public abstract class AgentBase implements Agent {
      * @param hubId MsgHub identifier
      * @param subscribers New list of subscribers (will be copied)
      */
+    /**
+     * 重置指定 MsgHub 的订阅者列表：用新列表覆盖已有订阅者。
+     * 通常在 MsgHub 的订阅拓扑发生变化时由 MsgHub 触发。
+     *
+     * @param hubId MsgHub 标识
+     * @param subscribers 新的订阅者列表（会复制以避免外部修改）
+     */
     public void resetSubscribers(String hubId, List<AgentBase> subscribers) {
+        // 复制入参避免外部后续修改影响内部状态
         hubSubscribers.put(hubId, new ArrayList<>(subscribers));
     }
 
@@ -856,7 +1267,14 @@ public abstract class AgentBase implements Agent {
      *
      * @return True if agent has one or more subscribers
      */
+    /**
+     * 判断本代理是否存在订阅者。
+     * 订阅者是指通过 MsgHub 接收本代理发布消息的代理。
+     *
+     * @return 存在至少一个订阅者则返回 true
+     */
     public boolean hasSubscribers() {
+        // 至少存在一个非空订阅者列表才算有订阅者
         return !hubSubscribers.isEmpty()
                 && hubSubscribers.values().stream().anyMatch(list -> !list.isEmpty());
     }
@@ -866,6 +1284,11 @@ public abstract class AgentBase implements Agent {
      * Subscribers are agents that will receive messages published through MsgHub.
      *
      * @return Total count of subscribers
+     */
+    /**
+     * 获取跨所有 MsgHub 的订阅者总数。
+     *
+     * @return 订阅者总数
      */
     public int getSubscriberCount() {
         return hubSubscribers.values().stream().mapToInt(List::size).sum();
@@ -879,10 +1302,18 @@ public abstract class AgentBase implements Agent {
      * @param msg Message to broadcast
      * @return Mono that completes when all subscribers have observed the message
      */
+    /**
+     * 把消息广播给所有 MsgHub 上的订阅者。
+     * 该方法在每次代理调用结束后自动触发，用以实现 MsgHub 的自动广播能力。
+     *
+     * @param msg 待广播的消息
+     * @return 全部订阅者观察完成后结束的 Mono
+     */
     private Mono<Void> broadcastToSubscribers(Msg msg) {
         if (hubSubscribers.isEmpty()) {
             return Mono.empty();
         }
+        // 扁平化两层 Map.values -> List<AgentBase>，逐个调用 observe
         return Flux.fromIterable(hubSubscribers.values())
                 .flatMap(Flux::fromIterable)
                 .flatMap(subscriber -> subscriber.observe(msg))
@@ -896,6 +1327,12 @@ public abstract class AgentBase implements Agent {
      * @param msg Message to observe
      * @return Mono that completes when observation is done
      */
+    /**
+     * 单条消息的观察入口（公开 API），内部委托给 {@link #doObserve}。
+     *
+     * @param msg 待观察的消息
+     * @return 观察完成时结束的 Mono
+     */
     @Override
     public final Mono<Void> observe(Msg msg) {
         return doObserve(msg);
@@ -907,6 +1344,12 @@ public abstract class AgentBase implements Agent {
      *
      * @param msgs Messages to observe
      * @return Mono that completes when all observations are done
+     */
+    /**
+     * 多条消息的观察入口（公开 API），逐条调用 {@link #doObserve}。
+     *
+     * @param msgs 待观察的消息列表
+     * @return 全部观察完成后结束的 Mono
      */
     @Override
     public final Mono<Void> observe(List<Msg> msgs) {
@@ -925,6 +1368,14 @@ public abstract class AgentBase implements Agent {
      * @deprecated since 2.0.0, for removal. Use {@code ReActAgent#streamEvents(List)} for the
      *     fine-grained {@code AgentEvent} stream.
      */
+    /**
+     * 流式执行：输入多条消息，返回执行过程中的事件流。
+     *
+     * @param msgs 输入消息列表
+     * @param options 流配置选项
+     * @return 执行过程中发出的事件 Flux
+     * @deprecated 自 2.0.0 起，将被移除。请改用 {@code ReActAgent#streamEvents(List)} 获取细粒度 {@code AgentEvent} 流。
+     */
     @Deprecated(since = "2.0.0", forRemoval = true)
     @Override
     public Flux<Event> stream(List<Msg> msgs, StreamOptions options) {
@@ -941,6 +1392,15 @@ public abstract class AgentBase implements Agent {
      * @deprecated since 2.0.0, for removal. Use {@code ReActAgent#streamEvents(...)} for the
      *     fine-grained {@code AgentEvent} stream.
      */
+    /**
+     * 流式执行（结构化输出 Class 版本）。
+     *
+     * @param msgs 输入消息列表
+     * @param options 流配置选项
+     * @param structuredModel 可选，定义输出结构的 Class
+     * @return 执行过程中发出的事件 Flux
+     * @deprecated 自 2.0.0 起，将被移除。请改用 {@code ReActAgent#streamEvents(...)} 获取细粒度 {@code AgentEvent} 流。
+     */
     @Deprecated(since = "2.0.0", forRemoval = true)
     @Override
     public Flux<Event> stream(List<Msg> msgs, StreamOptions options, Class<?> structuredModel) {
@@ -956,6 +1416,15 @@ public abstract class AgentBase implements Agent {
      * @return Flux of events emitted during execution
      * @deprecated since 2.0.0, for removal. Use {@code ReActAgent#streamEvents(...)} for the
      *     fine-grained {@code AgentEvent} stream.
+     */
+    /**
+     * 流式执行（结构化输出 JSON Schema 版本）。
+     *
+     * @param msgs 输入消息列表
+     * @param options 流配置选项
+     * @param schema 定义响应结构的 JSON Schema
+     * @return 执行过程中发出的事件 Flux
+     * @deprecated 自 2.0.0 起，将被移除。请改用 {@code ReActAgent#streamEvents(...)} 获取细粒度 {@code AgentEvent} 流。
      */
     @Deprecated(since = "2.0.0", forRemoval = true)
     @Override
@@ -979,24 +1448,37 @@ public abstract class AgentBase implements Agent {
      * @param callSupplier Supplier that executes the agent call (either single message or list)
      * @return Flux of events emitted during execution
      */
+    /**
+     * 构造事件流的辅助方法，统一管理 Hook 生命周期。
+     *
+     * <p>该方法封装代理流式执行期间的公共逻辑：
+     * <ul>
+     *   <li>创建并注册一个临时的 StreamingHook</li>
+     *   <li>管理 Hook 生命周期（加入/移出 hooks 列表）</li>
+     *   <li>可选地将最终结果作为事件发出</li>
+     *   <li>正确传递错误与完成信号</li>
+     * </ul>
+     *
+     * @param options 流配置选项
+     * @param callSupplier 触发代理调用的供应器（单条或多条消息均可）
+     * @return 执行过程中发出的事件 Flux
+     */
     private Flux<Event> createEventStream(StreamOptions options, Supplier<Mono<Msg>> callSupplier) {
         return Flux.deferContextual(
                 ctxView ->
                         Flux.<Event>create(
                                         sink -> {
-                                            // Create streaming hook with options
+                                            // 用 sink 构造 StreamingHook，把流式事件全部转给 sink
                                             StreamingHook streamingHook =
                                                     new StreamingHook(sink, options);
 
-                                            // Add temporary hook
+                                            // 临时加入 Hook 流
                                             addHook(streamingHook);
 
-                                            // Bus that subagent tools use to push child events
-                                            // into this parent sink without an extra Flux layer.
+                                            // 子代理工具通过该总线把子事件推送到父 sink，无需额外的 Flux 层级
                                             SubagentEventBus bus = sink::next;
 
-                                            // Use Mono.defer to ensure trace context propagation
-                                            // while maintaining streaming hook functionality
+                                            // 用 Mono.defer 保证 trace context 透传同时不影响 streaming hook
                                             Disposable callDisposable =
                                                     Mono.defer(() -> callSupplier.get())
                                                             .contextWrite(
@@ -1009,11 +1491,12 @@ public abstract class AgentBase implements Agent {
                                                                                             ctxView))
                                                             .doFinally(
                                                                     signalType -> {
-                                                                        // Remove temporary hook
+                                                                        // 收尾：移除临时 Hook
                                                                         hooks.remove(streamingHook);
                                                                     })
                                                             .subscribe(
                                                                     finalMsg -> {
+                                                                        // 按 StreamOptions 决定是否发出最终结果事件
                                                                         if (options.shouldStream(
                                                                                 EventType
                                                                                         .AGENT_RESULT)) {
@@ -1030,6 +1513,7 @@ public abstract class AgentBase implements Agent {
                                             sink.onCancel(callDisposable);
                                         },
                                         FluxSink.OverflowStrategy.BUFFER)
+                                // 切到 boundedElastic 调度器，避免阻塞事件循环
                                 .publishOn(Schedulers.boundedElastic()));
     }
 

@@ -26,9 +26,15 @@ import io.agentscope.harness.agent.subagent.SubagentFactory;
 /**
  * 子智能体描述器，包含智能体ID、描述信息、{@link SubagentFactory}，
  * 以及可选的 {@link SubagentDeclaration}（用于远程地址与请求头配置）。
+ *
+ * @param name 子智能体标识（即 agent_id），用于创建与寻址
+ * @param description 面向大模型展示的能力描述，用于系统提示词中的可用智能体列表
+ * @param factory 子智能体工厂，负责实际实例化子智能体
+ * @param declaration 可选的声明元数据（来自 subagents/*.md 文件），可为 null
  */
 public record SubagentEntry(
         String name, String description, SubagentFactory factory, SubagentDeclaration declaration) {
+    /** 便捷构造器：不带声明元数据（编程式注册的子智能体使用）。 */
     public SubagentEntry(String name, String description, SubagentFactory factory) {
         this(name, description, factory, null);
     }

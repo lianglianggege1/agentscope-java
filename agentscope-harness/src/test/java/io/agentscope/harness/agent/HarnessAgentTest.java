@@ -443,11 +443,11 @@ class HarnessAgentTest {
         String combined =
                 captor.getAllValues().stream()
                         .map(HarnessAgentTest::joinAllText)
-                        .filter(s -> s.contains("## Subagents"))
+                        .filter(s -> s.contains("## Subagents") || s.contains("## 子智能体"))
                         .findFirst()
                         .orElse("");
         assertTrue(
-                combined.contains("## Subagents"), "subagent hook should inject Subagents section");
+                combined.contains("## Subagents") || combined.contains("## 子智能体"), "subagent hook should inject Subagents section");
         assertTrue(
                 combined.contains("`" + specId + "`"),
                 "Markdown subagent id (from filename) should appear in prompt");
@@ -457,7 +457,7 @@ class HarnessAgentTest {
     }
 
     @Test
-    void subagentsDir_loadsMarkdownDeclarations() throws Exception {
+    void subagentsDir_loadsMarkdownDeclarations() throws Exception { // 这个测试方法需要认真理解，因为它涉及到subagent的生命周期 create   run 一系列
         Files.createDirectories(workspace);
         Files.writeString(workspace.resolve(WorkspaceConstants.AGENTS_MD), "# w\n");
         Path subagents = workspace.resolve("subagents");
@@ -603,12 +603,15 @@ class HarnessAgentTest {
                         .middlewares(List.of(userMiddleware, new AgentTraceMiddleware()))
                         .build();
 
+        // 创建了一个HarnessAgent.Builder实例，并设置了工作空间和文件系统
         HarnessAgent.Builder builder =
                 HarnessAgent.Builder.fromAgent(source)
                         .workspace(workspace)
                         .abstractFilesystem(new LocalFilesystem(workspace));
 
+        // 构建了子代理条目列表和子代理
         List<SubagentEntry> entries = builder.buildSubagentEntries(workspace);
+        // 构建了子代理
         HarnessAgent child = builder.build();
 
         long copiedUserMiddlewareCount =
@@ -944,6 +947,7 @@ class HarnessAgentTest {
                         .workspaceMode(WorkspaceMode.ISOLATED)
                         .build();
 
+         //  entries 是子 agent 清单
         List<SubagentEntry> entries =
                 HarnessAgent.builder()
                         .model(stubModel("ok"))

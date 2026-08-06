@@ -25,7 +25,6 @@ import io.agentscope.core.message.ToolUseBlock;
 import io.agentscope.core.model.Model;
 import io.agentscope.harness.agent.memory.MemoryFlushManager;
 import io.agentscope.harness.agent.memory.compaction.CompactionConfig.TruncateArgsConfig;
-import io.agentscope.harness.agent.middleware.CompactionMiddleware;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

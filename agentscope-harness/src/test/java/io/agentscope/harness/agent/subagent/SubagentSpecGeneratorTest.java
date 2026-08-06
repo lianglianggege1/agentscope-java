@@ -66,15 +66,15 @@ class SubagentSpecGeneratorTest {
     @Test
     void generateAndValidate_returnsParsedDeclaration() {
         /*"""
-                ---
-                description: 审查代码中的安全问题与并发缺陷
-                mode: subagent
-                hidden: false
-                temperature: 0.2
-                steps: 8
-                ---
-                你是代码审查专员，重点关注安全风险与并发问题。审查结果使用无序列表输出。
-                """;*/
+        ---
+        description: 审查代码中的安全问题与并发缺陷
+        mode: subagent
+        hidden: false
+        temperature: 0.2
+        steps: 8
+        ---
+        你是代码审查专员，重点关注安全风险与并发问题。审查结果使用无序列表输出。
+        """;*/
         String spec =
                 """
                 ---

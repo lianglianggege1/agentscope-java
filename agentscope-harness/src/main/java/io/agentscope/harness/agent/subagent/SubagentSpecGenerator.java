@@ -59,37 +59,37 @@ public final class SubagentSpecGenerator {
      * 生成子智能体配置规范所用的大模型提示词模板
      */
     /*private static final String PROMPT_TEMPLATE =
-            """
-            你正在为 agentscope-java 框架设计子智能体配置规范。
+    """
+    你正在为 agentscope-java 框架设计子智能体配置规范。
 
-            用户对该智能体用途的描述：
-            ---
-            %s
-            ---
+    用户对该智能体用途的描述：
+    ---
+    %s
+    ---
 
-            已存在的智能体ID（禁止复用，大小写不同也不行）：%s
+    已存在的智能体ID（禁止复用，大小写不同也不行）：%s
 
-            输出带有YAML头部元数据的Markdown文档，必须遵循以下结构规范：
+    输出带有YAML头部元数据的Markdown文档，必须遵循以下结构规范：
 
-            ---
-            description: <一句话说明调度器何时将任务委派给该智能体>
-            mode: subagent
-            hidden: false
-            # 可选模型超参（省略则继承父智能体配置）：
-            # temperature: <0.0~2.0>
-            # top_p: <0.0~1.0>
-            # steps: <正整数，默认值10>
-            # tools: [<继承的工具名称>, ...]   # 可选工具白名单；空列表代表继承全部工具
-            ---
+    ---
+    description: <一句话说明调度器何时将任务委派给该智能体>
+    mode: subagent
+    hidden: false
+    # 可选模型超参（省略则继承父智能体配置）：
+    # temperature: <0.0~2.0>
+    # top_p: <0.0~1.0>
+    # steps: <正整数，默认值10>
+    # tools: [<继承的工具名称>, ...]   # 可选工具白名单；空列表代表继承全部工具
+    ---
 
-            <Markdown格式系统提示正文：说明智能体角色、能力、输出格式与约束要求。内容需精炼，该文本将直接作为子智能体的系统提示词。>
+    <Markdown格式系统提示正文：说明智能体角色、能力、输出格式与约束要求。内容需精炼，该文本将直接作为子智能体的系统提示词。>
 
-            输出约束规则：
-            - 仅返回目标Markdown文档，禁止额外说明、代码块、注释文字。
-            - 不要添加 `name:` 字段，调用方会根据文件名自动生成名称。
-            - description 描述文字长度不超过200字符。
-            - 未指定 workspace.path 时，正文内容不能为空。
-            """;*/
+    输出约束规则：
+    - 仅返回目标Markdown文档，禁止额外说明、代码块、注释文字。
+    - 不要添加 `name:` 字段，调用方会根据文件名自动生成名称。
+    - description 描述文字长度不超过200字符。
+    - 未指定 workspace.path 时，正文内容不能为空。
+    """;*/
 
     private static final String PROMPT_TEMPLATE =
             """

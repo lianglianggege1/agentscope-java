@@ -452,7 +452,7 @@ public class CompactionConfig {
 
         /** Number of recent messages to keep verbatim after compaction. */
         /**
-         压缩完成后需要完整保留的近期消息条数。
+         * 压缩完成后需要完整保留的近期消息条数。
          */
         public Builder keepMessages(int keepMessages) {
             this.keepMessages = keepMessages;

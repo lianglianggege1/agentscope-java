@@ -69,18 +69,58 @@ import reactor.core.publisher.Mono;
  * the toolkit when building the inner {@link io.agentscope.core.ReActAgent ReActAgent}, so the
  * constructor-injected intermediate toolkit is not the same instance as the agent's live toolkit.
  */
+/**
+ * harness 原生的技能中间件。取代旧的 {@code DynamicSkillMiddleware} 子类方案，
+ * 以独立实现持有一个 {@link SkillRuntime}。
+ *
+ * <p>每次 {@code onSystemPrompt} 执行的完整流水线：
+ * <ol>
+ *   <li>从智能体解析当前 {@link RuntimeContext}；</li>
+ *   <li>按低→高优先级遍历技能仓库，按 {@code AgentSkill.name} 合并（后者覆盖前者）；</li>
+ *   <li>应用可选的 {@link SkillVisibilityFilter}（灰度/白名单可见性过滤）；</li>
+ *   <li>通过 {@link MarketplaceStager} 把 Layer-1/Layer-2 市场技能的资源暂存到
+ *       {@code <wsRoot>/.skills-cache/<source-ns>/<skill>/}；</li>
+ *   <li>构建 {@link HarnessSkillEntry} 组成的 {@link SkillCatalog}
+ *       （携带懒加载资源与解析后的 {@code filesRoot}）；</li>
+ *   <li>把目录安装进 {@link SkillRuntime}，由其（幂等地）向智能体运行时工具集
+ *       注册 {@code load_skill_through_path} 工具；</li>
+ *   <li>渲染 {@code <available_skills>} 提示块并追加到当前系统提示词。</li>
+ * </ol>
+ *
+ * <p><b>工具集注意点：</b>构造参数 {@code toolkit} 仅为 API 兼容而保留，
+ * <em>不用于</em>运行时工具注册。{@link #onSystemPrompt} 始终安装到
+ * {@code agent.getToolkit()}——即运行中智能体实际用于推理的工具集。
+ * 这很关键：{@link io.agentscope.harness.agent.HarnessAgent HarnessAgent} 在构建内层
+ * {@link io.agentscope.core.ReActAgent ReActAgent} 时会对工具集做深拷贝，
+ * 构造期注入的中间工具集并不是智能体实际使用的那个实例。
+ */
 @SuppressWarnings("deprecation")
 public class HarnessSkillMiddleware implements HarnessRuntimeMiddleware {
 
     private static final Logger log = LoggerFactory.getLogger(HarnessSkillMiddleware.class);
 
+    /** 技能仓库列表，按组合顺序排列（低优先级在前，高优先级在后）。 */
     private final List<AgentSkillRepository> repositories;
+
+    /** 仅为 API 兼容保留，运行时注册实际使用 agent.getToolkit()（见类注释）。 */
     private final Toolkit toolkit;
+
+    /** 构建期注入的技能过滤器（静态部分），会与请求级过滤器叠加。 */
     private final SkillFilter builderFilter;
+
+    /** 可选的请求级可见性过滤器（灰度/白名单），可为 null。 */
     private final SkillVisibilityFilter visibilityFilter;
+
+    /** 市场技能资源暂存器；为 null 时完全跳过资源暂存。 */
     private final MarketplaceStager stager;
+
+    /** 按 shell 模式解析技能 {@code <files-root>} 的策略，永不为 null。 */
     private final ShellPathPolicy shellPathPolicy;
+
+    /** 技能运行时：持有当前目录并幂等注册 load_skill_through_path 工具。 */
     private final SkillRuntime runtime;
+
+    /** 构建期预解析的"仓库 → 来源命名空间"映射，供资源暂存按命名空间分目录。 */
     private final Map<AgentSkillRepository, String> sourceNamespaces;
 
     public HarnessSkillMiddleware(List<AgentSkillRepository> repositories, Toolkit toolkit) {
@@ -119,6 +159,19 @@ public class HarnessSkillMiddleware implements HarnessRuntimeMiddleware {
      *                         {@code null} — pass {@link ShellPathPolicy#noShell()} when no
      *                         shell tool is registered
      */
+    /**
+     * 全参构造器。
+     *
+     * @param repositories     按组合顺序（低→高优先级）排列的仓库列表
+     * @param toolkit          仅为 API 兼容保留；不用于运行时注册
+     *                         （见类级注释中关于工具集拷贝语义的说明）
+     * @param builderFilter    智能体构建期传入的技能过滤器（可为 {@code null}）
+     * @param visibilityFilter 可选的请求级过滤器（灰度/白名单）
+     * @param stager           市场技能暂存器；{@code null} 表示完全跳过暂存
+     * @param shellPathPolicy  按 shell 模式解析 {@code <files-root>} 的策略；永不为
+     *                         {@code null}——未注册 shell 工具时传
+     *                         {@link ShellPathPolicy#noShell()}
+     */
     public HarnessSkillMiddleware(
             List<AgentSkillRepository> repositories,
             Toolkit toolkit,
@@ -136,37 +189,52 @@ public class HarnessSkillMiddleware implements HarnessRuntimeMiddleware {
         this.runtime = new SkillRuntime();
         // Pre-resolve source namespaces once at build time. The compose order is fixed for
         // the lifetime of the middleware, so this is safe and avoids repeated work per call.
+        // 构建期一次性预解析来源命名空间。组合顺序在中间件生命周期内固定不变，
+        // 因此预解析是安全的，也避免了每次调用重复计算。
         this.sourceNamespaces = MarketplaceStager.resolveSourceNamespaces(this.repositories);
     }
 
     /** Visible for tests / introspection. */
+    /** 供测试与内省访问：返回技能运行时实例。 */
     public SkillRuntime runtime() {
         return runtime;
     }
 
+    /**
+     * 技能装配主流程（每轮系统提示词渲染时执行）：
+     * 合并仓库 → 可见性过滤 → 市场资源暂存 → 组装 HarnessSkillEntry 目录
+     * → 安装进运行时（注册加载工具）→ 渲染 <available_skills> 提示块追加到系统提示词。
+     * 任一环节为空都会安装空目录并原样返回当前提示词。
+     */
     @Override
     public Mono<String> onSystemPrompt(Agent agent, RuntimeContext ctx, String currentPrompt) {
         if (ctx == null) {
             ctx = RuntimeContext.empty();
         }
 
+        // 关键：始终取运行中智能体自己的工具集（而非构造期注入的中间工具集）
         Toolkit agentToolkit = agent != null ? agent.getToolkit() : null;
 
+        // 步骤 1：按低→高优先级合并所有仓库的技能（同名后者覆盖前者）
         Map<String, RepoBound> merged = mergeRepositories(ctx);
         if (merged.isEmpty()) {
             runtime.install(SkillCatalog.empty(), agentToolkit);
             return Mono.just(currentPrompt);
         }
 
+        // 步骤 2：应用请求级可见性过滤（灰度/白名单）
         List<RepoBound> visible = applyVisibility(merged.values(), ctx);
         if (visible.isEmpty()) {
             runtime.install(SkillCatalog.empty(), agentToolkit);
             return Mono.just(currentPrompt);
         }
 
+        // 步骤 3：市场技能资源暂存到 .skills-cache（stager 为 null 时跳过）
         Map<String, StageResult> staged =
                 stager != null ? stager.stage(visible, sourceNamespaces) : Map.of();
 
+        // 步骤 4：为每个可见技能组装目录条目——
+        // 懒加载资源（仓库支持时）+ 按 shell 策略解析的 filesRoot
         List<HarnessSkillEntry> entries = new ArrayList<>(visible.size());
         for (RepoBound bound : visible) {
             SkillResources lazy = null;
@@ -185,9 +253,12 @@ public class HarnessSkillMiddleware implements HarnessRuntimeMiddleware {
             entries.add(new HarnessSkillEntry(bound.skill(), lazy, filesRoot));
         }
 
+        // 步骤 5：安装目录进运行时——幂等注册 load_skill_through_path 工具
         SkillCatalog catalog = SkillCatalog.of(entries);
         runtime.install(catalog, agentToolkit);
 
+        // 步骤 6：渲染 <available_skills> 提示块并追加到系统提示词。
+        // 生效过滤器 = 构建期过滤器 overlay 请求级过滤器（RuntimeContext 携带）
         SkillFilter effective =
                 builderFilter.overlay(ctx != null ? ctx.get(SkillFilter.class) : null);
         String append = runtime.renderPrompt(catalog, effective);
@@ -202,11 +273,20 @@ public class HarnessSkillMiddleware implements HarnessRuntimeMiddleware {
     // ---------------------------------------------------------------------
     //  Internals
     // ---------------------------------------------------------------------
+    // ---------------------------------------------------------------------
+    //  内部实现
+    // ---------------------------------------------------------------------
 
     /**
      * Merge skills from every repository, in compose order. Later entries with the same
      * {@code AgentSkill.name} win. Also remembers the source repository per winning skill so
      * subsequent steps (lazy resources, marketplace stage) can act on it.
+     */
+    /**
+     * 按组合顺序合并所有仓库的技能：同名技能（{@code AgentSkill.name}）后者胜出。
+     * 同时记录每个胜出技能的来源仓库（RepoBound），
+     * 供后续步骤（懒加载资源、市场资源暂存）定位使用。
+     * 单个仓库加载失败只记警告并跳过，不影响其他仓库。
      */
     private LinkedHashMap<String, RepoBound> mergeRepositories(RuntimeContext ctx) {
         LinkedHashMap<String, RepoBound> merged = new LinkedHashMap<>();
@@ -234,6 +314,10 @@ public class HarnessSkillMiddleware implements HarnessRuntimeMiddleware {
         return merged;
     }
 
+    /**
+     * 应用请求级可见性过滤：用 IdentityHashMap 建立技能实例到 RepoBound 的反查，
+     * 过滤后再映射回仓库绑定。过滤器抛异常或返回 null 时按全量通过处理（降级不阻断）。
+     */
     private List<RepoBound> applyVisibility(
             java.util.Collection<RepoBound> input, RuntimeContext ctx) {
         if (visibilityFilter == null || input.isEmpty()) {

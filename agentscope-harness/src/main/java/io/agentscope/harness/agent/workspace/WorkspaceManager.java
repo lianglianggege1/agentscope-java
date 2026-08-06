@@ -446,6 +446,11 @@ public class WorkspaceManager implements AutoCloseable {
      * <p>A per-path {@link ReentrantLock} serialises concurrent callers so that the
      * read→merge→write cycle is atomic within this process.
      */
+    /**
+     * 在路径`agents/<agentId>/sessions/sessions.json`中新增或更新会话元数据，该文件为小型可变JSON文件，以会话ID作为键。
+     *
+     * <p>采用路径粒度的可重入锁对并发调用串行管控，保障当前进程内读取、合并、写入流程的原子性。
+     */
     public void updateSessionIndex(
             RuntimeContext rc, String agentId, String sessionId, String summary) {
         if (agentId == null || agentId.isBlank() || sessionId == null || sessionId.isBlank()) {

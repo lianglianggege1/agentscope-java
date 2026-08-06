@@ -115,12 +115,22 @@ public interface DistributedStore {
      *
      * @return a distributed agent state store; must not be {@code null}
      */
+    /**
+     * 创建用于智能体会话状态持久化的{@link AgentStateStore}实例。
+     *
+     * @return 分布式智能体状态存储器，返回值不可为空
+     */
     AgentStateStore agentStateStore();
 
     /**
      * Creates the {@link BaseStore} for workspace filesystem KV storage.
      *
      * @return a distributed base store; must not be {@code null}
+     */
+    /**
+     * 创建用于工作区文件系统键值存储的{@link BaseStore}实例。
+     *
+     * @return 分布式基础存储器，返回值不可为空
      */
     BaseStore baseStore();
 
@@ -131,6 +141,13 @@ public interface DistributedStore {
      * Docker sandbox snapshots. The default returns {@link NoopSnapshotSpec} (no snapshots).
      *
      * @return a sandbox snapshot spec; must not be {@code null}
+     */
+    /**
+     * 创建用于沙箱快照持久化的{@link SandboxSnapshotSpec}实例。
+     *
+     * <p>若存储器支持适用于Docker沙箱快照的二进制大对象存储，可重写该方法。默认返回无操作快照配置类{@link NoopSnapshotSpec}，即不开启快照功能。
+     *
+     * @return 沙箱快照配置对象，返回值不可为空
      */
     default SandboxSnapshotSpec sandboxSnapshotSpec() {
         return new NoopSnapshotSpec();
@@ -143,6 +160,13 @@ public interface DistributedStore {
      * a no-op guard (no cross-node coordination).
      *
      * @return a sandbox execution guard; must not be {@code null}
+     */
+    /**
+     * 创建用于分布式沙箱并发控制的{@link SandboxExecutionGuard}实例。
+     *
+     * <p>若存储器支持分布式锁，可重写该方法。默认返回空执行守卫，不提供跨节点协同能力。
+     *
+     * @return 沙箱执行守卫对象，返回值不可为空
      */
     default SandboxExecutionGuard sandboxExecutionGuard() {
         return SandboxExecutionGuard.noop();
@@ -157,6 +181,14 @@ public interface DistributedStore {
      *
      * @return a message bus, or {@code null} to use the workspace default
      */
+    /**
+     * 创建{@link MessageBus}实例，用于基于收件箱的消息投递与会话事件流推送。
+     *
+     * <p>若存储组件支持实时传输（例如Redis发布订阅），可重写此方法。该方法默认返回null，
+     * 此时框架将降级使用基于文件系统的工作区实现。
+     *
+     * @return 消息总线实例；若返回null，则启用工作区默认实现
+     */
     default MessageBus messageBus() {
         return null;
     }
@@ -168,6 +200,13 @@ public interface DistributedStore {
      * {@code null}, which signals HarnessAgent to fall back to a workspace-backed implementation.
      *
      * @return an async tool registry, or {@code null} to use the workspace default
+     */
+    /**
+     * 创建用于追踪异步工具执行记录的{@link AsyncToolRegistry}实例。
+     *
+     * <p>当存储组件支持持久化键值存储时可重写该方法。默认返回null，框架会降级采用工作区配套实现。
+     *
+     * @return 异步工具注册器；返回null则使用工作区默认实现
      */
     default AsyncToolRegistry asyncToolRegistry() {
         return null;
@@ -192,12 +231,33 @@ public interface DistributedStore {
      *
      * @return a new builder
      */
+    /**
+     * 创建构建器，用于整合各类组件以组装{@link DistributedStore}，各组件可取自不同的存储实现。
+     *
+     * <p>示例：状态与文件使用MySQL，沙箱相关使用Redis
+     * <pre>{@code
+     * DistributedStore mysql = MysqlDistributedStore.create(dataSource);
+     * DistributedStore redis = RedisDistributedStore.fromJedis(jedis);
+     *
+     * DistributedStore mixed = DistributedStore.builder()
+     *     .agentStateStore(mysql.agentStateStore())
+     *     .baseStore(mysql.baseStore())
+     *     .sandboxSnapshotSpec(redis.sandboxSnapshotSpec())
+     *     .sandboxExecutionGuard(redis.sandboxExecutionGuard())
+     *     .build();
+     * }</pre>
+     *
+     * @return 全新的构建器实例
+     */
     static Builder builder() {
         return new Builder();
     }
 
     /**
      * Builder for composing a {@link DistributedStore} from individual components.
+     */
+    /**
+     * 用于组装各类组件、构建{@link DistributedStore}实例的构建器。
      */
     final class Builder {
 
@@ -216,6 +276,12 @@ public interface DistributedStore {
          * @param agentStateStore the state store to use
          * @return this builder
          */
+        /**
+         * 设置智能体状态存储组件。
+         *
+         * @param agentStateStore 待使用的状态存储器
+         * @return 当前构建器对象
+         */
         public Builder agentStateStore(AgentStateStore agentStateStore) {
             this.agentStateStore = agentStateStore;
             return this;
@@ -226,6 +292,12 @@ public interface DistributedStore {
          *
          * @param baseStore the base store to use
          * @return this builder
+         */
+        /**
+         * 设置用于工作区文件系统键值存储的基础存储组件。
+         *
+         * @param baseStore 要使用的基础存储器
+         * @return 当前构建器对象
          */
         public Builder baseStore(BaseStore baseStore) {
             this.baseStore = baseStore;
@@ -238,6 +310,12 @@ public interface DistributedStore {
          * @param sandboxSnapshotSpec the snapshot spec to use
          * @return this builder
          */
+        /**
+         * 设置沙箱快照配置。
+         *
+         * @param sandboxSnapshotSpec 待使用的快照配置对象
+         * @return 当前构建器实例
+         */
         public Builder sandboxSnapshotSpec(SandboxSnapshotSpec sandboxSnapshotSpec) {
             this.sandboxSnapshotSpec = sandboxSnapshotSpec;
             return this;
@@ -248,6 +326,12 @@ public interface DistributedStore {
          *
          * @param sandboxExecutionGuard the execution guard to use
          * @return this builder
+         */
+        /**
+         * 设置用于分布式并发控制的沙箱执行守卫。
+         *
+         * @param sandboxExecutionGuard 待使用的执行守卫
+         * @return 当前构建器对象
          */
         public Builder sandboxExecutionGuard(SandboxExecutionGuard sandboxExecutionGuard) {
             this.sandboxExecutionGuard = sandboxExecutionGuard;
@@ -270,6 +354,12 @@ public interface DistributedStore {
          * @return a new distributed store composed from the configured components
          * @throws NullPointerException if agentStateStore or baseStore is not set
          */
+        /**
+         * 组装并生成组合式{@link DistributedStore}实例。
+         *
+         * @return 由已配置组件组合而成的全新分布式存储器
+         * @throws NullPointerException 未配置智能体状态存储器或基础存储器时抛出空指针异常
+         */
         public DistributedStore build() {
             Objects.requireNonNull(agentStateStore, "agentStateStore is required");
             Objects.requireNonNull(baseStore, "baseStore is required");
@@ -286,6 +376,9 @@ public interface DistributedStore {
 
     /**
      * A distributed store composed from individually specified components.
+     */
+    /**
+     * 由各个指定组件组合而成的分布式存储器。
      */
     record CompositeDistributedStore(
             AgentStateStore stateStore,

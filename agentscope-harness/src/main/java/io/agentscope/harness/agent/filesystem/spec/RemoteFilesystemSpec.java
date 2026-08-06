@@ -287,7 +287,7 @@ public class RemoteFilesystemSpec {
         // exact-file routes (it does single-key exists/read), so the over-exposure is unreachable.
         // 供下方精确文件联合层使用、基于工作空间根目录的只读模板视图。底层文件系统
         // 理论上可访问整个工作空间，但CompositeFilesystem不会递归遍历精确文件路由
-        //（仅执行单路径存在性检查与读取操作），因此不会访问到超出预期的文件。
+        // （仅执行单路径存在性检查与读取操作），因此不会访问到超出预期的文件。
         LocalFilesystem workspaceTemplate = new LocalFilesystem(workspace, true, 10, null);
 
         Map<String, AbstractFilesystem> routes = new LinkedHashMap<>();

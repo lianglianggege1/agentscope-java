@@ -67,33 +67,33 @@ import java.util.regex.Pattern;
 public final class SkillSecurityScanner {
 
     public enum Severity {
-        LOW,        // 低风险
-        MEDIUM,     // 中风险
-        HIGH,       // 高风险
-        CRITICAL    // 严重风险
+        LOW, // 低风险
+        MEDIUM, // 中风险
+        HIGH, // 高风险
+        CRITICAL // 严重风险
     }
 
     public enum Category {
-        EXFILTRATION,  // 数据窃取
-        INJECTION,     // 注入攻击
-        DESTRUCTIVE,   // 破坏性操作
-        PERSISTENCE,   // 持久化威胁
-        NETWORK,       // 网络风险
-        OBFUSCATION    // 代码混淆
+        EXFILTRATION, // 数据窃取
+        INJECTION, // 注入攻击
+        DESTRUCTIVE, // 破坏性操作
+        PERSISTENCE, // 持久化威胁
+        NETWORK, // 网络风险
+        OBFUSCATION // 代码混淆
     }
 
     public enum Verdict {
-        SAFE,       // 安全
-        CAUTION,    // 需留意
-        DANGEROUS   // 危险
+        SAFE, // 安全
+        CAUTION, // 需留意
+        DANGEROUS // 危险
     }
 
     /** Where the skill came from. */
     public enum TrustLevel {
-        BUILTIN,        // 内置技能
-        TRUSTED,        // 可信技能
-        COMMUNITY,      // 社区技能
-        AGENT_CREATED   // 代理自主创建技能
+        BUILTIN, // 内置技能
+        TRUSTED, // 可信技能
+        COMMUNITY, // 社区技能
+        AGENT_CREATED // 代理自主创建技能
     }
 
     public record Finding(
@@ -120,7 +120,8 @@ public final class SkillSecurityScanner {
     private static List<Rule> buildRules() {
         List<Rule> rules = new ArrayList<>();
 
-        // EXFILTRATION /** 数据外泄：通过 curl/wget POST 向外窃取传输数据 */ ----------------------------------------------------
+        // EXFILTRATION /** 数据外泄：通过 curl/wget POST 向外窃取传输数据 */
+        // ----------------------------------------------------
         rules.add(
                 new Rule(
                         "exfil-curl-post",
@@ -143,7 +144,8 @@ public final class SkillSecurityScanner {
                         Pattern.compile("\\b(cat|tar|gzip)\\s+[^\\n]*\\|\\s*nc\\s"),
                         "piping local data into netcat — exfiltration"));
 
-        // INJECTION /** 注入风险：Markdown 中存在提示词注入特征 */ -------------------------------------------------------
+        // INJECTION /** 注入风险：Markdown 中存在提示词注入特征 */
+        // -------------------------------------------------------
         rules.add(
                 new Rule(
                         "inj-ignore-prev",
@@ -167,7 +169,8 @@ public final class SkillSecurityScanner {
                         Pattern.compile("(?i)\\b(DAN|jailbreak|developer\\s+mode)\\b"),
                         "prompt-injection marker: jailbreak vocabulary"));
 
-        // DESTRUCTIVE /** 破坏性风险：rm -rf /、mkfs、dd of=/dev 等高危销毁指令 */ -----------------------------------------------------
+        // DESTRUCTIVE /** 破坏性风险：rm -rf /、mkfs、dd of=/dev 等高危销毁指令 */
+        // -----------------------------------------------------
         rules.add(
                 new Rule(
                         "dest-rm-rf-root",
@@ -197,7 +200,8 @@ public final class SkillSecurityScanner {
                         Pattern.compile(">\\s*/dev/(sd|nvme|hd|xvd)[a-z0-9]*"),
                         "shell redirect to a raw disk device"));
 
-        // PERSISTENCE /** 持久化风险：篡改 crontab / systemd / Shell 启动脚本实现驻留 */ -----------------------------------------------------
+        // PERSISTENCE /** 持久化风险：篡改 crontab / systemd / Shell 启动脚本实现驻留 */
+        // -----------------------------------------------------
         rules.add(
                 new Rule(
                         "pers-crontab-install",
@@ -222,7 +226,8 @@ public final class SkillSecurityScanner {
                         Pattern.compile("echo\\s+[^\\n]*>>\\s+~?/?(\\.bashrc|\\.zshrc|\\.profile)"),
                         "writes shell-rc — persistence"));
 
-        // NETWORK /** 网络风险：监听套接字、反向Shell等恶意网络行为 */ ---------------------------------------------------------
+        // NETWORK /** 网络风险：监听套接字、反向Shell等恶意网络行为 */
+        // ---------------------------------------------------------
         rules.add(
                 new Rule(
                         "net-reverse-shell-bash",

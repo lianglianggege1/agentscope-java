@@ -73,13 +73,35 @@ import reactor.core.publisher.Flux;
  *       accumulates across iterations.
  * </ol>
  */
+/**
+ * 提供托管子智能体机制的中间件。
+ *
+ * <p><strong>默认模式</strong>（独立 harness 部署）下，本中间件内部创建由
+ * {@link DefaultAgentManager} 支撑的 {@link AgentSpawnTool}；
+ * <strong>会话模式</strong>（经 {@code AgentBootstrap} 编排）下，注入外部工具
+ * （通常为 {@code SessionsTool}）替换默认的 {@link AgentSpawnTool}。
+ *
+ * <p>职责：
+ *
+ * <ol>
+ *   <li>向智能体工具集暴露子智能体工具与 {@link TaskTool}（调用方通过
+ *       {@link #getTools()} 查询，并在编排阶段注册到工具集）。</li>
+ *   <li>每次 {@link #onAgent} 时从工作区文件系统（带命名空间隔离）重新加载
+ *       子智能体声明，支持按用户隔离的子智能体。</li>
+ *   <li>在每个 {@link ReasoningInput} 的首条 SYSTEM 消息前部注入子智能体使用说明
+ *       与当前异步任务摘要。由于框架每轮都会基于冻结的基础内容重建 SYSTEM 消息，
+ *       这样做是安全的——内容不会跨轮累积。</li>
+ * </ol>
+ */
 public class SubagentsMiddleware implements HarnessRuntimeMiddleware {
 
     private static final Logger log = LoggerFactory.getLogger(SubagentsMiddleware.class);
 
+    /** 任务摘要中起始时间的展示格式（UTC，精确到分钟）。 */
     private static final DateTimeFormatter ISO_SHORT =
             DateTimeFormatter.ofPattern("HH:mm'Z'").withZone(ZoneOffset.UTC);
 
+    /** 任务摘要中最多列出的任务条数，超出部分以省略提示收尾。 */
     private static final int MAX_TASK_SUMMARY_ENTRIES = 10;
 
     /**
@@ -87,86 +109,90 @@ public class SubagentsMiddleware implements HarnessRuntimeMiddleware {
      * message. Anything beyond this gets a "... and N more — call task_list()" footer; the LLM
      * can still fetch each one explicitly.
      */
+    /**
+     * 单条 {@code <system-reminder>} 推送消息中聚合的任务结果条数上限。
+     * 超出部分以"... and N more — call task_list()"尾注提示；
+     * 大模型仍可逐个显式获取完整结果。
+     */
     static final int MAX_DELIVERIES_PER_REMINDER = 10;
 
+   /* private static final String SUBAGENT_SECTION_TEMPLATE =
+            """
 
-//    private static final String SUBAGENT_SECTION_TEMPLATE =
-//            """
-//
-//            ## 子智能体
-//
-//            你可以使用子智能体工具创建并调度相互隔离的子智能体。
-//            子智能体属于临时实例，仅在任务执行周期内存活，最终仅返回一份结果。
-//
-//            ### 智能体工具
-//
-//            **`%s`** — 创建隔离的子智能体
-//            - `agent_id`（必填）：待实例化的子智能体标识
-//            - `task`（可选）：初始指令；不填则创建持久会话
-//            - `label`（可选）：便于引用的可读名称，后续可通过该标识发送消息
-//            - `timeout_seconds`：等待时长；0=发后即忘（仅返回 task_id），默认30秒，最大600秒
-//            - 返回结果始终包含 `agent_key`（不透明句柄），请保存用于后续消息交互
-//
-//            **`%s`** — 向已创建的子智能体发送后续消息
-//            - `agent_key`：复制创建结果中 `agent_key:` 后的完整值（以 `agent:` 开头）。
-//              该值不等于 `agent_id`、`session_id` 或 `task_id`
-//            - 若创建时指定了 `label`，也可使用标签寻址（与 agent_key 互斥）
-//            - `message`（必填）：待发送内容
-//            - `timeout_seconds`：0=发后即忘，大于0则等待回复（默认30秒）
-//
-//            **`%s`** — 列出当前活跃的子智能体
-//
-//            ### 任务工具（用于异步/后台任务）
-//
-//            **`task_output`** — 通过 task_id 获取后台任务执行结果。
-//            - **极少需要主动调用**。任务完成后，结果会自动以 `<system-reminder>` 区块推送给你，在下一轮推理前可见。
-//            - 仅当推送的摘要被截断、需要完整结果，或是按需查看指定任务时，使用 `task_output(block=false)`。
-//            - 尽量避免使用 `block=true`，该模式会阻塞会话流程。
-//
-//            **`task_cancel`** — 根据 task_id 终止正在运行的后台任务。对已完成任务无效。
-//
-//            **`task_list`** — 列出所有运行中的后台任务（具备持久能力，会话压缩、实例迁移后数据依然准确）。
-//            任务推送结果后会从列表中移除。
-//
-//            ### 后台任务执行流程
-//            1. 创建子智能体时设置 `timeout_seconds=0` 启用发后即忘模式，响应中将返回 task_id。
-//            2. **禁止轮询查询**。继续处理其他工作；任务完成后，结果会通过 `<system-reminder>` 自动推送。
-//            3. 若无待处理工作，可将控制权交还给用户；用户发起新一轮提问后，下一轮推理会加载所有已完成任务结果。
-//
-//            ### 超时自动升级机制
-//            同步创建/发送消息触发超时时，任务**不会丢失**，将自动升级为后台任务。
-//            返回状态 `status: timeout_promoted` 并附带 `task_id`。处理方式与普通异步任务一致：结果会通过 `<system-reminder>` 自动推送。
-//            **请勿重复发起相同任务**，后台已经在执行。
-//
-//            ### 可用智能体标识
-//            %s
-//
-//            ### 何时使用子智能体
-//            - 任务复杂、多步骤，能够完整独立委派执行
-//            - 任务与其他工作互不依赖，可以并行运行
-//            - 任务需要专注推理或消耗大量上下文，会导致主线上下文膨胀
-//            - 沙箱隔离有助于提升稳定性（例如代码分析、结构化检索、数据格式化）
-//            - 仅关心最终输出，不需要查看中间过程（例如调研 → 整合报告）
-//
-//            ### 不建议使用子智能体
-//            - 任务逻辑简单（仅少量工具调用、简单查询）
-//            - 任务完成后仍需要查看中间推理过程
-//            - 委派执行无法降低token消耗、系统复杂度或上下文切换开销
-//            - 任务拆分只会增加延迟且没有收益
-//
-//            ### 子智能体生命周期
-//            1. **创建** → 提供清晰角色、执行要求与预期输出格式
-//            2. **运行** → 子智能体自主完成任务
-//            3. **返回** → 子智能体输出一份结构化结果
-//            4. **整合** → 将结果吸收、汇总至主线会话
-//
-//            ### 使用范式
-//            - **并行执行**：多个任务相互独立时，设置 `timeout_seconds=0` 并发拉起子智能体；等待一段时间后使用 `task_output(block=false)` 收集结果
-//            - **同步委派**：简单一次性任务使用默认超时同步调用
-//            - **持久会话**：创建时不传入 task，后续反复调用 send 进行多轮交互
-//            - **清理过期任务**：使用 task_cancel 终止不再需要的后台任务
-//            - 子智能体执行结果对用户不可见，务必在最终回复中进行总结
-//            """;
+            ## 子智能体
+
+            你可以使用子智能体工具创建并调度相互隔离的子智能体。
+            子智能体属于临时实例，仅在任务执行周期内存活，最终仅返回一份结果。
+
+            ### 智能体工具
+
+            **`%s`** — 创建隔离的子智能体
+            - `agent_id`（必填）：待实例化的子智能体标识
+            - `task`（可选）：初始指令；不填则创建持久会话
+            - `label`（可选）：便于引用的可读名称，后续可通过该标识发送消息
+            - `timeout_seconds`：等待时长；0=发后即忘（仅返回 task_id），默认30秒，最大600秒
+            - 返回结果始终包含 `agent_key`（不透明句柄），请保存用于后续消息交互
+
+            **`%s`** — 向已创建的子智能体发送后续消息
+            - `agent_key`：复制创建结果中 `agent_key:` 后的完整值（以 `agent:` 开头）。
+              该值不等于 `agent_id`、`session_id` 或 `task_id`
+            - 若创建时指定了 `label`，也可使用标签寻址（与 agent_key 互斥）
+            - `message`（必填）：待发送内容
+            - `timeout_seconds`：0=发后即忘，大于0则等待回复（默认30秒）
+
+            **`%s`** — 列出当前活跃的子智能体
+
+            ### 任务工具（用于异步/后台任务）
+
+            **`task_output`** — 通过 task_id 获取后台任务执行结果。
+            - **极少需要主动调用**。任务完成后，结果会自动以 `<system-reminder>` 区块推送给你，在下一轮推理前可见。
+            - 仅当推送的摘要被截断、需要完整结果，或是按需查看指定任务时，使用 `task_output(block=false)`。
+            - 尽量避免使用 `block=true`，该模式会阻塞会话流程。
+
+            **`task_cancel`** — 根据 task_id 终止正在运行的后台任务。对已完成任务无效。
+
+            **`task_list`** — 列出所有运行中的后台任务（具备持久能力，会话压缩、实例迁移后数据依然准确）。
+            任务推送结果后会从列表中移除。
+
+            ### 后台任务执行流程
+            1. 创建子智能体时设置 `timeout_seconds=0` 启用发后即忘模式，响应中将返回 task_id。
+            2. **禁止轮询查询**。继续处理其他工作；任务完成后，结果会通过 `<system-reminder>` 自动推送。
+            3. 若无待处理工作，可将控制权交还给用户；用户发起新一轮提问后，下一轮推理会加载所有已完成任务结果。
+
+            ### 超时自动升级机制
+            同步创建/发送消息触发超时时，任务**不会丢失**，将自动升级为后台任务。
+            返回状态 `status: timeout_promoted` 并附带 `task_id`。处理方式与普通异步任务一致：结果会通过 `<system-reminder>` 自动推送。
+            **请勿重复发起相同任务**，后台已经在执行。
+
+            ### 可用智能体标识
+            %s
+
+            ### 何时使用子智能体
+            - 任务复杂、多步骤，能够完整独立委派执行
+            - 任务与其他工作互不依赖，可以并行运行
+            - 任务需要专注推理或消耗大量上下文，会导致主线上下文膨胀
+            - 沙箱隔离有助于提升稳定性（例如代码分析、结构化检索、数据格式化）
+            - 仅关心最终输出，不需要查看中间过程（例如调研 → 整合报告）
+
+            ### 不建议使用子智能体
+            - 任务逻辑简单（仅少量工具调用、简单查询）
+            - 任务完成后仍需要查看中间推理过程
+            - 委派执行无法降低token消耗、系统复杂度或上下文切换开销
+            - 任务拆分只会增加延迟且没有收益
+
+            ### 子智能体生命周期
+            1. **创建** → 提供清晰角色、执行要求与预期输出格式
+            2. **运行** → 子智能体自主完成任务
+            3. **返回** → 子智能体输出一份结构化结果
+            4. **整合** → 将结果吸收、汇总至主线会话
+
+            ### 使用范式
+            - **并行执行**：多个任务相互独立时，设置 `timeout_seconds=0` 并发拉起子智能体；等待一段时间后使用 `task_output(block=false)` 收集结果
+            - **同步委派**：简单一次性任务使用默认超时同步调用
+            - **持久会话**：创建时不传入 task，后续反复调用 send 进行多轮交互
+            - **清理过期任务**：使用 task_cancel 终止不再需要的后台任务
+            - 子智能体执行结果对用户不可见，务必在最终回复中进行总结
+            """;*/
 
     // @formatter:off
     private static final String SUBAGENT_SECTION_TEMPLATE =
@@ -244,16 +270,34 @@ public class SubagentsMiddleware implements HarnessRuntimeMiddleware {
             """;
     // @formatter:on
 
+    /** 编程式注册的基础条目集合（动态重载时以此为基准合并）。 */
     private final List<SubagentEntry> baseEntries;
+
+    /** 当前生效的条目集合（含动态重载结果），volatile 保证多线程可见性。 */
     private volatile List<SubagentEntry> entries;
+
+    /** 子智能体创建工具（默认模式为 AgentSpawnTool，会话模式为外部工具）。 */
     private volatile Object subagentTool;
+
+    /** 任务工具（task_output / task_cancel / task_list）。 */
     private final TaskTool taskTool;
+
+    /** 后台任务仓库，记录子智能体异步任务的状态与结果。 */
     private final TaskRepository taskRepository;
+
+    /** 是否为会话模式（使用外部工具，无内部管理器与动态重载）。 */
     private final boolean isSessionMode;
 
+    /** 工作区文件系统（带命名空间隔离），用于动态重载声明，可为 null（不支持重载）。 */
     private final AbstractFilesystem filesystem;
+
+    /** 主工作区根目录，动态重载声明文件的位置，可为 null。 */
     private final Path mainWorkspace;
+
+    /** 声明转工厂的构建函数，可为 null（不支持重载）。 */
     private final Function<SubagentDeclaration, SubagentFactory> factoryBuilder;
+
+    /** 内部智能体管理器，会话模式下为 null。 */
     private final DefaultAgentManager agentManager;
 
     /**
@@ -471,6 +515,9 @@ public class SubagentsMiddleware implements HarnessRuntimeMiddleware {
         // agent_spawn to the AgentSpawnTool instance returned by getTools() at orchestration
         // time, so a fresh instance here would never be invoked and exposure would silently
         // never fire.
+        // 就地修改现有工具实例上的桥，而不是替换实例：工具集在编排阶段已将 agent_spawn
+        // 绑定到 getTools() 返回的那个 AgentSpawnTool 实例，此处若新建实例将永远不会被调用，
+        // 子智能体暴露功能会静默失效。
         if (this.subagentTool instanceof AgentSpawnTool ast) {
             ast.setGatewayBridge(bridge);
         } else {
@@ -516,6 +563,7 @@ public class SubagentsMiddleware implements HarnessRuntimeMiddleware {
         return List.of(subagentTool, taskTool);
     }
 
+    /** 智能体钩子：每次调用开始时重新加载子智能体声明（支持按用户隔离的动态集合）。 */
     @Override
     public Flux<AgentEvent> onAgent(
             Agent agent,
@@ -526,6 +574,13 @@ public class SubagentsMiddleware implements HarnessRuntimeMiddleware {
         return next.apply(input);
     }
 
+    /**
+     * 推理钩子：每轮推理前向 SYSTEM 消息注入"子智能体使用说明 + 任务摘要"，
+     * 并把新完成的后台任务结果以 {@code <system-reminder>} 形式推送给模型。
+     *
+     * <p>推送采用"先注入、后确认"的安全顺序：仅在推理成功完成后才把任务标记为
+     * 已送达，崩溃场景下最多造成下一轮重复推送，不会丢消息。
+     */
     @Override
     public Flux<AgentEvent> onReasoning(
             Agent agent,
@@ -543,6 +598,9 @@ public class SubagentsMiddleware implements HarnessRuntimeMiddleware {
         // Drain newly-terminal tasks first so the SYSTEM summary built afterwards can omit them.
         // Only persist to AgentState when the agent is a ReActAgent — other Agent kinds keep
         // the legacy pull-only flow unchanged.
+        // ---- B-3 阶段：推送送达 -------------------------------------------------------
+        // 先取出新进入终态的任务，这样之后构建的 SYSTEM 摘要可以把它们排除。
+        // 仅当智能体为 ReActAgent 时才写入 AgentState——其他类型保持旧的仅拉取流程。
         List<TaskDelivery> pending = this.taskRepository.findPendingDeliveries(rc, sessionId);
         Msg deliveryMsg = null;
         if (!pending.isEmpty() && agent instanceof ReActAgent reAct) {
@@ -568,6 +626,8 @@ public class SubagentsMiddleware implements HarnessRuntimeMiddleware {
             // Inject for this round (parallel to the AgentState write — keeps the message visible
             // in the immediate LLM call regardless of when the framework re-derives messages from
             // the state next round).
+            // 本轮同时注入（与 AgentState 写入并行——无论框架下一轮何时从状态重建消息，
+            // 都能保证该消息在本次 LLM 调用中可见）。
             rebuilt = new ArrayList<>(rebuilt);
             rebuilt.add(deliveryMsg);
         }
@@ -580,6 +640,10 @@ public class SubagentsMiddleware implements HarnessRuntimeMiddleware {
             // AgentState write was never flushed, causing permanent message loss. The reverse
             // (crash AFTER reasoning, BEFORE markDelivered) only causes a redundant re-delivery
             // on the next round — annoying, but safe.
+            // 仅在内部推理成功完成后才标记为已送达。顺序很关键：
+            // 若在推理前标记，调用中途崩溃可能导致 deliveredAt 已持久化而 AgentState 写入未落盘，
+            // 造成消息永久丢失；反过来（推理成功后、标记前崩溃）只会导致下一轮重复推送——
+            // 虽然烦人，但是安全的。
             final TaskRepository repoRef = this.taskRepository;
             final RuntimeContext rcRef = rc;
             final String sidRef = sessionId;
@@ -678,6 +742,7 @@ public class SubagentsMiddleware implements HarnessRuntimeMiddleware {
                 .build();
     }
 
+    /** 把任务状态枚举转换为推送消息中展示的小写字面量（FAILED 显示为 error）。 */
     private static String stateLiteral(TaskStatus status) {
         return switch (status) {
             case COMPLETED -> "completed";
@@ -729,6 +794,13 @@ public class SubagentsMiddleware implements HarnessRuntimeMiddleware {
         return out;
     }
 
+    /**
+     * 从文件系统重新加载子智能体声明并与基础条目合并。
+     *
+     * <p>仅在默认模式且具备重载条件（文件系统与工厂构建器都已配置）时执行；
+     * 与基础条目同名的声明不会覆盖（与 {@link DynamicSubagentsMiddleware} 的
+     * 动态优先策略不同），只追加新声明。加载失败仅记录警告，保留旧条目集合。
+     */
     private void reloadSubagentEntries() {
         if (filesystem == null || factoryBuilder == null || isSessionMode) {
             return;
@@ -739,6 +811,7 @@ public class SubagentsMiddleware implements HarnessRuntimeMiddleware {
 
             List<SubagentEntry> newEntries = new ArrayList<>(baseEntries);
             for (SubagentDeclaration decl : decls) {
+                // 基础条目中已存在同名子智能体时跳过，不覆盖编程式注册
                 boolean alreadyExists =
                         baseEntries.stream().anyMatch(e -> e.name().equals(decl.getName()));
                 if (!alreadyExists) {

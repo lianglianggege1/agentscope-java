@@ -584,11 +584,11 @@ public class SessionTree {
         if (filesystem == null || workspaceRoot == null) {
             return;
         }
-//        MIRROR_EXECUTOR.execute(
-//                () -> {
+        MIRROR_EXECUTOR.execute(
+                () -> {
                     mirrorToFilesystem(contextFile, resolveRelativePath(contextFile));
                     mirrorToFilesystem(logFile, resolveRelativePath(logFile));
-//                });
+                });
     }
 
     /**

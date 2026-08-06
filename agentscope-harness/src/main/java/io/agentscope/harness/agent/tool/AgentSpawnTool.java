@@ -153,13 +153,13 @@ public class AgentSpawnTool {
     public static final String CTX_EXPOSE_TO_USER = "agentscope.subagent.expose_to_user";
 
     /*private static final String BG_RESULT_TEMPLATE =
-            """
-            status: accepted
-            task_id: %s
-            可使用 task_output(task_id='%s', block=false) 查询状态，\
-            task_cancel(task_id='%s') 终止任务，或调用 task_list() 查看全部任务。\
-            请勿立即调用 task_output — 当前任务刚刚启动。\
-            """;*/
+    """
+    status: accepted
+    task_id: %s
+    可使用 task_output(task_id='%s', block=false) 查询状态，\
+    task_cancel(task_id='%s') 终止任务，或调用 task_list() 查看全部任务。\
+    请勿立即调用 task_output — 当前任务刚刚启动。\
+    """;*/
 
     private static final String BG_RESULT_TEMPLATE =
             """

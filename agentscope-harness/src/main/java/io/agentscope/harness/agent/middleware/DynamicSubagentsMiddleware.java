@@ -83,18 +83,47 @@ public class DynamicSubagentsMiddleware implements HarnessRuntimeMiddleware {
 
     private static final Logger log = LoggerFactory.getLogger(DynamicSubagentsMiddleware.class);
 
+    /** 存放子智能体声明文件的目录名（工作区相对路径）。 */
     private static final String SUBAGENTS_DIR = "subagents";
+
+    /** 扫描声明文件时使用的通配符：仅识别 Markdown 声明文件。 */
     private static final String SUBAGENT_GLOB = "*.md";
 
+    /** 通过代码构造器注册的静态子智能体条目（合并时作为基准，同名动态条目会覆盖它们）。 */
     private final List<SubagentEntry> staticEntries;
+
+    /** 工作区文件系统（可能带用户命名空间隔离），用于第一层覆盖加载，可为 null。 */
     private final AbstractFilesystem filesystem;
+
+    /** 主工作区根目录，第二层基础加载从该目录下的 subagents/ 读取，可为 null。 */
     private final Path mainWorkspace;
+
+    /** 声明 → 工厂的构建函数，把加载到的声明实例化为可创建子智能体的工厂，可为 null。 */
     private final Function<SubagentDeclaration, SubagentFactory> factoryBuilder;
+
+    /** 智能体管理器，负责按最新条目集合物化/替换子智能体，可为 null。 */
     private final DefaultAgentManager agentManager;
+
+    /** 子智能体创建工具（默认 AgentSpawnTool），volatile 允许运行期通过网关桥重建。 */
     private volatile Object subagentTool;
+
+    /** 任务查询工具，与任务仓库配套注入工具集。 */
     private final TaskTool taskTool;
+
+    /** 子智能体任务仓库，记录派生任务的执行状态。 */
     private final TaskRepository taskRepository;
 
+    /**
+     * 完整构造器。
+     *
+     * @param staticEntries 编程式注册的静态条目，null 视为空列表（构造时做不可变拷贝）
+     * @param filesystem 带命名空间隔离的文件系统（第一层加载），可为 null
+     * @param mainWorkspace 主工作区目录（第二层加载），可为 null
+     * @param factoryBuilder 声明转工厂的构建函数，可为 null（为 null 时不物化任何动态条目）
+     * @param agentManager 智能体管理器，可为 null
+     * @param subagentTool 自定义的子智能体创建工具，null 时默认构建 AgentSpawnTool
+     * @param taskRepository 任务仓库，不允许为 null
+     */
     public DynamicSubagentsMiddleware(
             List<SubagentEntry> staticEntries,
             AbstractFilesystem filesystem,
@@ -135,6 +164,9 @@ public class DynamicSubagentsMiddleware implements HarnessRuntimeMiddleware {
         // agent_spawn to the AgentSpawnTool instance returned by getTools() at orchestration
         // time, so a fresh instance here would never be invoked and exposure would silently
         // never fire.
+        // 就地修改现有工具实例上的桥，而不是替换实例：工具集在编排阶段已将 agent_spawn
+        // 绑定到 getTools() 返回的那个 AgentSpawnTool 实例，此处若新建实例将永远不会被调用，
+        // 子智能体暴露功能会静默失效。
         if (this.subagentTool instanceof AgentSpawnTool ast) {
             ast.setGatewayBridge(bridge);
         } else {
@@ -166,10 +198,19 @@ public class DynamicSubagentsMiddleware implements HarnessRuntimeMiddleware {
         return List.of(subagentTool, taskTool);
     }
 
+    /** 返回子智能体任务仓库，供外部查询或装配任务相关工具。 */
     public TaskRepository getTaskRepository() {
         return taskRepository;
     }
 
+    /**
+     * 推理钩子：每个推理步骤执行前重新解析子智能体集合（与静态版
+     * {@link SubagentsMiddleware} 的核心差异），并同步到智能体管理器。
+     *
+     * <p>随后把"子智能体说明区块 + 任务摘要"前置追加到系统消息中，
+     * 让模型在每一步都看到最新可用的子智能体与任务状态；
+     * 两者均为空时原样透传输入。
+     */
     @Override
     public Flux<AgentEvent> onReasoning(
             Agent agent,
@@ -177,8 +218,10 @@ public class DynamicSubagentsMiddleware implements HarnessRuntimeMiddleware {
             ReasoningInput input,
             Function<ReasoningInput, Flux<AgentEvent>> next) {
         RuntimeContext rc = ctx != null ? ctx : RuntimeContext.empty();
+        // 重新加载并合并静态/动态条目
         List<SubagentEntry> merged = reloadEntries(rc);
         if (agentManager != null) {
+            // 用最新条目集合替换管理器中的子智能体
             agentManager.replaceAgents(merged);
         }
         StringBuilder addition = new StringBuilder();
@@ -192,13 +235,25 @@ public class DynamicSubagentsMiddleware implements HarnessRuntimeMiddleware {
         if (addition.length() == 0) {
             return next.apply(input);
         }
+        // 把追加内容前置到系统消息，其余消息与工具配置保持不变
         List<Msg> rebuilt =
                 SubagentsMiddleware.prependToSystemMessage(input.messages(), addition.toString());
         return next.apply(new ReasoningInput(rebuilt, input.tools(), input.options()));
     }
 
+    /**
+     * 重新加载并合并子智能体条目，共四步：
+     *
+     * <ol>
+     *   <li>第二层基础加载：扫描本地工作区 subagents/ 目录；</li>
+     *   <li>第一层覆盖加载：经文件系统（带用户命名空间）读取，同名条目覆盖基础层；</li>
+     *   <li>物化工厂：把合并后的声明逐个构建为 {@link SubagentEntry}；</li>
+     *   <li>与静态条目合并：动态条目同名优先。</li>
+     * </ol>
+     */
     private List<SubagentEntry> reloadEntries(RuntimeContext rc) {
         // ---- Layer 2 (base): local workspace scan ----
+        // ---- 第二层（基础层）：扫描本地工作区目录 ----
         Map<String, SubagentDeclaration> declsByName = new LinkedHashMap<>();
         Path subagentsDir = mainWorkspace != null ? mainWorkspace.resolve(SUBAGENTS_DIR) : null;
         if (subagentsDir != null && Files.isDirectory(subagentsDir)) {
@@ -209,6 +264,7 @@ public class DynamicSubagentsMiddleware implements HarnessRuntimeMiddleware {
         }
 
         // ---- Layer 1 (override): filesystem with namespace ----
+        // ---- 第一层（覆盖层）：经带命名空间的文件系统读取，同名覆盖基础层 ----
         if (filesystem != null) {
             for (SubagentDeclaration d : loadDeclarationsViaFilesystem(rc)) {
                 declsByName.put(d.getName(), d);
@@ -216,6 +272,7 @@ public class DynamicSubagentsMiddleware implements HarnessRuntimeMiddleware {
         }
 
         // ---- Materialise factories ----
+        // ---- 物化工厂：声明 → 工厂 → 条目 ----
         List<SubagentEntry> dynamicEntries = new ArrayList<>(declsByName.size());
         for (SubagentDeclaration decl : declsByName.values()) {
             if (factoryBuilder == null) {
@@ -229,6 +286,7 @@ public class DynamicSubagentsMiddleware implements HarnessRuntimeMiddleware {
                 dynamicEntries.add(
                         new SubagentEntry(decl.getName(), decl.getDescription(), factory, decl));
             } catch (Exception e) {
+                // 单个声明构建失败不影响其他子智能体，仅记录警告
                 log.warn(
                         "Failed to build factory for declared subagent '{}': {}",
                         decl.getName(),
@@ -237,6 +295,7 @@ public class DynamicSubagentsMiddleware implements HarnessRuntimeMiddleware {
         }
 
         // ---- Combine: static + dynamic, dynamic wins on name conflict ----
+        // ---- 合并：静态 + 动态，同名冲突时动态条目胜出 ----
         Map<String, SubagentEntry> combined = new LinkedHashMap<>();
         for (SubagentEntry e : staticEntries) {
             combined.put(e.name(), e);
@@ -247,6 +306,13 @@ public class DynamicSubagentsMiddleware implements HarnessRuntimeMiddleware {
         return List.copyOf(combined.values());
     }
 
+    /**
+     * 第一层加载：经文件系统枚举 subagents/ 下的 *.md 声明文件并逐个解析。
+     *
+     * <p>文件系统后端会透明应用命名空间隔离，因此不同用户读到的是各自的存储分片。
+     * 文件名（去掉 .md 后缀）作为子智能体名称；glob 或单文件读取失败时跳过该项，
+     * 不影响其余声明的加载。
+     */
     private List<SubagentDeclaration> loadDeclarationsViaFilesystem(RuntimeContext rc) {
         GlobResult glob;
         try {
@@ -269,6 +335,7 @@ public class DynamicSubagentsMiddleware implements HarnessRuntimeMiddleware {
             if (!fileName.endsWith(".md")) {
                 continue;
             }
+            // 去掉 .md 后缀得到子智能体名称
             String name = fileName.substring(0, fileName.length() - 3);
             if (name.isEmpty()) {
                 continue;
@@ -284,12 +351,14 @@ public class DynamicSubagentsMiddleware implements HarnessRuntimeMiddleware {
                     decls.add(decl);
                 }
             } catch (Exception e) {
+                // 单个文件解析失败只记警告，继续处理其余声明
                 log.warn("Failed to load subagent declaration from '{}': {}", path, e.getMessage());
             }
         }
         return decls;
     }
 
+    /** 从完整路径中提取文件名，兼容 Unix（/）与 Windows（\）两种分隔符。 */
     private static String extractFileName(String path) {
         int slash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
         return slash < 0 ? path : path.substring(slash + 1);

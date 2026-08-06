@@ -63,18 +63,51 @@ import reactor.core.scheduler.Schedulers;
  *       the whole agent instance (prevents concurrent maintenance races on shared memory files).</li>
  * </ul>
  */
+/**
+ * 中间件，每次智能体调用结束后执行周期性内存维护工作。
+ *
+ * <p>在智能体调用完成时触发（借助onAgent串联机制，执行时机晚于{@link MemoryFlushMiddleware}），
+ * 同时受可配置的最小执行间隔限流，不会在每次调用后都执行维护操作。
+ *
+ * <p>维护步骤按以下顺序执行：
+ * <ol>
+ *   <li>将超过日常文件留存天数的过期日常记忆文件迁移至memory/archive/归档目录。</li>
+ *   <li>若已配置整合器，则执行基于大模型的记忆整合（{@link MemoryConsolidator#consolidate}）。</li>
+ *   <li>清理超过会话日志留存天数的会话日志文件。</li>
+ * </ol>
+ *
+ * <p>限流窗口以隔离键为单位单独记录，与当前内存数据隔离规则保持一致：
+ * <ul>
+ *   <li>{@link IsolationScope#USER}（默认）：每个用户ID独立对应一个限流窗口。</li>
+ *   <li>{@link IsolationScope#SESSION}：每个会话ID独立对应一个限流窗口。</li>
+ *   <li>{@link IsolationScope#AGENT}、{@link IsolationScope#GLOBAL}：整个智能体实例共用一个限流窗口，
+ *       避免共享记忆文件在多任务维护时产生竞争冲突。</li>
+ * </ul>
+ */
 public class MemoryMaintenanceMiddleware implements HarnessRuntimeMiddleware {
 
     private static final Logger log = LoggerFactory.getLogger(MemoryMaintenanceMiddleware.class);
 
     /** Default minimum gap between two maintenance runs. */
+    /** 两次维护执行之间的默认最小间隔（30 分钟），即默认限流窗口。 */
     public static final Duration DEFAULT_MIN_GAP = Duration.ofMinutes(30);
 
+    /** 工作区管理器，用于获取智能体使用的文件系统（读写记忆文件、会话日志等）。 */
     private final WorkspaceManager workspaceManager;
+
+    /** 基于大模型的记忆整合器，可为 null（为 null 时跳过记忆整合步骤）。 */
     private final MemoryConsolidator consolidator;
+
+    /** 日常记忆文件（按日期命名的 .md 文件）的保留天数，超过则归档。 */
     private final int dailyFileRetentionDays;
+
+    /** 会话日志文件的保留天数，超过则删除。 */
     private final int sessionRetentionDays;
+
+    /** 两次维护执行之间的最小间隔，用于限流，避免每次智能体调用都触发维护。 */
     private final Duration minGap;
+
+    /** 隔离范围，决定限流窗口按用户、会话还是整个智能体实例划分。 */
     private final IsolationScope isolationScope;
 
     /**
@@ -82,9 +115,26 @@ public class MemoryMaintenanceMiddleware implements HarnessRuntimeMiddleware {
      * and the per-call {@link RuntimeContext} so the throttle window matches the memory data
      * namespace (see {@link MemoryFlushMiddleware} for the identical pattern).
      */
+    /**
+     * 按隔离键记录的上次维护执行时间戳。键由 {@link #isolationScope} 和每次调用的
+     * {@link RuntimeContext} 派生，因此限流窗口与记忆数据的命名空间保持一致
+     * （相同模式可参考 {@link MemoryFlushMiddleware}）。
+     *
+     * <p>使用 {@link AtomicReference} 包装是为了通过 CAS 操作保证并发调用时
+     * 只有一个线程能真正触发维护（见 {@link #maybeRunMaintenance}）。
+     */
     private final ConcurrentHashMap<String, AtomicReference<Instant>> lastRunAtByKey =
             new ConcurrentHashMap<>();
 
+    /**
+     * 构造维护中间件，隔离范围默认为 {@link IsolationScope#USER}（按用户限流）。
+     *
+     * @param workspaceManager 工作区管理器，提供文件系统访问能力
+     * @param consolidator 记忆整合器，可为 null
+     * @param dailyFileRetentionDays 日常记忆文件保留天数
+     * @param sessionRetentionDays 会话日志保留天数
+     * @param minGap 两次维护之间的最小间隔，为 null 时使用 {@link #DEFAULT_MIN_GAP}
+     */
     public MemoryMaintenanceMiddleware(
             WorkspaceManager workspaceManager,
             MemoryConsolidator consolidator,
@@ -100,6 +150,11 @@ public class MemoryMaintenanceMiddleware implements HarnessRuntimeMiddleware {
                 IsolationScope.USER);
     }
 
+    /**
+     * 完整构造器，可显式指定隔离范围。
+     *
+     * @param isolationScope 隔离范围，为 null 时默认 {@link IsolationScope#USER}
+     */
     public MemoryMaintenanceMiddleware(
             WorkspaceManager workspaceManager,
             MemoryConsolidator consolidator,
@@ -115,11 +170,25 @@ public class MemoryMaintenanceMiddleware implements HarnessRuntimeMiddleware {
         this.isolationScope = isolationScope != null ? isolationScope : IsolationScope.USER;
     }
 
+    /**
+     * 简化构造器，使用默认保留策略：日常记忆文件保留 90 天、会话日志保留 180 天，
+     * 限流间隔使用默认值 {@link #DEFAULT_MIN_GAP}。
+     */
     public MemoryMaintenanceMiddleware(
             WorkspaceManager workspaceManager, MemoryConsolidator consolidator) {
         this(workspaceManager, consolidator, 90, 180, DEFAULT_MIN_GAP);
     }
 
+    /**
+     * 中间件钩子：包裹智能体调用链。
+     *
+     * <p>通过 {@code concatWith} 在智能体正常事件流（{@code next.apply(input)}）<b>结束后</b>
+     * 追加一次维护动作，因此不影响智能体本身的输出事件顺序。维护逻辑：
+     * <ul>
+     *   <li>订阅在 {@code boundedElastic} 调度器上执行，避免阻塞事件流线程；</li>
+     *   <li>{@code onErrorResume} 兜底，维护失败只记录警告日志，不会让智能体调用报错。</li>
+     * </ul>
+     */
     @Override
     public Flux<AgentEvent> onAgent(
             Agent agent,
@@ -140,13 +209,22 @@ public class MemoryMaintenanceMiddleware implements HarnessRuntimeMiddleware {
                                         }));
     }
 
+    /**
+     * 限流判断 + 触发维护。
+     *
+     * <p>先检查距上次维护是否已满 {@link #minGap} 间隔；若未满直接返回。
+     * 随后用 CAS（{@code compareAndSet}）抢占更新时间戳：并发场景下多个调用同时到达时，
+     * 只有 CAS 成功的那个会继续执行维护，其余直接跳过，避免重复维护造成的文件竞争。
+     */
     private void maybeRunMaintenance(RuntimeContext rc) {
         Instant now = Instant.now();
         AtomicReference<Instant> ref = lastRunAtFor(rc);
         Instant last = ref.get();
+        // 距上次维护不足 minGap，本次跳过
         if (Duration.between(last, now).compareTo(minGap) < 0) {
             return;
         }
+        // CAS 抢占失败说明已有其他线程触发维护，直接跳过
         if (!ref.compareAndSet(last, now)) {
             return;
         }
@@ -157,6 +235,10 @@ public class MemoryMaintenanceMiddleware implements HarnessRuntimeMiddleware {
         }
     }
 
+    /**
+     * 获取（不存在则初始化）当前隔离键对应的限流时间戳引用。
+     * 初始值为 {@link Instant#EPOCH}，保证首次调用必然触发维护。
+     */
     private AtomicReference<Instant> lastRunAtFor(RuntimeContext rc) {
         return lastRunAtByKey.computeIfAbsent(
                 timerKeyFor(rc), k -> new AtomicReference<>(Instant.EPOCH));
@@ -166,6 +248,14 @@ public class MemoryMaintenanceMiddleware implements HarnessRuntimeMiddleware {
      * Derives the timer map key from the configured {@link IsolationScope} and the per-call
      * {@link RuntimeContext}, mirroring the memory data namespace. See
      * {@link MemoryFlushMiddleware#timerKeyFor(RuntimeContext)} for the same logic.
+     */
+    /**
+     * 根据配置的 {@link IsolationScope} 和每次调用的 {@link RuntimeContext} 派生限流键，
+     * 与记忆数据的命名空间保持镜像一致。相同逻辑参见
+     * {@link MemoryFlushMiddleware#timerKeyFor(RuntimeContext)}。
+     *
+     * <p>取值规则：USER 用 userId、SESSION 用 sessionId、AGENT/GLOBAL 共用空键；
+     * 上下文缺失或字段为空时回退为空键（全局共享窗口）。
      */
     String timerKeyFor(RuntimeContext rc) {
         return switch (isolationScope) {
@@ -181,6 +271,10 @@ public class MemoryMaintenanceMiddleware implements HarnessRuntimeMiddleware {
         };
     }
 
+    /**
+     * 执行一次完整维护，按固定顺序完成三步：
+     * 归档过期日常记忆文件 → LLM 记忆整合 → 清理过期会话日志。
+     */
     private void runMaintenance(RuntimeContext rc) {
         log.debug("Running memory maintenance...");
         expireDailyFiles(rc);
@@ -189,6 +283,13 @@ public class MemoryMaintenanceMiddleware implements HarnessRuntimeMiddleware {
         log.debug("Memory maintenance completed");
     }
 
+    /**
+     * 第一步：归档过期的日常记忆文件。
+     *
+     * <p>扫描记忆目录下的 {@code *.md} 文件，日常文件以日期命名（如 {@code 2026-01-01.md}）。
+     * 将文件名解析为日期，早于"今天 - 保留天数"截止线的文件移动到
+     * {@code memory/archive/} 归档目录。跳过目录、隐藏文件及非日期命名的文件。
+     */
     private void expireDailyFiles(RuntimeContext rc) {
         AbstractFilesystem fs = workspaceManager.getFilesystem();
         if (fs == null) {
@@ -199,6 +300,7 @@ public class MemoryMaintenanceMiddleware implements HarnessRuntimeMiddleware {
             return;
         }
 
+        // 归档截止线：早于该日期的文件视为过期
         LocalDate cutoff = LocalDate.now().minusDays(dailyFileRetentionDays);
         for (FileInfo fi : glob.matches()) {
             if (fi.isDirectory()) {
@@ -206,8 +308,9 @@ public class MemoryMaintenanceMiddleware implements HarnessRuntimeMiddleware {
             }
             String fileName = fileName(fi.path());
             if (fileName.startsWith(".")) {
-                continue;
+                continue; // 隐藏文件，不处理
             }
+            // 去掉 .md 后缀，剩余部分应为一个日期字符串
             String baseName =
                     fileName.endsWith(".md")
                             ? fileName.substring(0, fileName.length() - 3)
@@ -222,21 +325,35 @@ public class MemoryMaintenanceMiddleware implements HarnessRuntimeMiddleware {
                 }
             } catch (Exception e) {
                 // not a date-named file, skip
+                // 文件名不是日期格式（如 MEMORY.md 等常驻文件），跳过
             }
         }
     }
 
+    /**
+     * 第二步：基于大模型的记忆整合。
+     *
+     * <p>调用 {@link MemoryConsolidator#consolidate} 将零散的日常记忆归纳整合进长期记忆。
+     * 未配置整合器时直接跳过；整合失败仅记录警告日志，不中断后续清理步骤。
+     */
     private void consolidateMemory(RuntimeContext rc) {
         if (consolidator == null) {
             return;
         }
         try {
+            // 维护整体在 boundedElastic 线程上同步执行，因此这里可以安全阻塞等待
             consolidator.consolidate(rc).block();
         } catch (Exception e) {
             log.warn("Memory consolidation failed: {}", e.getMessage());
         }
     }
 
+    /**
+     * 第三步：清理过期的会话日志文件。
+     *
+     * <p>扫描智能体目录下的 {@code *.log.jsonl} 会话日志，按文件的最后修改时间判断：
+     * 早于"当前时间 - 保留天数"的文件直接删除（与日常文件不同，会话日志不做归档）。
+     */
     private void pruneOldSessions(RuntimeContext rc) {
         AbstractFilesystem fs = workspaceManager.getFilesystem();
         if (fs == null) {
@@ -254,7 +371,7 @@ public class MemoryMaintenanceMiddleware implements HarnessRuntimeMiddleware {
             }
             String modifiedAt = fi.modifiedAt();
             if (modifiedAt == null || modifiedAt.isEmpty()) {
-                continue;
+                continue; // 无修改时间信息，无法判断，跳过
             }
             try {
                 Instant modified = Instant.parse(modifiedAt);
@@ -268,6 +385,10 @@ public class MemoryMaintenanceMiddleware implements HarnessRuntimeMiddleware {
         }
     }
 
+    /**
+     * 工具方法：从完整路径中提取文件名（最后一个 {@code /} 之后的部分），
+     * 路径为 null 时返回空字符串。
+     */
     private static String fileName(String path) {
         if (path == null) {
             return "";

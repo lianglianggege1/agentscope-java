@@ -70,63 +70,64 @@ public class MemoryFlushManager {
      记忆提取环节的默认提示词。对外公开，调用方在构建
      {@link io.agentscope.harness.agent.memory.MemoryConfig} 时可进行扩展
     （例如追加项目专属约束）。
+    */
     public static final String DEFAULT_FLUSH_PROMPT =
-        """
-        你是记忆提取助手。分析下方对话内容，提取需要留存至后续会话的重要事实、决策、偏好与上下文信息。
+            """
+            你是记忆提取助手。分析下方对话内容，提取需要留存至后续会话的重要事实、决策、偏好与上下文信息。
 
-        仅以Markdown无序列表形式输出提取出的记忆内容。每条内容为简洁且独立完整的信息；存在日期、人名、具体细节时一并保留。
+            仅以Markdown无序列表形式输出提取出的记忆内容。每条内容为简洁且独立完整的信息；存在日期、人名、具体细节时一并保留。
 
-        若无值得记忆的内容，严格输出：NO_REPLY
+            若无值得记忆的内容，严格输出：NO_REPLY
 
-        提取准则：
-        - 提取用户偏好、个人信息、项目相关决议
-        - 记录关键技术决策及其背后理由
-        - 记下所有承诺、截止时间与待执行事项
-        - 留存人员协作信息（分工、团队架构）
-        - 忽略常规问候、工具调用、临时状态信息
+            提取准则：
+            - 提取用户偏好、个人信息、项目相关决议
+            - 记录关键技术决策及其背后理由
+            - 记下所有承诺、截止时间与待执行事项
+            - 留存人员协作信息（分工、团队架构）
+            - 忽略常规问候、工具调用、临时状态信息
 
-        重要写入规则（目标文件为追加模式）：
-        - 你写入的是**当日每日记忆账本（memory/YYYY-MM-DD.md）**，而非MEMORY.md。每日账本仅支持追加，你的输出会新增至已有记录末尾。
-        - MEMORY.md 是经过整理的长期记忆文件，仅作为只读上下文提供参考。不要重复记录MEMORY.md或今日已存在的条目；后续独立的整合任务会定期将新增账本内容合并至MEMORY.md。
-        - 每条记录保持独立完整，支持单独检索。
-        """;
-     */
+            重要写入规则（目标文件为追加模式）：
+            - 你写入的是**当日每日记忆账本（memory/YYYY-MM-DD.md）**，而非MEMORY.md。每日账本仅支持追加，你的输出会新增至已有记录末尾。
+            - MEMORY.md 是经过整理的长期记忆文件，仅作为只读上下文提供参考。不要重复记录MEMORY.md或今日已存在的条目；后续独立的整合任务会定期将新增账本内容合并至MEMORY.md。
+            - 每条记录保持独立完整，支持单独检索。
+            """;
 
     /**
      * Default prompt for the memory extraction step. Exposed publicly so callers can extend
      * (e.g. append project-specific guidelines) when constructing
      * {@link io.agentscope.harness.agent.memory.MemoryConfig}.
      */
-    public static final String DEFAULT_FLUSH_PROMPT =
-            """
-            You are a memory extraction assistant. Analyze the conversation below and extract \
-            important facts, decisions, preferences, and contextual information that should be \
-            remembered for future conversations.
+    /*public static final String DEFAULT_FLUSH_PROMPT =
+    """
+    You are a memory extraction assistant. Analyze the conversation below and extract \
+    important facts, decisions, preferences, and contextual information that should be \
+    remembered for future conversations.
 
-            Output ONLY the extracted memories as a markdown bullet list. Each item should be \
-            a concise, self-contained fact. Include dates, names, and specifics when available.
+    Output ONLY the extracted memories as a markdown bullet list. Each item should be \
+    a concise, self-contained fact. Include dates, names, and specifics when available.
 
-            If there is nothing worth remembering, respond with exactly: NO_REPLY
+    If there is nothing worth remembering, respond with exactly: NO_REPLY
 
-            Guidelines:
-            - Extract user preferences, personal information, project decisions
-            - Capture important technical decisions and their rationale
-            - Note any commitments, deadlines, or action items
-            - Record relationship context (who works on what, team structure)
-            - Ignore routine greetings, tool invocations, and ephemeral status updates
+    Guidelines:
+    - Extract user preferences, personal information, project decisions
+    - Capture important technical decisions and their rationale
+    - Note any commitments, deadlines, or action items
+    - Record relationship context (who works on what, team structure)
+    - Ignore routine greetings, tool invocations, and ephemeral status updates
 
-            IMPORTANT — write target and append-only rules:
-            - You are writing to TODAY'S daily memory ledger (memory/YYYY-MM-DD.md), NOT to \
-            MEMORY.md. The daily ledger is append-only — your output will be appended after the \
-            entries already shown below.
-            - MEMORY.md is the curated long-term memory and is shown ONLY as read-only context. \
-            Do NOT restate facts already covered by MEMORY.md or by today's earlier entries; a \
-            separate consolidation step periodically merges new daily entries into MEMORY.md.
-            - Keep each bullet point independent and self-contained so entries can be searched \
-            individually.\
-            """;
+    IMPORTANT — write target and append-only rules:
+    - You are writing to TODAY'S daily memory ledger (memory/YYYY-MM-DD.md), NOT to \
+    MEMORY.md. The daily ledger is append-only — your output will be appended after the \
+    entries already shown below.
+    - MEMORY.md is the curated long-term memory and is shown ONLY as read-only context. \
+    Do NOT restate facts already covered by MEMORY.md or by today's earlier entries; a \
+    separate consolidation step periodically merges new daily entries into MEMORY.md.
+    - Keep each bullet point independent and self-contained so entries can be searched \
+    individually.\
+    """;*/
 
     private final WorkspaceManager workspaceManager;
+
     private final Model model;
     private final String flushPrompt;
 
@@ -184,11 +185,14 @@ public class MemoryFlushManager {
                     .append(existingDaily)
                     .append("\n\n");
         }
-        userPrompt
-                .append(
-                        "Extract NEW memories from this conversation window (skip anything"
-                                + " already covered above):\n\n")
-                .append(conversationText);
+        //        userPrompt
+        //                .append(
+        //                        "Extract NEW memories from this conversation window (skip
+        // anything"
+        //                                + " already covered above):\n\n")
+        //                .append(conversationText);
+
+        userPrompt.append("从本次对话片段中提取**新增记忆**，上文已记录过的内容全部忽略：\n\n").append(conversationText);
 
         List<Msg> flushInput = new ArrayList<>();
         flushInput.add(

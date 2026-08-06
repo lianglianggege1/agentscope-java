@@ -54,19 +54,48 @@ import reactor.core.publisher.Flux;
  * <p>Tools listed in {@link ToolResultEvictionConfig#getExcludedToolNames()} are never evicted
  * (e.g. {@code readFile} — evicting would cause re-read loops).
  */
+/**
+ * 在每个执行阶段结束后、下游推理看到臃肿消息列表之前，把超大工具结果
+ * 转移到 {@link AbstractFilesystem} 中的中间件。
+ *
+ * <p>当新增工具结果消息中 {@link ToolResultBlock} 的文本内容超过
+ * {@link ToolResultEvictionConfig#getMaxResultChars()} 时，本中间件会：
+ * <ol>
+ *   <li>把完整结果写入文件系统的
+ *       {@code {evictionPath}/{agentName}/{净化后的toolCallId}} 路径。</li>
+ *   <li>用精简占位符替换上下文中的 {@code ToolResultBlock}：包含首尾预览，
+ *       并指引模型用 {@code readFile} 读取完整内容。</li>
+ *   <li>原地修改 {@link AgentState#contextMutable()}，使后续推理轮次
+ *       只能看到占位符。</li>
+ * </ol>
+ *
+ * <p>{@link ToolResultEvictionConfig#getExcludedToolNames()} 中列出的工具永不被转移
+ * （例如 {@code readFile}——若转移会导致反复重读的循环）。
+ */
 public class ToolResultEvictionMiddleware implements HarnessRuntimeMiddleware {
 
     private static final Logger log = LoggerFactory.getLogger(ToolResultEvictionMiddleware.class);
 
+    /** 工作区文件系统，用于存放被转移的超大工具结果。 */
     private final AbstractFilesystem filesystem;
+
+    /** 转移配置：字符上限、排除工具列表、存储路径、预览长度等。 */
     private final ToolResultEvictionConfig config;
 
+    /**
+     * @param filesystem 用于存储转移内容的文件系统
+     * @param config 转移行为配置
+     */
     public ToolResultEvictionMiddleware(
             AbstractFilesystem filesystem, ToolResultEvictionConfig config) {
         this.filesystem = filesystem;
         this.config = config;
     }
 
+    /**
+     * 推理钩子：在推理开始前对消息上下文做一次转移扫描，
+     * 确保本轮 LLM 调用不会携带上一轮遗留的超大工具结果。
+     */
     @Override
     public Flux<AgentEvent> onReasoning(
             Agent agent,
@@ -78,6 +107,10 @@ public class ToolResultEvictionMiddleware implements HarnessRuntimeMiddleware {
         return next.apply(input);
     }
 
+    /**
+     * 遍历智能体可变消息上下文，对每条 TOOL 角色消息尝试转移其超大结果块，
+     * 命中时原地替换该消息（其余消息不动）。
+     */
     private void evictOversizedToolResults(Agent agent, RuntimeContext rc) {
         AgentState state = RuntimeContext.resolveAgentState(rc, agent);
         if (state == null) {
@@ -97,6 +130,10 @@ public class ToolResultEvictionMiddleware implements HarnessRuntimeMiddleware {
         }
     }
 
+    /**
+     * 对单条消息内的每个 {@link ToolResultBlock} 尝试转移；
+     * 任一内容块被替换则重建消息返回，否则返回原消息对象。
+     */
     private Msg evictMessage(Msg msg, String agentName, RuntimeContext rc) {
         List<ContentBlock> contentBlocks = msg.getContent();
         if (contentBlocks == null || contentBlocks.isEmpty()) {
@@ -128,6 +165,13 @@ public class ToolResultEvictionMiddleware implements HarnessRuntimeMiddleware {
                 .build();
     }
 
+    /**
+     * 判断并执行单个工具结果的转移。
+     *
+     * <p>跳过条件：工具在排除列表中、文本未超限。转移流程：完整内容写入文件 →
+     * 生成占位符 → 返回替换后的新 {@link ToolResultBlock}。
+     * 写入失败或发生异常时返回原结果块（不转移），保证工具结果不会丢失。
+     */
     private ToolResultBlock maybeEvict(
             ToolResultBlock toolResult, String agentName, RuntimeContext rc) {
         String toolName = toolResult.getName();
@@ -175,6 +219,7 @@ public class ToolResultEvictionMiddleware implements HarnessRuntimeMiddleware {
         }
     }
 
+    /** 拼接工具结果中所有文本块的内容，非文本块忽略。 */
     private String extractText(ToolResultBlock toolResult) {
         if (toolResult.getOutput() == null) {
             return "";
@@ -188,6 +233,10 @@ public class ToolResultEvictionMiddleware implements HarnessRuntimeMiddleware {
         return sb.toString();
     }
 
+    /**
+     * 构建转移文件路径：{evictionPath}/{agentName}/{toolCallId}。
+     * 智能体名与调用 ID 中的非法字符统一替换为下划线，防止路径穿越。
+     */
     private String buildEvictionPath(String agentName, String toolCallId) {
         String base = config.getEvictionPath();
         if (!base.startsWith("/")) {
@@ -198,6 +247,10 @@ public class ToolResultEvictionMiddleware implements HarnessRuntimeMiddleware {
         return base + "/" + safeAgent + "/" + safeId;
     }
 
+    /**
+     * 构建替换原结果的占位符文本：说明完整内容的存储位置及读取方式，
+     * 并附上首尾各一段预览（预览长度不超过原文一半），帮助模型判断是否需要读全文。
+     */
     private String buildPlaceholder(String fullText, String evictionPath) {
         int len = fullText.length();
         int pLen = Math.min(config.getPreviewChars(), len / 2);

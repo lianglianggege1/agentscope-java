@@ -54,12 +54,38 @@ import reactor.core.publisher.Flux;
  * If the model does not report its context window, falls back to
  * {@link CompactionConfig#FALLBACK_TRIGGER_TOKENS}.
  */
+/**
+ * 上下文压缩中间件：在每次 LLM 推理调用之前检查并执行会话压缩，
+ * 防止上下文超出模型窗口。
+ *
+ * <p>触发于 {@link #onReasoning}。当 token 数超过触发阈值时依次执行：
+ * <ol>
+ *   <li>通过 {@link MemoryFlushManager} 把前缀中的长期记忆先落盘；</li>
+ *   <li>把完整会话转储到会话 JSONL 文件（归档保底）；</li>
+ *   <li>用一次 LLM 调用把前缀蒸馏为结构化摘要；</li>
+ *   <li>用 {@code [摘要消息] + 保留尾部} 替换智能体的工作上下文
+ *       （{@link AgentState#contextMutable()}）；</li>
+ *   <li>用 {@code [系统消息] + [摘要消息] + 保留尾部} 重建下游 {@link ReasoningInput}。</li>
+ * </ol>
+ *
+ * <p>动态阈值（默认）：当 {@link CompactionConfig#getTriggerTokens()} 为 0 时，
+ * 有效触发阈值 = {@code 模型上下文窗口 - reserved}；
+ * 模型未上报窗口大小时回退到 {@link CompactionConfig#FALLBACK_TRIGGER_TOKENS}。
+ *
+ * <p>容错：压缩过程出现任何异常都不会阻断主流程——记录警告后按原上下文继续推理。
+ * 该实例同时被 HarnessAgent 用作"上下文溢出紧急压缩"恢复路径的开关。
+ */
 public class CompactionMiddleware implements HarnessRuntimeMiddleware {
 
     private static final Logger log = LoggerFactory.getLogger(CompactionMiddleware.class);
 
+    /** 工作空间管理器：压缩时把完整会话转储到会话 JSONL、长期记忆落盘都依赖它。 */
     private final WorkspaceManager workspaceManager;
+
+    /** 主模型：既用于估算动态阈值（上下文窗口），也用于执行摘要蒸馏的 LLM 调用。 */
     private final Model model;
+
+    /** 压缩配置（触发/保留 token、保留比例等），可能含待解析的动态默认值。 */
     private final CompactionConfig config;
 
     public CompactionMiddleware(
@@ -69,6 +95,12 @@ public class CompactionMiddleware implements HarnessRuntimeMiddleware {
         this.config = config;
     }
 
+    /**
+     * 推理前压缩检查。用 Flux.defer 保证每次订阅都重新求值（读取最新输入消息）。
+     * 流程：拆分系统消息与会话正文 → 解析有效配置 → 调 compactIfNeeded
+     * → 未触发则原样放行；触发则把压缩结果同时应用到 AgentState 上下文
+     * 与下游 ReasoningInput（重新拼回系统消息）。
+     */
     @Override
     public Flux<AgentEvent> onReasoning(
             Agent agent,
@@ -82,6 +114,7 @@ public class CompactionMiddleware implements HarnessRuntimeMiddleware {
 
         return Flux.defer(
                 () -> {
+                    // 步骤 1：把首条系统消息剥离出来，剩余部分作为待压缩的会话正文
                     List<Msg> messages = input.messages();
                     Msg systemMsg = null;
                     List<Msg> conversation;
@@ -98,8 +131,10 @@ public class CompactionMiddleware implements HarnessRuntimeMiddleware {
                     String sessionId =
                             rc != null && rc.getSessionId() != null ? rc.getSessionId() : "default";
 
+                    // 步骤 2：解析含动态默认值的有效配置（触发阈值/保留 token）
                     CompactionConfig effectiveConfig = resolveEffectiveConfig();
 
+                    // 步骤 3：构建压缩器（记忆落盘器 + 会话压缩器），按需执行压缩
                     MemoryFlushManager flushManager =
                             new MemoryFlushManager(workspaceManager, model);
                     ConversationCompactor compactor =
@@ -111,8 +146,10 @@ public class CompactionMiddleware implements HarnessRuntimeMiddleware {
                             .flatMapMany(
                                     optResult -> {
                                         if (optResult.isEmpty()) {
+                                            // 未达阈值：不做任何事，原样放行
                                             return next.apply(input);
                                         }
+                                        // 步骤 4：把压缩结果应用到智能体工作上下文
                                         List<Msg> compacted = optResult.get();
                                         applyToContext(
                                                 RuntimeContext.resolveAgentState(rc, reActAgent),
@@ -120,6 +157,7 @@ public class CompactionMiddleware implements HarnessRuntimeMiddleware {
                                         log.debug(
                                                 "Compacted to {} messages before reasoning",
                                                 compacted.size());
+                                        // 步骤 5：重建下游输入 = 系统消息 + 压缩后的会话
                                         List<Msg> newMessages = new ArrayList<>();
                                         if (sys != null) {
                                             newMessages.add(sys);
@@ -133,6 +171,8 @@ public class CompactionMiddleware implements HarnessRuntimeMiddleware {
                                     })
                             .onErrorResume(
                                     e -> {
+                                        // 容错兜底：压缩失败（如摘要 LLM 调用出错）不阻断主流程，
+                                        // 记录警告后按原始上下文继续推理
                                         log.warn(
                                                 "Compaction failed, continuing without compaction:"
                                                         + " {}",
@@ -144,6 +184,16 @@ public class CompactionMiddleware implements HarnessRuntimeMiddleware {
 
     /**
      * Resolves dynamic defaults in the config using the model's context window.
+     */
+    /**
+     * 用模型的上下文窗口解析配置中的动态默认值：
+     * <ul>
+     *   <li>triggerTokens == 0 → 动态触发阈值 = 窗口 - reserved
+     *       （结果为负/零时钳制到窗口的一半，模型未报窗口则用回退常量）；</li>
+     *   <li>keepTokens == -1 → 动态保留 token = clamp(窗口 - reserved 的比例值,
+     *       keepTokensMin, keepTokensMax)。</li>
+     * </ul>
+     * 两者都非动态时直接原样返回配置，避免无谓计算。
      */
     private CompactionConfig resolveEffectiveConfig() {
         int configTrigger = config.getTriggerTokens();
@@ -164,6 +214,8 @@ public class CompactionMiddleware implements HarnessRuntimeMiddleware {
                     // reserved exceeds the model's context window; a negative or zero trigger
                     // would fire compaction on every call. Clamp to half the context window so
                     // compaction still activates at a sensible point without thrashing.
+                    // reserved 超过了模型的上下文窗口；负数或零的触发阈值会导致每次调用
+                    // 都触发压缩。钳制到窗口的一半，让压缩仍在合理的位置触发且不会反复抖动。
                     effectiveTrigger = Math.max(1, contextWindow / 2);
                     log.warn(
                             "Dynamic compaction trigger clamped: contextWindow={} <= reserved={}"
@@ -210,6 +262,10 @@ public class CompactionMiddleware implements HarnessRuntimeMiddleware {
         return config.withEffective(effectiveTrigger, effectiveKeep);
     }
 
+    /**
+     * 把压缩后的消息列表整体替换进 AgentState 的工作上下文（clear + addAll），
+     * 使后续轮次的记忆与持久化都基于压缩后的上下文。任何异常只记警告不抛出。
+     */
     private static void applyToContext(AgentState state, List<Msg> compacted) {
         if (state == null) {
             log.warn("Cannot apply compacted messages: AgentState is null");

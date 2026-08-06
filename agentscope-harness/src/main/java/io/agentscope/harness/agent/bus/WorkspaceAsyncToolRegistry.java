@@ -61,6 +61,10 @@ public class WorkspaceAsyncToolRegistry implements AsyncToolRegistry {
      * @param filesystem   any {@link AbstractFilesystem} implementation
      * @param registryRoot absolute path within the filesystem (e.g. {@code "/bus/async-tools"})
      */
+    /**
+     * @param filesystem 任意{@link AbstractFilesystem}实现类实例
+     * @param registryRoot 文件系统内的绝对路径（示例：{@code "/bus/async-tools"}）
+     */
     public WorkspaceAsyncToolRegistry(AbstractFilesystem filesystem, String registryRoot) {
         this.fs = filesystem;
         this.registryRoot =
