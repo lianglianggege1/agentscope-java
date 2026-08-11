@@ -114,6 +114,92 @@ import org.redisson.client.codec.StringCodec;
  * RedissonClientAdapter adapter = RedissonClientAdapter.of(redissonClient);
  * }</pre>
  */
+/**
+ * Redisson Redis客户端适配器。
+ *
+ * <p>Redisson是功能完善的Redis客户端，可通过统一的{@link RedissonClient}接口兼容各类部署架构。
+ *
+ * <p>该适配器支持Redisson全部部署模式：
+ * <ul>
+ *   <li>单机模式 - 单Redis节点实例</li>
+ *   <li>集群模式 - 多节点Redis集群</li>
+ *   <li>哨兵模式 - 依托哨兵实现高可用的Redis架构</li>
+ *   <li>主从模式 - 采用主从复制的Redis架构</li>
+ * </ul>
+ *
+ * <p>RedissonClient内部已封装连接池管理、线程安全保障以及各类部署模式的专属逻辑，
+ * 在不同架构下均可流畅使用。
+ *
+ * <p>使用示例：
+ *
+ * <p>单机模式：
+ * <pre>{@code
+ * // 构建单机配置
+ * Config config = new Config();
+ * config.useSingleServer()
+ *     .setAddress("redis://localhost:6379")
+ *     .setConnectionMinimumIdleSize(5)
+ *     .setConnectionPoolSize(20);
+ *
+ * // 实例化Redisson客户端
+ * RedissonClient redissonClient = Redisson.create(config);
+ *
+ * // 创建适配器
+ * RedissonClientAdapter adapter = RedissonClientAdapter.of(redissonClient);
+ *
+ * // 结合RedisAgentStateStore使用
+ * AgentStateStore stateStore = RedisAgentStateStore.builder()
+ *     .redissonClient(redissonClient)
+ *     .build();
+ * }</pre>
+ *
+ * <p>集群模式：
+ * <pre>{@code
+ * // 构建集群配置
+ * Config config = new Config();
+ * config.useClusterServers()
+ *     .addNodeAddress("redis://localhost:7000", "redis://localhost:7001", "redis://localhost:7002")
+ *     .setScanInterval(2000);
+ *
+ * // 实例化Redisson客户端
+ * RedissonClient redissonClient = Redisson.create(config);
+ *
+ * // 创建适配器
+ * RedissonClientAdapter adapter = RedissonClientAdapter.of(redissonClient);
+ * }</pre>
+ *
+ * <p>哨兵模式：
+ * <pre>{@code
+ * // 构建哨兵配置
+ * Config config = new Config();
+ * config.useSentinelServers()
+ *     .setMasterName("mymaster")
+ *     .addSentinelAddress("redis://localhost:26379", "redis://localhost:26380")
+ *     .setDatabase(0);
+ *
+ * // 实例化Redisson客户端
+ * RedissonClient redissonClient = Redisson.create(config);
+ *
+ * // 创建适配器
+ * RedissonClientAdapter adapter = RedissonClientAdapter.of(redissonClient);
+ * }</pre>
+ *
+ * <p>主从模式：
+ * <pre>{@code
+ * // 构建主从配置
+ * Config config = new Config();
+ * config.useMasterSlaveServers()
+ *     .setMasterAddress("redis://localhost:6379")
+ *     .addSlaveAddress("redis://localhost:6380", "redis://localhost:6381")
+ *     .setReadMode(ReadMode.SLAVE);
+ *
+ * // 实例化Redisson客户端
+ * RedissonClient redissonClient = Redisson.create(config);
+ *
+ * // 创建适配器
+ * RedissonClientAdapter adapter = RedissonClientAdapter.of(redissonClient);
+ * }</pre>
+ */
 public class RedissonClientAdapter implements RedisClientAdapter {
 
     private final RedissonClient redissonClient;

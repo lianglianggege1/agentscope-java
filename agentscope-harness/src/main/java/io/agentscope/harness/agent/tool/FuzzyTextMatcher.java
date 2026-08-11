@@ -139,8 +139,10 @@ final class FuzzyTextMatcher {
 
     // ---------------------------------------------------------------------
     //  Exact-mode helpers
+    //  精确模式辅助方法
     // ---------------------------------------------------------------------
 
+    /** 精确模式下用 indexOf 循环找出 needle 在 haystack 中的全部匹配区间。 */
     private static List<MatchRange> findAll(String haystack, String needle, Level level) {
         List<MatchRange> out = new ArrayList<>();
         int idx = 0;

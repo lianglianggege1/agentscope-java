@@ -85,11 +85,13 @@ public class SkillManageTool implements AgentTool {
     public static final String NAME = "skill_manage";
 
     // Validation constants (mirrored from hermes tools/skill_manager_tool.py)
+    // 校验常量（与 hermes tools/skill_manager_tool.py 保持一致）
     static final int MAX_NAME_LENGTH = 64;
     static final int MAX_DESCRIPTION_LENGTH = 1024;
     static final int MAX_SKILL_CONTENT_CHARS = 100_000;
     static final int MAX_SKILL_FILE_BYTES = 1_048_576; // 1 MiB
     static final Pattern VALID_NAME_RE = Pattern.compile("^[a-z0-9][a-z0-9._-]*$");
+    /** 附属文件仅允许存放于这四个子目录。 */
     static final Set<String> ALLOWED_SUBDIRS =
             Set.of("references", "templates", "scripts", "assets");
 
@@ -111,6 +113,7 @@ public class SkillManageTool implements AgentTool {
 
     private final SkillManageConfig config;
 
+    /** 构造器：不启用遥测与审计。 */
     public SkillManageTool(
             WorkspaceSkillRepository mainRepo,
             WorkspaceSkillRepository draftsRepo,
@@ -118,6 +121,7 @@ public class SkillManageTool implements AgentTool {
         this(mainRepo, draftsRepo, config, null, null);
     }
 
+    /** 构造器：启用遥测（使用统计），不启用审计。 */
     public SkillManageTool(
             WorkspaceSkillRepository mainRepo,
             WorkspaceSkillRepository draftsRepo,
@@ -126,6 +130,7 @@ public class SkillManageTool implements AgentTool {
         this(mainRepo, draftsRepo, config, usageStore, null);
     }
 
+    /** 构造器：完整装配，可选启用遥测与审计。 */
     public SkillManageTool(
             WorkspaceSkillRepository mainRepo,
             WorkspaceSkillRepository draftsRepo,
@@ -249,6 +254,7 @@ public class SkillManageTool implements AgentTool {
         return schema;
     }
 
+    /** 响应式入口：把同步分发逻辑包装为 {@link Mono}，异常统一转为错误结果块。 */
     @Override
     public Mono<ToolResultBlock> callAsync(ToolCallParam param) {
         RuntimeContext ctx = param.getRuntimeContext();
@@ -262,6 +268,10 @@ public class SkillManageTool implements AgentTool {
                         });
     }
 
+    /**
+     * 同步分发核心：校验 action 与 name 必填及名称合法性后，
+     * 按 action 分发到 create/edit/patch/write_file/remove_file/delete 六个子操作。
+     */
     private ToolResultBlock dispatchSync(Map<String, Object> input, RuntimeContext ctx) {
         if (input == null) {
             return ToolResultBlock.error("Missing input parameters.");
@@ -302,6 +312,7 @@ public class SkillManageTool implements AgentTool {
         }
     }
 
+    /** 尽力获取当前会话 ID；无上下文或获取失败时返回 null。 */
     private static String sessionIdOf(RuntimeContext ctx) {
         if (ctx == null) {
             return null;
@@ -317,6 +328,14 @@ public class SkillManageTool implements AgentTool {
     //  Actions
     // ---------------------------------------------------------------------
 
+    /**
+     * {@code create} 动作：创建全新技能。
+     *
+     * <p>执行流程：校验内容与重名（两个仓库均检查）→ 解析 frontmatter
+     * 并校验 name 一致、description 必填且长度受限 →
+     * 按 autoPromote 写入正式或草稿仓库 → 写入后安全扫描
+     * （判定 DANGEROUS 时回滚归档）→ 记录遥测溯源 → 追加审计日志。
+     */
     private ToolResultBlock doCreate(String name, String content, String sessionId) {
         if (content == null || content.isBlank()) {
             return ToolResultBlock.error(
@@ -327,6 +346,7 @@ public class SkillManageTool implements AgentTool {
             return ToolResultBlock.error(contentErr);
         }
         // Reject if a skill with this name already exists in either repo.
+        // 任一仓库（正式/草稿）已存在同名技能则拒绝创建。
         if (mainRepo.skillExists(name) || draftsRepo.skillExists(name)) {
             return ToolResultBlock.error(
                     "A skill named '" + name + "' already exists. Use action=edit to update it.");
@@ -362,12 +382,14 @@ public class SkillManageTool implements AgentTool {
                     "Failed to write skill '" + name + "'. Check logs for details.");
         }
         // Static security scan post-write; roll back on DANGEROUS so the agent can revise.
+        // 写入后执行静态安全扫描；判定 DANGEROUS 时回滚，让智能体修正后重试。
         if (config.securityScan()) {
             SkillSecurityScanner.ScanResult scan =
                     SkillSecurityScanner.scan(name, content, skill.getResources());
             if (!SkillSecurityScanner.shouldAllow(
                     SkillSecurityScanner.TrustLevel.AGENT_CREATED, scan.verdict())) {
                 target.delete(name); // best-effort rollback (archives the bad draft)
+                // 尽力而为的回滚（把有问题的草稿归档）
                 return ToolResultBlock.error(
                         "Security scan blocked this skill ("
                                 + scan.verdict()
@@ -376,6 +398,7 @@ public class SkillManageTool implements AgentTool {
             }
         }
         // Telemetry: record provenance so visibility filters / curator can see this skill.
+        // 遥测：记录溯源信息，供可见性过滤器/策展器识别该技能。
         if (usageStore != null) {
             try {
                 if (config.autoPromote()) {
@@ -410,6 +433,11 @@ public class SkillManageTool implements AgentTool {
                                 : " It is a draft and will NOT be auto-loaded until promoted."));
     }
 
+    /**
+     * {@code edit} 动作：全量重写已有技能的 SKILL.md。
+     * 写入前暂存旧内容，安全扫描判定 DANGEROUS 时回滚到旧版本；
+     * 成功后递增补丁版本号。
+     */
     private ToolResultBlock doEdit(String name, String content) {
         if (content == null || content.isBlank()) {
             return ToolResultBlock.error("Missing 'content' parameter (full SKILL.md).");
@@ -433,6 +461,7 @@ public class SkillManageTool implements AgentTool {
                     "The 'name' parameter must match the SKILL.md frontmatter 'name' field.");
         }
         // Stash the previous SKILL.md so we can roll back on a DANGEROUS scan verdict.
+        // 暂存旧版 SKILL.md，便于安全扫描判定 DANGEROUS 时回滚。
         String previous = target.readSkillFile(name, "SKILL.md");
         boolean ok = target.save(List.of(skill), true /* force = overwrite */);
         if (!ok) {
@@ -457,6 +486,14 @@ public class SkillManageTool implements AgentTool {
         return ToolResultBlock.text("Skill '" + name + "' SKILL.md replaced.");
     }
 
+    /**
+     * {@code patch} 动作：在 SKILL.md 或附属文件内执行定向查找替换。
+     *
+     * <p>核心机制：借助 {@link FuzzyTextMatcher} 的三级模糊匹配阶梯
+     * （精确 → 去行尾空白 → 空白折叠）定位 old_string；非 replace_all 时
+     * 要求在同级匹配中唯一。替换从右向左应用以避免偏移失效；
+     * 写入后经安全扫描校验，失败则回滚。
+     */
     private ToolResultBlock doPatch(
             String name, String oldString, String newString, String filePath, boolean replaceAll) {
         if (oldString == null) {
@@ -489,6 +526,9 @@ public class SkillManageTool implements AgentTool {
         // Fuzzy-match ladder: EXACT → TRAILING_WS_STRIPPED → WHITESPACE_COLLAPSED. Looser
         // levels only fire when stricter levels return zero matches; uniqueness is then
         // checked against the chosen level's matches so non-replace_all stays safe.
+        // 模糊匹配阶梯：EXACT → TRAILING_WS_STRIPPED → WHITESPACE_COLLAPSED。
+        // 仅当更严格的层级零匹配时才放宽；唯一性校验基于所选层级的匹配结果，
+        // 保证非 replace_all 模式的安全性。
         FuzzyTextMatcher.SearchResult search = FuzzyTextMatcher.search(existing, oldString);
         if (search.isEmpty()) {
             return ToolResultBlock.error(
@@ -506,6 +546,7 @@ public class SkillManageTool implements AgentTool {
         int replacements;
         if (replaceAll) {
             // Apply replacements right-to-left so earlier offsets aren't invalidated.
+            // 从右向左应用替换，避免前面的偏移量失效。
             StringBuilder buf = new StringBuilder(existing);
             for (int i = matches.size() - 1; i >= 0; i--) {
                 FuzzyTextMatcher.MatchRange m = matches.get(i);
@@ -554,6 +595,8 @@ public class SkillManageTool implements AgentTool {
         bumpPatchSilent(name);
         // Surface the fuzziness level so the LLM knows when whitespace was normalised — useful
         // for the agent to decide whether to re-verify by reading the file back.
+        // 向大模型暴露模糊匹配层级，使其知晓空白字符被归一化的情况——
+        // 便于智能体决定是否回读文件重新校验。
         String levelSuffix =
                 matchedLevel == FuzzyTextMatcher.Level.EXACT
                         ? ""
@@ -572,6 +615,11 @@ public class SkillManageTool implements AgentTool {
                         + ".");
     }
 
+    /**
+     * {@code write_file} 动作：新增/覆盖技能附属文件
+     * （仅限 references/templates/scripts/assets 四个子目录）。
+     * 写入前暂存旧内容，安全扫描失败时恢复旧文件或删除新文件。
+     */
     private ToolResultBlock doWriteFile(String name, String filePath, String fileContent) {
         if (filePath == null || filePath.isBlank()) {
             return ToolResultBlock.error("Missing 'file_path' for write_file.");
@@ -617,6 +665,7 @@ public class SkillManageTool implements AgentTool {
         return ToolResultBlock.text("Wrote " + filePath + " in skill '" + name + "'.");
     }
 
+    /** {@code remove_file} 动作：删除技能的单个附属文件（路径须通过子目录校验）。 */
     private ToolResultBlock doRemoveFile(String name, String filePath) {
         if (filePath == null || filePath.isBlank()) {
             return ToolResultBlock.error("Missing 'file_path' for remove_file.");
@@ -637,6 +686,11 @@ public class SkillManageTool implements AgentTool {
         return ToolResultBlock.text("Removed " + filePath + " from skill '" + name + "'.");
     }
 
+    /**
+     * {@code delete} 动作：归档整个技能目录（非破坏性，移入 .archive/）。
+     * absorbed_into 非空时校验目标技能存在且不能是自身，
+     * 供策展器后续区分"合并吸收"与"纯裁剪"；同时把遥测状态置为 ARCHIVED。
+     */
     private ToolResultBlock doDelete(String name, String absorbedInto) {
         WorkspaceSkillRepository target = locate(name);
         if (target == null) {
@@ -644,6 +698,8 @@ public class SkillManageTool implements AgentTool {
         }
         // absorbedInto validation: if non-empty, the target must exist (matches hermes intent so
         // the Curator can later classify consolidation vs pruning).
+        // absorbedInto 校验：非空时目标技能必须存在（与 hermes 语义一致，
+        // 便于策展器后续区分合并吸收与纯裁剪）。
         if (absorbedInto != null && !absorbedInto.isBlank()) {
             String trimmed = absorbedInto.trim();
             if (trimmed.equals(name)) {
@@ -684,6 +740,7 @@ public class SkillManageTool implements AgentTool {
     // ---------------------------------------------------------------------
 
     /** Best-effort {@code bumpPatch}; never throws into the caller. */
+    /** 尽力而为地递增补丁版本号；绝不向调用方抛出异常。 */
     private void bumpPatchSilent(String name) {
         if (usageStore == null) {
             return;
@@ -696,6 +753,7 @@ public class SkillManageTool implements AgentTool {
     }
 
     /** Locate the repository that owns a skill by name; drafts win on collision. */
+    /** 按名称定位技能所属仓库；同名冲突时草稿仓库优先。 */
     private WorkspaceSkillRepository locate(String name) {
         if (draftsRepo.skillExists(name)) {
             return draftsRepo;
@@ -706,6 +764,7 @@ public class SkillManageTool implements AgentTool {
         return null;
     }
 
+    /** 校验技能名称：非空、长度 ≤ 64、符合小写字母数字与 ._- 的正则；合法时返回 null。 */
     static String validateName(String name) {
         if (name == null || name.isEmpty()) {
             return "Skill name is required.";
@@ -722,11 +781,13 @@ public class SkillManageTool implements AgentTool {
         return null;
     }
 
+    /** 校验 SKILL.md 内容：长度受限且必须具备完整的 YAML frontmatter 结构；合法时返回 null。 */
     static String validateContent(String content) {
         if (content.length() > MAX_SKILL_CONTENT_CHARS) {
             return "SKILL.md content exceeds " + MAX_SKILL_CONTENT_CHARS + " chars.";
         }
         // Must look like frontmatter: starts with "---" on first line and contains closing "---".
+        // 必须符合 frontmatter 形态：首行为 "---" 且包含闭合的 "---" 行。
         String trimmed = content.stripLeading();
         if (!trimmed.startsWith("---")) {
             return "SKILL.md must start with '---' (YAML frontmatter).";
@@ -738,6 +799,10 @@ public class SkillManageTool implements AgentTool {
         return null;
     }
 
+    /**
+     * 校验附属文件路径：必须为相对路径（无 ..、不以 / 开头），
+     * 且首级目录属于允许的四个子目录之一；合法时返回 null。
+     */
     static String validateSubFilePath(String filePath) {
         if (filePath.contains("..") || filePath.startsWith("/")) {
             return "file_path must be relative and may not contain '..' segments.";
@@ -753,11 +818,13 @@ public class SkillManageTool implements AgentTool {
         return null;
     }
 
+    /** 从入参 Map 中取字符串值；不存在时返回 null。 */
     private static String stringOf(Map<String, Object> m, String key) {
         Object v = m.get(key);
         return v == null ? null : v.toString();
     }
 
+    /** 从入参 Map 中取布尔值：兼容 Boolean 与布尔字符串，其余情况返回 false。 */
     private static boolean boolOf(Map<String, Object> m, String key) {
         Object v = m.get(key);
         if (v instanceof Boolean b) {

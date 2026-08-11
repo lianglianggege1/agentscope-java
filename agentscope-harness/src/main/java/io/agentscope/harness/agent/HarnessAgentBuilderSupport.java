@@ -793,11 +793,14 @@ final class HarnessAgentBuilderSupport {
             Model parentModel,
             Function<String, Model> resolver,
             String subagentName) {
+        // ① 没有覆盖声明 → 直接用父模型
         if (modelOverride == null || modelOverride.isBlank()) {
             return parentModel;
         }
+        // ② 选择解析器：自定义 > ModelRegistry
         Function<String, Model> effectiveResolver =
                 resolver != null ? resolver : ModelRegistry::resolve;
+        // ③  尝试解析
         if (ModelRegistry.canResolve(modelOverride) || resolver != null) {
             try {
                 Model resolved = effectiveResolver.apply(modelOverride);

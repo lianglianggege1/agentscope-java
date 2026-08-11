@@ -55,6 +55,13 @@ import reactor.core.publisher.Flux;
  * ({@code Flux<AgentEvent>}) path instead of the deprecated {@code stream()} ({@code Flux<Event>})
  * path.
  */
+/**
+ * 校验同步本地子智能体调用可将子级{@link AgentEvent}事件推送至父智能体的{@link HarnessAgent#streamEvents}事件管道，
+ * 事件携带非空来源路径{@link AgentEvent#getSource()}，并标注子智能体编号。
+ *
+ * <p>本测试对标{@link HarnessAgentSubagentStreamTest}，仅采用streamEvents()（Flux<AgentEvent>）新链路，
+ * 不再使用已废弃的stream()（Flux<Event>）旧链路。
+ */
 class HarnessAgentSubagentStreamEventsTest {
 
     @TempDir Path workspace;
@@ -81,11 +88,28 @@ class HarnessAgentSubagentStreamEventsTest {
     // Helpers
     // -----------------------------------------------------------------
 
+    /**
+     * 构造一个"停止块"响应：模型返回纯文本内容并结束当前轮次（finishReason="stop"）。
+     * 模拟模型推理完成后输出文本、不再调用工具的行为。
+     *
+     * @param id   响应唯一标识
+     * @param text 模型输出的文本内容
+     * @return finishReason="stop" 的 ChatResponse，内容仅含一个 TextBlock
+     */
     private static ChatResponse stopChunk(String id, String text) {
         return new ChatResponse(
                 id, List.of(TextBlock.builder().text(text).build()), null, Map.of(), "stop");
     }
 
+    /**
+     * 构造一个"工具调用块"响应：模型返回一个 ToolUseBlock，触发 agent 执行指定工具。
+     * 模拟模型决定调用工具（如 agent_spawn）而非直接输出文本的行为。
+     *
+     * @param id       响应唯一标识，工具调用 ID 会拼接为 "tc-{id}"
+     * @param toolName 要调用的工具名称（如 "agent_spawn"）
+     * @param in       工具输入参数（Map 结构，会被序列化为 JSON）
+     * @return finishReason="tool_use" 的 ChatResponse，内容仅含一个 ToolUseBlock
+     */
     private static ChatResponse toolCallChunk(String id, String toolName, Map<String, Object> in) {
         String contentJson = io.agentscope.core.util.JsonUtils.getJsonCodec().toJson(in);
         ToolUseBlock tc =

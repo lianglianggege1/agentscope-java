@@ -59,6 +59,7 @@ public class TaskTool {
 
     private final TaskRepository taskRepository;
 
+    /** 构造器：注入任务仓库，负责任务的存取、取消与持久化降级读取。 */
     public TaskTool(TaskRepository taskRepository) {
         this.taskRepository = taskRepository;
     }
@@ -91,6 +92,14 @@ public class TaskTool {
                                     "最大等待时长，单位毫秒（默认：30000，上限：600000）",
                             required = false)
                     Long timeout) { }
+     */
+    /**
+     * {@code task_output} 工具方法：获取后台任务的输出结果。
+     *
+     * <p>执行流程：按 task_id 从仓库查找任务（限定当前父会话）→
+     * 更新最近查看时间 → block 模式下等待完成（上限受 timeout 约束）→
+     * 若仍未完成则提示可能在其他节点运行 → 终态结果标记为已投递
+     * （避免 SubagentsMiddleware 重复推送）→ 格式化输出任务详情。
      */
     @Tool(
             name = "task_output",
@@ -143,6 +152,8 @@ public class TaskTool {
         if (shouldBlock && !bgTask.isCompleted()) {
             // If the task has no local future (cross-node or post-restart), degrade gracefully
             // instead of blocking indefinitely on an incomplete synthetic future.
+            // 若任务在本地没有对应 Future（跨节点或重启后场景），优雅降级处理，
+            // 而不是在不完整的合成 Future 上无限阻塞。
             if (bgTask.getTaskStatus() == TaskStatus.PENDING
                     || bgTask.getTaskStatus() == TaskStatus.RUNNING) {
                 try {
@@ -152,6 +163,7 @@ public class TaskTool {
                     return "Error: Wait for task interrupted";
                 }
                 // After waiting, if still not complete it may be running on another node
+                // 等待后若仍未完成，任务可能正在其他节点上运行
                 if (!bgTask.isCompleted()) {
                     return "task_id: "
                             + taskId
@@ -165,11 +177,14 @@ public class TaskTool {
         // If the caller successfully retrieved a terminal result, mark this task delivered so the
         // SubagentsMiddleware push path doesn't re-deliver the same payload on the next reasoning
         // round. Idempotent — if already delivered, this is a no-op. (Phase B-3.)
+        // 调用方成功获取终态结果后，将任务标记为已投递，避免 SubagentsMiddleware
+        // 的推送路径在下一轮推理时重复投递相同内容。幂等操作——已投递时为空操作。
         if (bgTask.isCompleted() && bgTask.getTaskStatus().isTerminal()) {
             try {
                 taskRepository.markDelivered(runtimeContext, sessionId, taskId);
             } catch (RuntimeException ignore) {
                 // Marking is best-effort; failure just risks a redundant push, never wrong data.
+                // 标记为尽力而为；失败最多导致一次重复推送，不会产生错误数据。
             }
         }
         return formatTaskDetail(bgTask);
@@ -184,6 +199,10 @@ public class TaskTool {
     public String taskCancel(
             RuntimeContext runtimeContext,
             @ToolParam(name = "task_id", description = "待取消任务的 task_id") String taskId) {}
+     */
+    /**
+     * {@code task_cancel} 工具方法：取消正在运行的后台任务。
+     * 已处于终态（完成/失败/已取消）的任务无法取消，直接返回当前状态。
      */
     @Tool(
             name = "task_cancel",
@@ -235,6 +254,11 @@ public class TaskTool {
                             required = false)
                     String statusFilter) {}
      */
+    /**
+     * {@code task_list} 工具方法：列出当前会话下所有后台任务及其实时状态。
+     * 数据来源于持久化工作区存储，支持按状态过滤；
+     * 每个任务输出 task_id、所属智能体、状态与创建时间。
+     */
     @Tool(
             name = "task_list",
             description =
@@ -278,6 +302,7 @@ public class TaskTool {
         return sb.toString().trim();
     }
 
+    /** 解析状态过滤参数：空值/"all"/非法值均返回 null（表示不过滤）。 */
     private static TaskStatus parseStatusFilter(String filter) {
         if (filter == null || filter.isBlank() || "all".equalsIgnoreCase(filter.trim())) {
             return null;
@@ -289,6 +314,7 @@ public class TaskTool {
         }
     }
 
+    /** 格式化单个任务详情：依次输出 task_id、agent_id、状态、创建时间，以及结果/错误/运行中提示。 */
     private static String formatTaskDetail(BackgroundTask task) {
         StringBuilder sb = new StringBuilder();
         sb.append("task_id: ").append(task.getTaskId()).append('\n');

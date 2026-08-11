@@ -56,12 +56,14 @@ public class AgentGenerateTool {
     private static final Logger log = LoggerFactory.getLogger(AgentGenerateTool.class);
 
     /** Subagent ids must be kebab-case identifiers; matches {@code AgentSpecLoader} expectations. */
+    /** 子智能体标识必须为 kebab-case 格式；与 {@code AgentSpecLoader} 的命名约定保持一致。 */
     private static final Pattern NAME_PATTERN = Pattern.compile("[a-z][a-z0-9-]{0,62}");
 
     private final SubagentSpecGenerator generator;
     private final DefaultAgentManager agentManager;
     private final AbstractFilesystem filesystem;
 
+    /** 构造器：注入配置生成器、智能体管理器（用于重名检测）与可选文件系统（用于持久化）。 */
     public AgentGenerateTool(
             SubagentSpecGenerator generator,
             DefaultAgentManager agentManager,
@@ -98,6 +100,13 @@ public class AgentGenerateTool {
                                     "设为 true 时仅返回生成的 Markdown 文本，不持久化保存（默认 false）。",
                             required = false)
                     Boolean dryRun) {}
+     */
+    /**
+     * {@code agent_generate}：由自然语言描述生成子智能体配置。校验流程：
+     * 名称必填且须为 kebab-case → 描述必填 → 与运行态注册表做重名检测 →
+     * 委托 {@link SubagentSpecGenerator#generateAndValidate} 生成并校验 →
+     * dry_run=true 仅返回预览文本；否则写入 {@code subagents/<name>.md}，
+     * 写入失败时连同生成的配置一并返回以便排查。
      */
     @Tool(
             name = "agent_generate",

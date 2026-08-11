@@ -61,6 +61,17 @@ import reactor.core.publisher.Flux;
  * child → parent turn 2) yields the appropriate {@link ChatResponse}. This mirrors how
  * {@code buildDeclaredFactory} captures {@code this.model} for child agents.
  */
+/**
+ * 验证同步本地子代理调用会将子代理产生的{@link Event}转发至父代理
+ * {@link HarnessAgent#stream(List, StreamOptions, RuntimeContext)} 流水线，
+ * 事件绑定非空{@link EventSource}，携带正确的agentId与调用路径。
+ *
+ * <p>同时验证非流式call调用链路不受影响：最终回复以单个{@link Msg}返回，行为保持不变。
+ *
+ * <p><b>模型调用时序说明：</b>父、子代理共用同一个Model模拟对象。
+ * 该模拟对象通过链式thenReturn配置返回值，依次执行父首轮调用→子代理调用→父次轮调用，
+ * 逐级返回匹配场景的{@link ChatResponse}。该配置逻辑与buildDeclaredFactory为子代理注入当前model的实际逻辑保持一致。
+ */
 class HarnessAgentSubagentStreamTest {
 
     @TempDir Path workspace;
@@ -131,6 +142,24 @@ class HarnessAgentSubagentStreamTest {
      *   <li>Some events have {@code source.agentId == "researcher"}.
      *   <li>The {@code source.path} contains {@code "researcher"}.
      *   <li>Events without {@code source} exist (parent's own events).
+     * </ul>
+     */
+    /**
+     * 测试场景：
+     *
+     * <ol>
+     *   <li>父代理首轮模型调用 → 执行{@code agent_spawn(researcher, …, timeout_seconds=60)}。
+     *   <li>子代理（researcher）模型调用 → 输出推理分片，随后给出最终回复。
+     *   <li>父代理次轮模型调用 → 输出结束语“summary done”。
+     * </ol>
+     *
+     * <p>收集得到的{@code Flux<Event>}预期结果：
+     *
+     * <ul>
+     *   <li>事件总数大于1（已合并子代理产生的事件）。
+     *   <li>部分事件的{@code source.agentId}取值为"researcher"。
+     *   <li>{@code source.path}字段包含字符串"researcher"。
+     *   <li>存在无来源标记的事件（父代理自身产生的事件）。
      * </ul>
      */
     @Test

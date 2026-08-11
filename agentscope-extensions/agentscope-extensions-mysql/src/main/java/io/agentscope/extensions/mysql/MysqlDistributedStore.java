@@ -51,6 +51,30 @@ import javax.sql.DataSource;
  *   <li>{@link JdbcSandboxExecutionGuard} — distributed lock via MySQL {@code GET_LOCK()}</li>
  * </ul>
  */
+/**
+ * 基于MySQL/JDBC实现的{@link DistributedStore}。
+ *
+ * <p>使用示例：
+ * <pre>{@code
+ * DataSource dataSource = ... // 数据源，可选用HikariCP、Druid等连接池
+ *
+ * HarnessAgent agent = HarnessAgent.builder()
+ *     .name("my-agent")
+ *     .model("dashscope:qwen-plus")
+ *     .distributedStore(MysqlDistributedStore.create(dataSource))
+ *     .filesystem(new DockerFilesystemSpec()
+ *             .image("ubuntu:24.04"))
+ *     .build();
+ * }</pre>
+ *
+ * <p>该配置包含以下组件：
+ * <ul>
+ *   <li>{@link MysqlAgentStateStore} — 用于在MySQL中持久化智能体会话状态</li>
+ *   <li>{@link JdbcStore} — 在MySQL中存储工作区文件系统键值对数据</li>
+ *   <li>{@link JdbcSnapshotSpec} — 将沙箱快照以二进制大对象(BLOB)形式存入MySQL</li>
+ *   <li>{@link JdbcSandboxExecutionGuard} — 依托MySQL内置{@code GET_LOCK()}函数实现分布式锁</li>
+ * </ul>
+ */
 public class MysqlDistributedStore implements DistributedStore {
 
     private final DataSource dataSource;
@@ -64,6 +88,12 @@ public class MysqlDistributedStore implements DistributedStore {
      *
      * @param dataSource JDBC data source for MySQL
      * @return a new MySQL distributed store
+     */
+    /**
+     * 创建MySQL分布式存储实例。
+     *
+     * @param dataSource MySQL对应的JDBC数据源
+     * @return 全新MySQL分布式存储对象
      */
     public static MysqlDistributedStore create(DataSource dataSource) {
         return new MysqlDistributedStore(dataSource);

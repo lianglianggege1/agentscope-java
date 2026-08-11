@@ -123,11 +123,13 @@ public final class ModelRegistry {
             throw new IllegalArgumentException("modelId must not be blank");
         }
 
+        // ① 查找已注册的命名模型（ModelRegistry.register(name, model)
         Model named = namedModels.get(trimmed);
         if (named != null) {
             return named;
         }
 
+        // ② 查找缓存
         ModelCacheKey cacheKey = cacheKey(trimmed, context);
         if (cacheKey != null) {
             Model cached = resolvedCache.get(cacheKey);
@@ -136,13 +138,17 @@ public final class ModelRegistry {
             }
         }
 
+        // ③ 查找用户注册的正则工厂（ModelRegistry.registerFactory(regex, factory)）
         ProviderEntry entry = findMatchingUserEntry(trimmed);
+        // ④ 查找 SPI 加载的 ModelProvider（如 openai:、gemini:、dashscope: 等）
         ModelProvider provider = entry == null ? findServiceProvider(trimmed, context) : null;
+        // ⑤ 都没找到，抛异常
         if (entry == null && provider == null) {
             throw new IllegalArgumentException(buildNotFoundMessage(trimmed));
         }
 
         try {
+            // ⑥ 创建模型实例并缓存
             Model created;
             if (entry != null) {
                 created = entry.factory().create(trimmed, context);
@@ -156,6 +162,7 @@ public final class ModelRegistry {
                                 + " returned null for: "
                                 + trimmed);
             }
+            // ⑦ 缓存创建的模型实例
             if (cacheKey != null) {
                 resolvedCache.put(cacheKey, created);
             }
@@ -238,9 +245,11 @@ public final class ModelRegistry {
 
     private static ModelProvider findServiceProvider(String modelId, ModelCreationContext context) {
         ModelProvider matched = null;
+        // 遍历所有通过 SPI 加载的 ModelProvider
         for (ModelProvider provider : loadServiceProviders()) {
             boolean supports;
             try {
+                // ① 检查该 Provider 是否支持这个 modelId
                 supports = provider.supports(modelId, context);
             } catch (RuntimeException | LinkageError e) {
                 logger.warn(
@@ -253,6 +262,7 @@ public final class ModelRegistry {
             if (!supports) {
                 continue;
             }
+            // ② 多个 Provider 都支持时，警告并使用第一个
             if (matched != null) {
                 logger.warn(
                         "Multiple ModelProvider implementations support model id \"{}\": {} and"

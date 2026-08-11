@@ -65,15 +65,50 @@ import javax.sql.DataSource;
  *   <li>SQL injection prevention through parameterized queries
  * </ul>
  */
+/**
+ * 基于MySQL数据库的会话实现类。
+ *
+ * <p>该实现将会话状态持久化至MySQL数据表，存储结构规则如下：
+ *
+ * <ul>
+ *   <li>单值状态：以JSON格式存储，条目索引item_index固定为0
+ *   <li>列表状态：列表每一项单独占一行，item_index依次取值0、1、2……
+ * </ul>
+ *
+ * <p>数据表结构（开启createIfNotExist=true时自动建表）：
+ *
+ * <pre>
+ * CREATE TABLE IF NOT EXISTS agentscope_sessions (
+ *     session_id VARCHAR(255) NOT NULL,
+ *     state_key VARCHAR(255) NOT NULL,
+ *     item_index INT NOT NULL DEFAULT 0,
+ *     state_data LONGTEXT NOT NULL,
+ *     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ *     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ *     PRIMARY KEY (session_id, state_key, item_index)
+ * ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ * </pre>
+ *
+ * <p>特性：
+ *
+ * <ul>
+ *   <li>列表增量存储：仅新增插入，无需读取改写原有数据
+ *   <li>基于Jackson实现类型安全的状态序列化
+ *   <li>支持数据表自动创建
+ *   <li>使用参数化查询，防止SQL注入攻击
+ * </ul>
+ */
 public class MysqlAgentStateStore implements AgentStateStore {
 
     private static final String DEFAULT_DATABASE_NAME = "agentscope";
     private static final String DEFAULT_TABLE_NAME = "agentscope_sessions";
 
     /** Suffix for hash storage keys. */
+    /** 哈希存储键的后缀。 */
     private static final String HASH_KEY_SUFFIX = ":_hash";
 
     /** item_index value for single state values. */
+    /** 单状态值对应的条目索引。 */
     private static final int SINGLE_STATE_INDEX = 0;
 
     /**
@@ -82,6 +117,12 @@ public class MysqlAgentStateStore implements AgentStateStore {
      * attacks through malicious database/table names.
      *
      * <p>Note: Identifiers containing hyphens require backtick escaping in SQL queries.
+     */
+    /**
+     * 用于校验数据库名与数据表名的正则表达式。仅允许字母、数字、下划线与连字符，
+     * 名称首字符必须为字母或下划线，以此防范利用恶意库名、表名发起的SQL注入攻击。
+     *
+     * <p>注意：包含连字符的标识符在SQL语句中需要使用反引号进行转义。
      */
     private static final Pattern IDENTIFIER_PATTERN = Pattern.compile("^[a-zA-Z_][a-zA-Z0-9_-]*$");
 
@@ -107,6 +148,16 @@ public class MysqlAgentStateStore implements AgentStateStore {
      * @throws IllegalArgumentException if dataSource is null
      * @throws IllegalStateException if database or table does not exist
      */
+    /**
+     * 采用默认配置构建MysqlAgentStateStore对象。
+     *
+     * <p>本构造器默认数据库名称为{@code agentscope}，数据表名称为{@code agentscope_sessions}，
+     * 不会自动创建数据库和数据表。数据库或数据表不存在时，会抛出{@link IllegalStateException}。
+     *
+     * @param dataSource 数据库连接所用数据源
+     * @throws IllegalArgumentException 数据源为null时抛出该异常
+     * @throws IllegalStateException 数据库或数据表不存在时抛出该异常
+     */
     public MysqlAgentStateStore(DataSource dataSource) {
         this(dataSource, DEFAULT_DATABASE_NAME, DEFAULT_TABLE_NAME, false);
     }
@@ -123,6 +174,18 @@ public class MysqlAgentStateStore implements AgentStateStore {
      * @param createIfNotExist If true, auto-create database and table; if false, require existing
      * @throws IllegalArgumentException if dataSource is null
      * @throws IllegalStateException if createIfNotExist is false and database/table does not exist
+     */
+    /**
+     * 构建MysqlAgentStateStore，可选择是否自动创建数据库与数据表。
+     *
+     * <p>本构造器默认数据库名为{@code agentscope}，数据表名为{@code agentscope_sessions}。
+     * 当{@code createIfNotExist}为true时，库、表不存在则自动创建；
+     * 该参数为false且库、表缺失时，将抛出{@link IllegalStateException}异常。
+     *
+     * @param dataSource 数据库连接数据源
+     * @param createIfNotExist 为true则自动建库建表；为false则要求库表必须已存在
+     * @throws IllegalArgumentException 数据源为null时抛出
+     * @throws IllegalStateException createIfNotExist为false且库/表不存在时抛出
      */
     public MysqlAgentStateStore(DataSource dataSource, boolean createIfNotExist) {
         this(dataSource, DEFAULT_DATABASE_NAME, DEFAULT_TABLE_NAME, createIfNotExist);
@@ -141,6 +204,19 @@ public class MysqlAgentStateStore implements AgentStateStore {
      * @param createIfNotExist If true, auto-create database and table; if false, require existing
      * @throws IllegalArgumentException if dataSource is null
      * @throws IllegalStateException if createIfNotExist is false and database/table does not exist
+     */
+    /**
+     * 自定义数据库名、数据表名并可配置自动创建选项，构建MysqlAgentStateStore实例。
+     *
+     * <p>若{@code createIfNotExist}为true，数据库与数据表不存在时会自动创建；
+     * 若该参数为false且库、表不存在，则抛出{@link IllegalStateException}异常。
+     *
+     * @param dataSource 数据库连接数据源
+     * @param databaseName 自定义数据库名称，为null或空字符串时使用默认名称
+     * @param tableName 自定义数据表名称，为null或空字符串时使用默认名称
+     * @param createIfNotExist 为true则自动创建库和表；为false则要求库表必须预先存在
+     * @throws IllegalArgumentException 数据源为null时抛出该异常
+     * @throws IllegalStateException createIfNotExist为false且数据库/数据表不存在时抛出该异常
      */
     public MysqlAgentStateStore(
             DataSource dataSource,

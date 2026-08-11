@@ -52,6 +52,7 @@ public class MemorySaveTool {
 
     private final WorkspaceManager workspaceManager;
 
+    /** 构造器：注入工作空间管理器，负责记忆文件的追加写入。 */
     public MemorySaveTool(WorkspaceManager workspaceManager) {
         this.workspaceManager = workspaceManager;
     }
@@ -72,6 +73,13 @@ public class MemorySaveTool {
                                             + "- 用户偏好深色模式\\n"
                                             + "- 项目截止日期为2026-07-01")
                     String content) {}
+     */
+    /**
+     * {@code memory_save} 工具方法：把一条或多条事实持久写入长期记忆。
+     *
+     * <p>执行流程：校验内容非空 → 追加写入 {@code MEMORY.md} →
+     * 同步写入当日日志 {@code memory/YYYY-MM-DD.md}（带时间戳小节标题）→
+     * 统计 Markdown 无序列表条目数并返回保存结果摘要。
      */
     @Tool(
             name = "memory_save",
@@ -98,8 +106,10 @@ public class MemorySaveTool {
 
         String section = "\n" + content.strip() + "\n";
 
+        // 写入长期记忆主文件 MEMORY.md（追加模式）。
         workspaceManager.appendUtf8WorkspaceRelative(rc, WorkspaceConstants.MEMORY_MD, section);
 
+        // 写入当日日志文件 memory/YYYY-MM-DD.md，附时间戳小节标题便于回溯。
         String today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
         String dailyPath = WorkspaceConstants.MEMORY_DIR + "/" + today + ".md";
         String dailyEntry =

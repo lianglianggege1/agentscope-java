@@ -27,8 +27,17 @@ import java.util.List;
  * @param messages the outbound messages
  * @param timestampMs when the envelope was created
  */
+/**
+ * 由网关投递到 {@link ChatUiChannel} 的缓冲式主动出站消息信封。
+ * 调用方通过 {@link ChatUiChannel#pollOutbound()} 拉取这些消息。
+ *
+ * @param address 投递目标地址
+ * @param messages 出站消息列表
+ * @param timestampMs 信封创建时间（毫秒时间戳）
+ */
 public record OutboundEnvelope(OutboundAddress address, List<Msg> messages, long timestampMs) {
 
+    /** 便捷构造器：自动取当前时间戳，并对消息列表做防御性拷贝。 */
     public OutboundEnvelope(OutboundAddress address, List<Msg> messages) {
         this(address, List.copyOf(messages), System.currentTimeMillis());
     }

@@ -53,6 +53,31 @@ import redis.clients.jedis.UnifiedJedis;
  *   <li>{@link RedisSandboxExecutionGuard} — sandbox concurrency lock (auto-wired for sandbox mode)</li>
  * </ul>
  */
+/**
+ * 基于Redis实现的{@link DistributedStore}，通过单个Jedis连接统一配置全部分布式存储组件。
+ *
+ * <p>使用示例：
+ * <pre>{@code
+ * JedisPooled jedis = new JedisPooled("redis://localhost:6379");
+ * RedisDistributedStore store = RedisDistributedStore.fromJedis(jedis);
+ *
+ * HarnessAgent agent = HarnessAgent.builder()
+ *     .name("my-agent")
+ *     .model("dashscope:qwen-plus")
+ *     .distributedStore(store)
+ *     .filesystem(new RemoteFilesystemSpec(store.baseStore())
+ *             .isolationScope(IsolationScope.USER))
+ *     .build();
+ * }</pre>
+ *
+ * <p>该组件提供以下能力：
+ * <ul>
+ *   <li>{@link RedisAgentStateStore} — 智能体会话状态（由distributedStore自动装配）</li>
+ *   <li>{@link RedisStore} — 工作区文件系统键值存储（通过{@link #baseStore()}获取）</li>
+ *   <li>{@link RedisSnapshotSpec} — 沙箱快照存储（沙箱模式下自动装配）</li>
+ *   <li>{@link RedisSandboxExecutionGuard} — 沙箱并发锁（沙箱模式下自动装配）</li>
+ * </ul>
+ */
 public class RedisDistributedStore implements DistributedStore {
 
     private final UnifiedJedis jedis;
@@ -69,6 +94,12 @@ public class RedisDistributedStore implements DistributedStore {
      * @param jedis initialized Jedis client (e.g. {@code new JedisPooled("redis://localhost:6379")})
      * @return a new Redis distributed store
      */
+    /**
+     * 使用默认键前缀，基于Jedis客户端创建Redis分布式存储实例。
+     *
+     * @param jedis 已初始化的Jedis客户端（例如：{@code new JedisPooled("redis://localhost:6379")}）
+     * @return 全新的Redis分布式存储对象
+     */
     public static RedisDistributedStore fromJedis(UnifiedJedis jedis) {
         return new RedisDistributedStore(jedis, null);
     }
@@ -79,6 +110,13 @@ public class RedisDistributedStore implements DistributedStore {
      * @param jedis initialized Jedis client
      * @param keyPrefix prefix for all Redis keys (e.g. {@code "myapp:"})
      * @return a new Redis distributed store
+     */
+    /**
+     * 使用自定义键前缀，基于Jedis客户端创建Redis分布式存储实例。
+     *
+     * @param jedis 已初始化的Jedis客户端
+     * @param keyPrefix 全部Redis键的前缀（例如：{@code "myapp:"}）
+     * @return 全新的Redis分布式存储对象
      */
     public static RedisDistributedStore fromJedis(UnifiedJedis jedis, String keyPrefix) {
         return new RedisDistributedStore(jedis, keyPrefix);

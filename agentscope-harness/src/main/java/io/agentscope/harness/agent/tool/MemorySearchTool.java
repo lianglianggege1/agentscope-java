@@ -45,6 +45,7 @@ public class MemorySearchTool {
 
     private final WorkspaceManager workspaceManager;
 
+    /** 构造器：注入工作空间管理器，用于枚举并读取记忆文件。 */
     public MemorySearchTool(WorkspaceManager workspaceManager) {
         this.workspaceManager = workspaceManager;
     }
@@ -60,6 +61,10 @@ public class MemorySearchTool {
             RuntimeContext runtimeContext,
             @ToolParam(name = "query", description = "在记忆文件中进行检索的关键词")
                     String query) {}
+     */
+    /**
+     * {@code memory_search} 工具方法：在长期记忆文件中按关键词检索。
+     * 校验查询词非空后委托 {@link #keywordSearch} 执行实际检索。
      */
     @Tool(
             name = "memory_search",
@@ -80,6 +85,11 @@ public class MemorySearchTool {
         return keywordSearch(rc, query);
     }
 
+    /**
+     * 关键词检索核心实现：遍历所有记忆文件，逐行做大小写不敏感的
+     * 字面量子串匹配（{@link Pattern#quote} 转义避免正则注入），
+     * 命中行以 {@code "Source: 路径#行号: 内容"} 格式汇总返回。
+     */
     private String keywordSearch(RuntimeContext rc, String query) {
         StringJoiner results = new StringJoiner("\n");
         int matchCount = 0;

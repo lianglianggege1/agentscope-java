@@ -31,5 +31,18 @@ import io.agentscope.harness.agent.gateway.MsgContext;
  * @param outboundAddress delivery target for proactive replies (e.g. subagent announces); derived
  *     from the inbound message's channel and peer metadata
  */
+/**
+ * {@link ChannelRouter#resolveRoute} 的输出：解析出的智能体 ID、要传给
+ * {@link io.agentscope.harness.agent.gateway.Gateway#run} 的 {@link MsgContext}、
+ * 指示结果来自哪个绑定层级（或回退）的诊断标签 {@code matchedBy}，
+ * 以及用于把回复投递回发起通道/对端的 {@link OutboundAddress}。
+ *
+ * @param agentId 解析出的目标智能体 ID
+ * @param context 可直接用于网关执行的路由上下文（通道、会话作用域键、agentId extra）
+ * @param matchedBy 命中的绑定层级的可读标签（例如 {@code "peer"}、
+ *     {@code "guild+roles"}、{@code "default"}）；便于调试与日志
+ * @param outboundAddress 主动回复（例如子智能体公告）的投递目标；
+ *     由入站消息的通道与对端元数据推导
+ */
 public record RouteResult(
         String agentId, MsgContext context, String matchedBy, OutboundAddress outboundAddress) {}

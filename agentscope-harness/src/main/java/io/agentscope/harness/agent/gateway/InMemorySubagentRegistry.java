@@ -23,10 +23,15 @@ import java.util.concurrent.ConcurrentHashMap;
  * Default single-process {@link SubagentRegistry}. Records live only for the JVM's lifetime; this
  * preserves the legacy in-memory exposure behaviour when no distributed store is configured.
  */
+/**
+ * 默认的单进程 {@link SubagentRegistry}。记录仅在 JVM 生命周期内存活；
+ * 在未配置分布式存储时保持旧版的内存暴露行为。
+ */
 public final class InMemorySubagentRegistry implements SubagentRegistry {
 
     private final ConcurrentHashMap<String, SubagentRecord> records = new ConcurrentHashMap<>();
 
+    /** 注册记录；记录或 subagentId 为 null 时忽略。 */
     @Override
     public void register(SubagentRecord record) {
         if (record == null || record.subagentId() == null) {
@@ -35,6 +40,7 @@ public final class InMemorySubagentRegistry implements SubagentRegistry {
         records.put(record.subagentId(), record);
     }
 
+    /** 查找记录；命中后校验过期时间，已过期则惰性移除并视为不存在。 */
     @Override
     public Optional<SubagentRecord> find(String subagentId) {
         if (subagentId == null) {
@@ -51,6 +57,7 @@ public final class InMemorySubagentRegistry implements SubagentRegistry {
         return Optional.of(r);
     }
 
+    /** 撤销单条记录；ID 为 null 时忽略。 */
     @Override
     public void revoke(String subagentId) {
         if (subagentId != null) {
@@ -58,6 +65,7 @@ public final class InMemorySubagentRegistry implements SubagentRegistry {
         }
     }
 
+    /** 撤销归属指定父会话的全部记录（遍历过滤）。 */
     @Override
     public void revokeByParentSession(String parentSessionId) {
         if (parentSessionId == null) {

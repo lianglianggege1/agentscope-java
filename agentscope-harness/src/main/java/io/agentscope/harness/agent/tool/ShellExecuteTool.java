@@ -35,6 +35,7 @@ public class ShellExecuteTool {
 
     private final AbstractSandboxFilesystem sandbox;
 
+    /** 构造器：注入沙箱文件系统实现，所有命令均在其中执行。 */
     public ShellExecuteTool(AbstractSandboxFilesystem sandbox) {
         this.sandbox = sandbox;
     }
@@ -63,6 +64,14 @@ public class ShellExecuteTool {
      * @param runtimeContext 框架注入的单次调用智能体运行时上下文（不属于大模型入参）；
      *     无合并上下文时可为 {@code null}
      */
+    /**
+     * {@code execute} 工具方法：在沙箱中执行 Shell 命令。
+     *
+     * <p>执行流程：若提供 working_directory，先校验其为工作空间内相对路径
+     * （拒绝绝对路径、{@code ~} 与 {@code ..}），再以 {@code cd '<目录>' && 命令}
+     * 形式拼接；随后交由沙箱执行（默认超时 30 秒），最终返回
+     * 退出码、合并输出及截断提示。
+     */
     @Tool(
             description =
                     "Execute a shell command. Use for git, npm, build, test, and other terminal"
@@ -80,10 +89,12 @@ public class ShellExecuteTool {
         String effectiveCommand = command;
         if (workingDirectory != null && !workingDirectory.isBlank()) {
             String wd = workingDirectory.strip();
+            // 路径穿越防护：只允许工作空间内的相对路径。
             if (wd.startsWith("/") || wd.startsWith("~") || wd.contains("..")) {
                 return "Error: working_directory must be a relative path within the workspace"
                         + " (absolute paths, '~', and '..' are not allowed).";
             }
+            // 对目录中的单引号做 shell 转义后拼接 cd 前缀。
             effectiveCommand = "cd '" + wd.replace("'", "'\\''") + "' && " + command;
         }
 

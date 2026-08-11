@@ -39,11 +39,26 @@ import org.slf4j.LoggerFactory;
  * {@link io.agentscope.core.state.AgentStateStore} (and {@link BaseStore#putIfVersion} where
  * explicit optimistic guarding is desired), not of this registry.
  */
+/**
+ * 基于 {@link BaseStore} 的分布式 {@link SubagentRegistry}。由于存储由
+ * {@link io.agentscope.harness.agent.DistributedStore}（Redis / 对象存储 / MySQL）提供，
+ * 暴露记录对所有节点可见，任意副本都能解析 {@code subagentId} 并重建子智能体。
+ *
+ * <p>记录存储在命名空间 {@code ["subagents", "exposed"]} 下，以
+ * {@code subagentId} 为键。TTL 在 {@link #find} 时惰性执行：
+ * 已过期的记录会被删除并按不存在处理。
+ *
+ * <p>本注册表有意只存储路由/身份元数据。子智能体可变会话状态的并发安全
+ * 由分布式 {@link io.agentscope.core.state.AgentStateStore} 负责
+ * （需要显式乐观锁时可用 {@link BaseStore#putIfVersion}），不属于本注册表的职责。
+ */
 public final class StoreBackedSubagentRegistry implements SubagentRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(StoreBackedSubagentRegistry.class);
 
+    /** 记录存储命名空间：["subagents", "exposed"]。 */
     private static final List<String> NAMESPACE = List.of("subagents", "exposed");
+    /** 按父会话撤销时扫描存储的分页大小。 */
     private static final int SCAN_PAGE_SIZE = 1000;
 
     private final BaseStore store;
@@ -52,6 +67,7 @@ public final class StoreBackedSubagentRegistry implements SubagentRegistry {
         this.store = Objects.requireNonNull(store, "store");
     }
 
+    /** 持久化记录到存储；写入失败仅告警不抛出。 */
     @Override
     public void register(SubagentRecord record) {
         if (record == null || record.subagentId() == null) {
@@ -67,6 +83,10 @@ public final class StoreBackedSubagentRegistry implements SubagentRegistry {
         }
     }
 
+    /**
+     * 从存储读取记录并反序列化；读取失败或记录不存在返回空；
+     * 已过期的记录立即撤销并视为不存在。
+     */
     @Override
     public Optional<SubagentRecord> find(String subagentId) {
         if (subagentId == null) {
@@ -93,6 +113,7 @@ public final class StoreBackedSubagentRegistry implements SubagentRegistry {
         return Optional.of(record);
     }
 
+    /** 从存储删除单条记录；删除失败仅告警不抛出。 */
     @Override
     public void revoke(String subagentId) {
         if (subagentId == null) {
@@ -105,6 +126,10 @@ public final class StoreBackedSubagentRegistry implements SubagentRegistry {
         }
     }
 
+    /**
+     * 按父会话撤销：存储不支持按父键检索，这里扫描命名空间首页条目，
+     * 逐条反序列化后筛出归属该父会话的记录并撤销。
+     */
     @Override
     public void revokeByParentSession(String parentSessionId) {
         if (parentSessionId == null) {

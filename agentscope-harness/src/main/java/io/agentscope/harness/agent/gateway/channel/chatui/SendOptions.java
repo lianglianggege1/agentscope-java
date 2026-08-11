@@ -51,29 +51,67 @@ import java.util.Objects;
  * @param sessionId optional conversation identifier; null means one session per user
  * @param agentId optional target agent override; null for default routing
  */
+/**
+ * {@link ChatUiChannel} 请求的路由身份。让调用方通过简单的业务标识表达路由意图，
+ * 从而无需理解 {@link io.agentscope.harness.agent.gateway.channel.DmScope}。
+ *
+ * <ul>
+ *   <li>{@code userId} —— 标识用户。映射到
+ *       {@link io.agentscope.harness.agent.gateway.MsgContext#userId()}
+ *       用于 HarnessAgent 命名空间隔离；当 {@code sessionId} 为 null 时，
+ *       同时作为默认会话键。
+ *   <li>{@code sessionId} —— 可选的显式会话标识。提供时同一用户的不同会话
+ *       相互隔离；为 null 时默认每个用户一个会话。
+ *   <li>{@code agentId} —— 多智能体场景下可选的目标智能体覆盖。
+ *       为 null 时使用通道的默认智能体。
+ * </ul>
+ *
+ * <h2>用法</h2>
+ *
+ * <pre>{@code
+ * // 每用户一个会话（最常见）
+ * chat.send(SendOptions.userId("user-1"), "hello");
+ *
+ * // 同一用户、不同会话
+ * chat.send(SendOptions.of("user-1", "session-a"), "hello");
+ * chat.send(SendOptions.of("user-1", "session-b"), "hello");
+ *
+ * // 多智能体场景下指定目标智能体
+ * chat.send(SendOptions.userId("user-1").withAgentId("support"), "help me");
+ * }</pre>
+ *
+ * @param userId 用户身份（必填）
+ * @param sessionId 可选的会话标识；null 表示每用户一个会话
+ * @param agentId 可选的目标智能体覆盖；null 表示默认路由
+ */
 public record SendOptions(String userId, String sessionId, String agentId) {
 
+    /** 紧凑构造器：校验 userId 非 null。 */
     public SendOptions {
         Objects.requireNonNull(userId, "userId");
     }
 
     /** One session per user — the most common case. */
+    /** 每用户一个会话——最常见的场景。 */
     public static SendOptions userId(String userId) {
         return new SendOptions(userId, null, null);
     }
 
     /** Explicit user + session — multiple conversations for the same user. */
+    /** 显式用户 + 会话——同一用户的多个会话。 */
     public static SendOptions of(String userId, String sessionId) {
         Objects.requireNonNull(sessionId, "sessionId");
         return new SendOptions(userId, sessionId, null);
     }
 
     /** Returns a copy with the given agent id override. */
+    /** 返回应用了指定 agentId 覆盖的副本。 */
     public SendOptions withAgentId(String agentId) {
         return new SendOptions(userId, sessionId, agentId);
     }
 
     /** The effective session key: sessionId if provided, otherwise userId. */
+    /** 生效的会话键：提供 sessionId 时优先使用，否则使用 userId。 */
     String effectiveSessionKey() {
         return sessionId != null ? sessionId : userId;
     }

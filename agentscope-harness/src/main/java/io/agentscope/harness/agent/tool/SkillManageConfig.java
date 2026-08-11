@@ -51,6 +51,7 @@ public final class SkillManageConfig {
     private final String draftsDir;
     private final String mainDir;
 
+    /** 私有构造器：只能通过 {@link Builder} 创建实例。 */
     private SkillManageConfig(Builder b) {
         this.autoPromote = b.autoPromote;
         this.securityScan = b.securityScan;
@@ -82,14 +83,17 @@ public final class SkillManageConfig {
         return mainDir;
     }
 
+    /** 返回默认配置实例（草稿暂存开启、安全扫描开启、禁止静默覆盖）。 */
     public static SkillManageConfig defaults() {
         return builder().build();
     }
 
+    /** 创建新的 {@link Builder}。 */
     public static Builder builder() {
         return new Builder();
     }
 
+    /** 配置构建器：提供企业级默认值，可按部署场景覆盖。 */
     public static final class Builder {
         private boolean autoPromote = false;
         private boolean securityScan = true;
@@ -98,16 +102,19 @@ public final class SkillManageConfig {
 
         private Builder() {}
 
+        /** 设置是否跳过草稿暂存、直接写入正式技能根目录。 */
         public Builder autoPromote(boolean autoPromote) {
             this.autoPromote = autoPromote;
             return this;
         }
 
+        /** 设置是否在每次写入后执行安全扫描。 */
         public Builder securityScan(boolean securityScan) {
             this.securityScan = securityScan;
             return this;
         }
 
+        /** 设置草稿目录（工作空间相对路径）；空白值忽略，保留默认。 */
         public Builder draftsDir(String draftsDir) {
             if (draftsDir != null && !draftsDir.isBlank()) {
                 this.draftsDir = draftsDir;
@@ -115,6 +122,7 @@ public final class SkillManageConfig {
             return this;
         }
 
+        /** 设置正式技能目录（工作空间相对路径）；空白值忽略，保留默认。 */
         public Builder mainDir(String mainDir) {
             if (mainDir != null && !mainDir.isBlank()) {
                 this.mainDir = mainDir;
@@ -122,6 +130,7 @@ public final class SkillManageConfig {
             return this;
         }
 
+        /** 构建不可变的 {@link SkillManageConfig} 实例。 */
         public SkillManageConfig build() {
             return new SkillManageConfig(this);
         }

@@ -54,6 +54,7 @@ public class ProposeSkillTool implements AgentTool {
 
     private final SkillManageTool delegate;
 
+    /** 构造器：注入被委托的 {@link SkillManageTool}，复用其完整的暂存/校验/扫描链路。 */
     public ProposeSkillTool(SkillManageTool delegate) {
         this.delegate = java.util.Objects.requireNonNull(delegate, "delegate");
     }
@@ -72,6 +73,7 @@ public class ProposeSkillTool implements AgentTool {
                 + " approach and want to commit it without re-deriving the SKILL.md format.";
     }
 
+    /** 构造工具入参 JSON Schema：name/description/body 必填，scripts 可选。 */
     @Override
     public Map<String, Object> getParameters() {
         Map<String, Object> properties = new LinkedHashMap<>();
@@ -113,6 +115,11 @@ public class ProposeSkillTool implements AgentTool {
         return schema;
     }
 
+    /**
+     * 工具执行主体：校验必填参数 → 拼接带 frontmatter 的 SKILL.md →
+     * 委托 {@code skill_manage(action=create)} 创建技能 →
+     * 成功后按序上传可选脚本列表 → 汇总结果返回。
+     */
     @Override
     public Mono<ToolResultBlock> callAsync(ToolCallParam param) {
         Map<String, Object> input = param.getInput();
@@ -135,6 +142,7 @@ public class ProposeSkillTool implements AgentTool {
         String skillMd = "---\nname: " + name + "\ndescription: " + description + "\n---\n" + body;
         // Step 1: create the skill via the existing SkillManageTool path (validation +
         // staging + scanner all reused).
+        // 第一步：经既有 SkillManageTool 路径创建技能（复用校验、暂存与扫描流程）。
         Map<String, Object> createInput = new HashMap<>();
         createInput.put("action", "create");
         createInput.put("name", name);
@@ -153,6 +161,8 @@ public class ProposeSkillTool implements AgentTool {
                             }
                             // Step 2: optional scripts. Delegate sequentially via skill_manage
                             // write_file (same staging / scan / sidecar plumbing).
+                            // 第二步：处理可选脚本列表。按序委托 skill_manage write_file 逐个上传
+                            //（复用同一套暂存、扫描与遥测机制）。
                             @SuppressWarnings("unchecked")
                             List<Map<String, Object>> scripts =
                                     (List<Map<String, Object>>) input.get("scripts");
@@ -176,6 +186,10 @@ public class ProposeSkillTool implements AgentTool {
                         });
     }
 
+    /**
+     * 按序上传脚本列表：每个脚本委托 {@code skill_manage(action=write_file)} 写入。
+     * path 与 content 缺失的条目直接跳过；path 不含目录分隔符时自动补 {@code scripts/} 前缀。
+     */
     private Mono<Void> uploadScripts(
             String name, List<Map<String, Object>> scripts, ToolCallParam parent) {
         return reactor.core.publisher.Flux.fromIterable(scripts)
@@ -187,6 +201,7 @@ public class ProposeSkillTool implements AgentTool {
                                 return Mono.empty();
                             }
                             // Default to scripts/<filename>.sh if the agent forgot the prefix.
+                            // 若智能体未带目录前缀，默认归入 scripts/<文件名>。
                             if (!path.contains("/")) {
                                 path = "scripts/" + path;
                             }
@@ -206,11 +221,13 @@ public class ProposeSkillTool implements AgentTool {
                 .then();
     }
 
+    /** 从 Map 中安全读取字符串值：不存在或非字符串时返回其 toString，键缺失返回 null。 */
     private static String stringOf(Map<String, Object> m, String key) {
         Object v = m.get(key);
         return v == null ? null : v.toString();
     }
 
+    /** 提取工具结果块中所有 {@code TextBlock} 的文本并拼接，用于判断结果内容。 */
     private static String textOf(ToolResultBlock r) {
         if (r == null || r.getOutput() == null) return "";
         StringBuilder sb = new StringBuilder();

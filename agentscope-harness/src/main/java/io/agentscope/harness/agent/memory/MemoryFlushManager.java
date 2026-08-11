@@ -71,33 +71,34 @@ public class MemoryFlushManager {
      {@link io.agentscope.harness.agent.memory.MemoryConfig} 时可进行扩展
     （例如追加项目专属约束）。
     */
-    public static final String DEFAULT_FLUSH_PROMPT =
+    /*public static final String DEFAULT_FLUSH_PROMPT =
             """
             你是记忆提取助手。分析下方对话内容，提取需要留存至后续会话的重要事实、决策、偏好与上下文信息。
 
-            仅以Markdown无序列表形式输出提取出的记忆内容。每条内容为简洁且独立完整的信息；存在日期、人名、具体细节时一并保留。
+            仅以Markdown无序列表形式输出提取出的记忆内容。
+            每条内容为简洁且独立完整的信息；存在日期(dates)、人名(names)、具体细节(specifics)时一并保留。
 
             若无值得记忆的内容，严格输出：NO_REPLY
 
-            提取准则：
-            - 提取用户偏好、个人信息、项目相关决议
-            - 记录关键技术决策及其背后理由
-            - 记下所有承诺、截止时间与待执行事项
-            - 留存人员协作信息（分工、团队架构）
-            - 忽略常规问候、工具调用、临时状态信息
+            提取准则(Guidelines)：
+            - 提取用户偏好(user preferences)、个人信息(personal)、项目相关决议(project decisions)
+            - 记录关键技术决策及其背后理由(Capture important technical decisions and their rationale)
+            - 记下所有承诺、截止时间与待执行事项(Note any commitments, deadlines, or action items)
+            - 留存人员协作信息（分工、团队架构）(Record relationship context (who works on what, team structure))
+            - 忽略常规问候、工具调用、临时状态信息(Ignore routine greetings, tool invocations, and ephemeral status updates)
 
             重要写入规则（目标文件为追加模式）：
             - 你写入的是**当日每日记忆账本（memory/YYYY-MM-DD.md）**，而非MEMORY.md。每日账本仅支持追加，你的输出会新增至已有记录末尾。
             - MEMORY.md 是经过整理的长期记忆文件，仅作为只读上下文提供参考。不要重复记录MEMORY.md或今日已存在的条目；后续独立的整合任务会定期将新增账本内容合并至MEMORY.md。
             - 每条记录保持独立完整，支持单独检索。
-            """;
+            """;*/
 
     /**
      * Default prompt for the memory extraction step. Exposed publicly so callers can extend
      * (e.g. append project-specific guidelines) when constructing
      * {@link io.agentscope.harness.agent.memory.MemoryConfig}.
      */
-    /*public static final String DEFAULT_FLUSH_PROMPT =
+    public static final String DEFAULT_FLUSH_PROMPT =
     """
     You are a memory extraction assistant. Analyze the conversation below and extract \
     important facts, decisions, preferences, and contextual information that should be \
@@ -124,7 +125,7 @@ public class MemoryFlushManager {
     separate consolidation step periodically merges new daily entries into MEMORY.md.
     - Keep each bullet point independent and self-contained so entries can be searched \
     individually.\
-    """;*/
+    """;
 
     private final WorkspaceManager workspaceManager;
 

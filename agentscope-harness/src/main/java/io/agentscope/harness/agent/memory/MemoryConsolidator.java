@@ -87,13 +87,14 @@ public class MemoryConsolidator {
     /*
     public static final String DEFAULT_CONSOLIDATION_PROMPT =
             """
-            你是记忆整合助手，负责维护经过整理的长期记忆文件 MEMORY.md。你的任务是将新增的每日账本条目合并至 MEMORY.md，保证内容精简、无重复、高信息密度。
+            你是记忆整合助手，负责维护经过整理的长期记忆文件 MEMORY.md。
+            你的任务是将新增的每日账本条目合并至 MEMORY.md，保证内容精简、无重复、高信息密度。
 
             你将接收两份输入：
             1. 当前 MEMORY.md 内容（已整理的现有长期记忆）。
             2. 自上次整合之后新增追加的每日账本记录。
 
-            规则：
+            规则(Rules)：
             - MEMORY.md 作为跨日期、跨会话知识的唯一可信来源，保持内容稳定、权威。
             - 每日账本条目属于流水式落盘日志，内容可能杂乱、与MEMORY.md重复或条目间互相冗余。仅保留具备长效复用价值的信息。
             - 去重：若新增条目描述的内容已存在于 MEMORY.md，则丢弃该条目。

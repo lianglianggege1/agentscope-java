@@ -24,6 +24,12 @@ import javax.sql.DataSource;
  *
  * <p>Stores sandbox workspace tar archives as BLOBs in a database table.
  */
+/**
+ * 便捷化的{@link io.agentscope.harness.agent.sandbox.snapshot.SandboxSnapshotSpec}实现，
+ * 用于基于JDBC的快照存储方案。
+ *
+ * <p>将沙箱工作空间打包文件以二进制大对象(BLOB)形式存储在数据库表中。
+ */
 public class JdbcSnapshotSpec extends RemoteSnapshotSpec {
 
     public JdbcSnapshotSpec(DataSource dataSource) {

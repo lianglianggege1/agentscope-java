@@ -52,9 +52,12 @@ import reactor.core.publisher.Mono;
 public class WorkspaceAsyncToolRegistry implements AsyncToolRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceAsyncToolRegistry.class);
+    /** 文件系统操作使用的空 RuntimeContext（注册器操作不依赖调用上下文）。 */
     private static final RuntimeContext RC = RuntimeContext.empty();
 
+    /** 底层文件系统抽象（本地/远端/沙箱均可）。 */
     private final AbstractFilesystem fs;
+    /** 注册表根目录（末尾斜杠已在构造时去除）。 */
     private final String registryRoot;
 
     /**
@@ -73,6 +76,10 @@ public class WorkspaceAsyncToolRegistry implements AsyncToolRegistry {
                         : registryRoot;
     }
 
+    /**
+     * 注册异步任务：把记录序列化为 JSON 写入
+     * {@code {registryRoot}/{sessionId}/{recordId}.json}（按会话分目录存放）。
+     */
     @Override
     public Mono<Void> register(AsyncToolRecord record) {
         return Mono.fromRunnable(
@@ -91,21 +98,29 @@ public class WorkspaceAsyncToolRegistry implements AsyncToolRegistry {
                 });
     }
 
+    /** 标记任务已完成：更新记录文件中的 status 字段为 COMPLETED。 */
     @Override
     public Mono<Void> complete(String id, String result) {
         return updateStatus(id, AsyncToolRecord.COMPLETED);
     }
 
+    /** 标记任务失败：更新记录文件中的 status 字段为 FAILED。 */
     @Override
     public Mono<Void> fail(String id, String error) {
         return updateStatus(id, AsyncToolRecord.FAILED);
     }
 
+    /** 标记任务超时：更新记录文件中的 status 字段为 TIMEOUT。 */
     @Override
     public Mono<Void> markTimeout(String id) {
         return updateStatus(id, AsyncToolRecord.TIMEOUT);
     }
 
+    /**
+     * 查找指定会话下的过期孤立任务：遍历会话目录的全部记录文件，
+     * 筛出状态仍为 RUNNING 且创建时间早于（当前时间 - ttl）的记录。
+     * 这类任务大概率因进程崩溃而失去宿主，由 InboxMiddleware 在会话恢复时通知模型。
+     */
     @Override
     public Mono<List<AsyncToolRecord>> findStale(String sessionId, Duration ttl) {
         return Mono.fromCallable(
@@ -135,6 +150,11 @@ public class WorkspaceAsyncToolRegistry implements AsyncToolRegistry {
                 });
     }
 
+    /**
+     * 状态更新核心逻辑：跨会话目录定位记录文件 → 读出原记录 →
+     * 删除旧文件后以新状态重写（文件系统无原子改写，采用删后重写）。
+     * 记录不存在或读取失败时静默跳过。
+     */
     private Mono<Void> updateStatus(String id, String newStatus) {
         return Mono.fromRunnable(
                 () -> {
@@ -159,6 +179,7 @@ public class WorkspaceAsyncToolRegistry implements AsyncToolRegistry {
                 });
     }
 
+    /** 读取并反序列化单条记录文件；读取失败或 JSON 解析异常时返回 null。 */
     private AsyncToolRecord readRecord(String path) {
         ReadResult rr = fs.read(RC, path, 0, Integer.MAX_VALUE);
         if (!rr.isSuccess() || rr.fileData() == null) {
@@ -181,6 +202,10 @@ public class WorkspaceAsyncToolRegistry implements AsyncToolRegistry {
         }
     }
 
+    /**
+     * 按记录 ID 全局定位文件路径：记录按会话分目录存放，
+     * 而状态更新只带 ID 不带会话，故需遍历全部会话目录查找同名文件。
+     */
     private String findRecordPath(String id) {
         LsResult rootLs = fs.ls(RC, registryRoot);
         if (!rootLs.isSuccess() || rootLs.entries() == null) {
@@ -198,20 +223,24 @@ public class WorkspaceAsyncToolRegistry implements AsyncToolRegistry {
         return null;
     }
 
+    /** 会话目录路径：{registryRoot}/{清洗后的 sessionId}。 */
     private String sessionDir(String sessionId) {
         return registryRoot + "/" + sanitize(sessionId);
     }
 
+    /** 记录文件路径：{会话目录}/{记录 ID}.json。 */
     private String recordPath(String sessionId, String id) {
         return sessionDir(sessionId) + "/" + id + ".json";
     }
 
+    /** 确保目录存在：不存在时写入一个 .keep 占位文件创建目录。 */
     private void ensureDir(String dir) {
         if (!fs.exists(RC, dir)) {
             fs.write(RC, dir + "/.keep", "");
         }
     }
 
+    /** 清洗字符串为安全目录名：非法字符替换为下划线；null 时用 "default" 兜底。 */
     private static String sanitize(String s) {
         return s != null ? s.replaceAll("[^a-zA-Z0-9._-]", "_") : "default";
     }

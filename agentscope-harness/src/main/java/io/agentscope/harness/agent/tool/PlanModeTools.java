@@ -59,23 +59,28 @@ import reactor.core.publisher.Mono;
 public final class PlanModeTools {
 
     /** Tool names that {@code PlanModeMiddleware} always allows, even in plan mode. */
+    /** {@code PlanModeMiddleware} 始终放行的工具名（即使在规划模式下）。 */
     public static final String PLAN_ENTER = "plan_enter";
 
     public static final String PLAN_WRITE = "plan_write";
     public static final String PLAN_EXIT = "plan_exit";
 
+    /** 工具类入口，不可实例化。 */
     private PlanModeTools() {}
 
+    /** 从工具调用参数中解析智能体状态（优先运行时上下文，其次参数中的智能体引用）。 */
     private static AgentState stateOf(ToolCallParam param) {
         return RuntimeContext.resolveAgentState(param.getRuntimeContext(), param.getAgent());
     }
 
+    /** 构造携带原工具调用 ID 与名称的文本结果块。 */
     private static ToolResultBlock result(ToolCallParam param, String text) {
         return ToolResultBlock.text(text)
                 .withIdAndName(param.getToolUseBlock().getId(), param.getToolUseBlock().getName());
     }
 
     /** {@code plan_enter}: enter read-only plan mode. */
+    /** {@code plan_enter}：进入只读规划模式。 */
     public static final class PlanEnterTool extends ToolBase {
         private final PlanModeManager manager;
 
@@ -96,6 +101,7 @@ public final class PlanModeTools {
             this.manager = manager;
         }
 
+        /** 执行进入规划模式：切换智能体状态为只读，并返回规划文件的存放路径提示。 */
         @Override
         public Mono<ToolResultBlock> callAsync(ToolCallParam param) {
             AgentState state = stateOf(param);
@@ -115,6 +121,7 @@ public final class PlanModeTools {
     }
 
     /** {@code plan_write}: create / overwrite the plan markdown file. */
+    /** {@code plan_write}：创建/覆盖规划 Markdown 文件。 */
     public static final class PlanWriteTool extends ToolBase {
         private final PlanModeManager manager;
 
@@ -145,6 +152,7 @@ public final class PlanModeTools {
             this.manager = manager;
         }
 
+        /** 执行写入规划：把入参 content 整体写入规划 Markdown 文件（全量覆盖）。 */
         @Override
         public Mono<ToolResultBlock> callAsync(ToolCallParam param) {
             AgentState state = stateOf(param);
@@ -160,6 +168,7 @@ public final class PlanModeTools {
     }
 
     /** {@code plan_exit}: request approval, then leave plan mode for BUILD. */
+    /** {@code plan_exit}：请求用户批准，随后退出规划模式进入执行（BUILD）模式。 */
     public static final class PlanExitTool extends ToolBase {
         private final PlanModeManager manager;
 
@@ -195,6 +204,11 @@ public final class PlanModeTools {
          * lightweight permission path honours an explicit ASK self-check even when no permission
          * rules are configured, so this works out of the box.
          */
+        /**
+         * 始终返回 ASK：退出规划模式是一次需要用户确认的刻意交接。
+         * 即使未配置任何权限规则，轻量级权限路径也会遵循显式的 ASK 自检，
+         * 因此开箱即用。
+         */
         @Override
         public Mono<PermissionDecision> checkPermissions(
                 Map<String, Object> toolInput, PermissionContextState context) {
@@ -205,6 +219,7 @@ public final class PlanModeTools {
         }
 
         /** Runs only after the user approves the ASK above. */
+        /** 仅在用户批准上述 ASK 请求后执行：退出规划模式并提示初始化任务清单。 */
         @Override
         public Mono<ToolResultBlock> callAsync(ToolCallParam param) {
             AgentState state = stateOf(param);

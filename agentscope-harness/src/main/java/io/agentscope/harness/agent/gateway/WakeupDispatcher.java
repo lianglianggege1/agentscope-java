@@ -44,10 +44,30 @@ import reactor.core.publisher.Mono;
  * <p>Lifecycle: call {@link #start()} after the gateway is fully configured. Call {@link #close()}
  * on shutdown. Typically managed by the application bootstrap or gateway factory.
  */
+/**
+ * 进程级分发器：在后台任务完成时唤醒空闲会话。
+ *
+ * <p>订阅 {@link MessageBus#subscribeWakeup()} 上的共享唤醒信号通道，
+ * 每收到一次信号就排空持久化唤醒队列。对每个目标会话处于空闲状态的队列条目，
+ * 通过 {@link WakeupTarget#runWakeup(String)} 触发新一轮推理。
+ *
+ * 它是所有跨会话通信的统一激活器：
+ *
+ * <ul>
+ *   <li>后台子智能体任务完成
+ *   <li>异步工具结果（{@link io.agentscope.harness.agent.middleware.AsyncToolMiddleware}）
+ *   <li>团队消息（未来 Agent Teams 支持）
+ *   <li>定时任务触发
+ * </ul>
+ *
+ * <p>生命周期：在网关完全配置好后调用 {@link #start()}；关闭时调用 {@link #close()}。
+ * 通常由应用引导或网关工厂管理。
+ */
 public class WakeupDispatcher implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(WakeupDispatcher.class);
 
+    /** 单次信号最多消费的唤醒队列条目数。 */
     private static final int MAX_DRAIN_COUNT = 64;
 
     private final MessageBus messageBus;
@@ -58,9 +78,15 @@ public class WakeupDispatcher implements AutoCloseable {
      * Thin interface for the two gateway operations the dispatcher needs. {@link HarnessGateway}
      * implements this directly; tests can supply a stub.
      */
+    /**
+     * 分发器所需的两个网关操作的细粒度接口。{@link HarnessGateway} 直接实现；
+     * 测试可提供桩实现。
+     */
     public interface WakeupTarget {
+        /** 指定会话当前是否有执行在进行。 */
         boolean isSessionRunning(String sessionId);
 
+        /** 对空闲会话发起一次唤醒驱动的推理执行。 */
         Mono<Msg> runWakeup(String sessionId);
     }
 
@@ -72,6 +98,10 @@ public class WakeupDispatcher implements AutoCloseable {
     /**
      * Starts the dispatcher: performs an initial drain of any queued wakeups (to pick up signals
      * produced while this process was down), then subscribes to the live signal channel.
+     */
+    /**
+     * 启动分发器：先执行一次初始排空（拾取本进程停机期间产生的唤醒信号），
+     * 然后订阅实时信号通道。
      */
     public void start() {
         drainAndDispatch();
@@ -88,6 +118,7 @@ public class WakeupDispatcher implements AutoCloseable {
         log.info("WakeupDispatcher started");
     }
 
+    /** 停止分发器：释放信号通道订阅。 */
     @Override
     public void close() {
         Disposable d = subscription;
@@ -98,6 +129,10 @@ public class WakeupDispatcher implements AutoCloseable {
         log.info("WakeupDispatcher stopped");
     }
 
+    /**
+     * 从唤醒队列（键 {@code "agentscope:wakeups"}）阻塞式消费最多
+     * {@link #MAX_DRAIN_COUNT} 条条目，逐条分发；整体异常仅告警不抛出。
+     */
     private void drainAndDispatch() {
         try {
             List<BusEntry> entries =
@@ -114,6 +149,11 @@ public class WakeupDispatcher implements AutoCloseable {
         }
     }
 
+    /**
+     * 分发单个唤醒条目：解析 sessionId/agentId；缺少 sessionId 跳过；
+     * 目标会话正在运行也跳过（其当前执行会自然排空收件箱）；
+     * 否则异步触发 {@link WakeupTarget#runWakeup}。
+     */
     private void dispatch(Map<String, Object> payload) {
         String sessionId = getString(payload, "sessionId");
         String agentId = getString(payload, "agentId");
@@ -145,6 +185,7 @@ public class WakeupDispatcher implements AutoCloseable {
                                         err));
     }
 
+    /** 从 Map 中安全取出字符串值，类型不符或缺失时返回 null。 */
     private static String getString(Map<String, Object> map, String key) {
         Object v = map.get(key);
         return v instanceof String s ? s : null;

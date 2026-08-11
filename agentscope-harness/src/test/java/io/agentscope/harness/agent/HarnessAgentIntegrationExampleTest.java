@@ -65,6 +65,24 @@ import reactor.core.publisher.Flux;
  * <p>These tests use a stub {@link Model} (no API keys). Tag {@code integration} lets you filter
  * them in the IDE or via JUnit Platform if you add {@code groups} later.
  */
+/**
+ * {@link HarnessAgent}集成风格示例：本地磁盘真实工作目录、构建器完整装配、端到端{@link #call(Msg, RuntimeContext)}调用链路。
+ *
+ * <p>示例工作目录结构（测试用临时目录{@link TempDir}内生成）：
+ *
+ * <pre>
+ * workspace/
+ * ├── AGENTS.md              # 智能体人设、本地规约
+ * ├── MEMORY.md              # 可选长期记忆缓存，会载入<memory_context>
+ * ├── knowledge/
+ * │   └── KNOWLEDGE.md       # 可选领域概述文档
+ * └── subagents/
+ *     ├── helper.md          # YAML前置配置+正文作为系统提示词
+ *     └── reviewer.md        # 第二份子智能体配置示例
+ * </pre>
+ *
+ * <p>测试采用模拟{@link Model}，无需密钥。标注integration标签，后续配置分组后可在IDE、JUnit测试框架中筛选运行。
+ */
 @Tag("integration")
 class HarnessAgentIntegrationExampleTest {
 
@@ -74,6 +92,10 @@ class HarnessAgentIntegrationExampleTest {
      * Materializes the layout above, builds the main agent, runs one turn, and asserts the stub
      * reply. The model capture shows that session, subagent docs, and workspace files reached the
      * LLM message list.
+     */
+    /**
+     * 构建上述目录结构、实例化主智能体、执行一轮调用并校验模拟模型的返回结果。
+     * 模型捕获日志可验证会话信息、子智能体配置文件、工作区文件均已载入大模型消息列表。
      */
     @Test
     void example_fullWorkspace_singleTurn_seesSessionSubagentsAndWorkspaceContext()
@@ -174,6 +196,10 @@ class HarnessAgentIntegrationExampleTest {
      * markdown-defined id under {@code subagents/}, runs {@code factory().create()} and {@link
      * Agent#call(List)} to prove the delegated {@link HarnessAgent} is wired with the spec name
      * and prompt.
+     */
+    /**
+     * 复用构建器的工作空间检索逻辑，获取subagents目录下由Markdown定义的子智能体对应的{@link SubagentEntry}，
+     * 依次执行factory().create()与{@link Agent#call(List)}，验证委派生成的{@link HarnessAgent}已正确加载对应配置名称与提示词。
      */
     @Test
     void example_subagentFactory_markdownSpec_runsChildHarnessAgent() throws Exception {

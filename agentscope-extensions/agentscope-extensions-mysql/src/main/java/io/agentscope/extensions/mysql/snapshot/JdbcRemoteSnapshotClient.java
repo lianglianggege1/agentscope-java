@@ -36,6 +36,14 @@ import org.slf4j.LoggerFactory;
  *
  * <p>The table is auto-created if it does not exist when {@code initializeSchema} is true.
  */
+/**
+ * 基于JDBC二进制大字段实现的{@link RemoteSnapshotClient}。
+ *
+ * <p>将沙箱工作空间压缩包存储在数据表中，数据表字段为
+ * {@code (snapshot_id VARCHAR 主键, data LONGBLOB, created_at TIMESTAMP)}。
+ *
+ * <p>开启initializeSchema参数时，若数据表不存在则自动创建该表。
+ */
 public class JdbcRemoteSnapshotClient implements RemoteSnapshotClient {
 
     private static final Logger log = LoggerFactory.getLogger(JdbcRemoteSnapshotClient.class);

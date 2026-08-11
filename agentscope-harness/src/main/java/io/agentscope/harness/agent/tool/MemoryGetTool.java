@@ -34,6 +34,7 @@ public class MemoryGetTool {
 
     private final WorkspaceManager workspaceManager;
 
+    /** 构造器：注入工作空间管理器，用于定位并读取记忆文件。 */
     public MemoryGetTool(WorkspaceManager workspaceManager) {
         this.workspaceManager = workspaceManager;
     }
@@ -56,6 +57,13 @@ public class MemoryGetTool {
                     int startLine,
             @ToolParam(name = "endLine", description = "结束行号（从1开始，闭区间）")
                     int endLine) {}
+     */
+    /**
+     * {@code memory_get} 工具方法：读取记忆文件指定行区间的上下文。
+     *
+     * <p>执行流程：校验路径非空 → 路径穿越防护（归一化后必须仍位于工作空间内）→
+     * 读取文件全文 → 截取 [startLine, endLine] 闭区间（1 基）→
+     * 以 {@code "行号|内容"} 格式逐行输出。
      */
     @Tool(
             name = "memory_get",

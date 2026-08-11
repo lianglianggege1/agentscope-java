@@ -44,16 +44,19 @@ public class FilesystemTool {
     private final AbstractFilesystem abstractFilesystem;
     private final WorkspacePathNormalizer pathNormalizer;
 
+    /** 构造器：仅注入文件系统实现，不做路径归一化。 */
     public FilesystemTool(AbstractFilesystem abstractFilesystem) {
         this(abstractFilesystem, null);
     }
 
+    /** 构造器：同时注入文件系统实现与可选的路径归一化器。 */
     public FilesystemTool(
             AbstractFilesystem abstractFilesystem, WorkspacePathNormalizer pathNormalizer) {
         this.abstractFilesystem = abstractFilesystem;
         this.pathNormalizer = pathNormalizer;
     }
 
+    /** 路径归一化入口：配置了归一化器则处理，否则原样返回。 */
     private String norm(String path) {
         return pathNormalizer != null ? pathNormalizer.normalize(path) : path;
     }
@@ -69,6 +72,7 @@ public class FilesystemTool {
             @ToolParam(name = "offset", description = "起始行（0索引），默认0") int offset,
             @ToolParam(name = "limit", description = "最大返回行数，默认0表示读取全部") int limit) {}
      */
+    /** {@code read_file}：读取带行号的文件内容，支持 offset/limit 分页。 */
     @Tool(
             name = "read_file",
             readOnly = true,
@@ -100,6 +104,7 @@ public class FilesystemTool {
             @ToolParam(name = "path", description = "目标文件路径") String path,
             @ToolParam(name = "content", description = "待写入的文件内容") String content) {}
      */
+    /** {@code write_file}：写入文件内容，必要时自动创建上级目录。 */
     @Tool(
             name = "write_file",
             description = "Write content to a new file, creating parent directories if needed.")
@@ -126,6 +131,10 @@ public class FilesystemTool {
                             description = "替换全部匹配项（默认 false）",
                             required = false)
                     Boolean replaceAll) {}
+     */
+    /**
+     * {@code edit_file}：文件内精确字符串替换。
+     * 除非 {@code replace_all=true}，否则待查找文本必须在文件中唯一。
      */
     @Tool(
             name = "edit_file",
@@ -164,6 +173,7 @@ public class FilesystemTool {
             @ToolParam(name = "glob", description = "可选文件通配符过滤（例如 *.java）")
                     String glob) {}
      */
+    /** {@code grep_files}：按纯文本内容检索文件，结果以 {@code "路径:行号:内容"} 格式输出。 */
     @Tool(
             name = "grep_files",
             readOnly = true,
@@ -196,6 +206,7 @@ public class FilesystemTool {
         String pattern,
         @ToolParam(name = "path", description = "检索起始根目录") String path) {}
      */
+    /** {@code glob_files}：按通配符模式查找文件，输出路径与大小信息。 */
     @Tool(name = "glob_files", readOnly = true, description = "Find files matching a glob pattern.")
     public String globFiles(
             RuntimeContext runtimeContext,
@@ -224,6 +235,7 @@ public class FilesystemTool {
             RuntimeContext runtimeContext,
             @ToolParam(name = "path", description = "待浏览目录路径") String path) {}
      */
+    /** {@code list_files}：列出指定路径下的文件与目录，带 [DIR]/[FILE] 类型标记。 */
     @Tool(
             name = "list_files",
             readOnly = true,

@@ -42,6 +42,16 @@ import org.slf4j.LoggerFactory;
  * <p><b>Important:</b> MySQL named locks are server-scoped, not database-scoped. Use a unique
  * {@code keyPrefix} to avoid collisions with other applications sharing the same MySQL server.
  */
+/**
+ * 基于JDBC、依托MySQL {@code GET_LOCK()} / {@code RELEASE_LOCK()} 实现的{@link SandboxExecutionGuard}。
+ *
+ * <p>每一把锁的标识字符串由{@link SandboxIsolationKey}的作用域与取值生成。{@code GET_LOCK()}会持续阻塞，直至获取到锁或超时。
+ * 锁与数据库连接绑定，连接关闭时锁会自动释放。
+ *
+ * <p>调用返回的{@link SandboxLease#close()}方法会执行{@code RELEASE_LOCK()}并关闭底层连接，即便调用方忘记手动释放锁，也能保证锁被释放。
+ *
+ * <p><b>注意：</b>MySQL命名锁作用域为整个数据库服务，而非单个数据库。需配置唯一{@code keyPrefix}，防止同一MySQL服务下不同应用出现锁冲突。
+ */
 public final class JdbcSandboxExecutionGuard implements SandboxExecutionGuard {
 
     private static final Logger log = LoggerFactory.getLogger(JdbcSandboxExecutionGuard.class);

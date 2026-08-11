@@ -61,6 +61,19 @@ import reactor.core.publisher.Flux;
  * <p>The contract under test is the middleware list registered on the underlying
  * {@code ReActAgent}.
  */
+/**
+ * 校验{@link HarnessAgent.Builder}中工具与子智能体的装配逻辑：
+ *
+ * <ul>
+ *   <li>默认配置（工作区文件系统可用、未主动关闭动态能力）：自动注册
+ *       {@link io.agentscope.core.skill.DynamicSkillMiddleware}与{@link DynamicSubagentsMiddleware}。
+ *   <li>自定义工具仓库skillRepository(custom)会与工作区工具叠加生效，动态中间件依旧保留，同时加载两类工具源。
+ *   <li>调用disableDynamicSkills()：不再注册动态工具中间件。
+ *   <li>调用disableDynamicSubagents()：移除动态子智能体中间件，降级使用静态{@link SubagentsMiddleware}。
+ * </ul>
+ *
+ * <p>该校验用于验证底层ReActAgent所注册的中间件列表是否符合约定规范。
+ */
 class HarnessAgentDynamicHookBuilderTest {
 
     @TempDir Path workspace;

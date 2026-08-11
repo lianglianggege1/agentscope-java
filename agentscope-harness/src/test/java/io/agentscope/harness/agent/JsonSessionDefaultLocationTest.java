@@ -50,6 +50,14 @@ import reactor.core.publisher.Flux;
  * TempDir} so we can both (a) assert state lands at the expected location and (b) avoid sharing
  * state across tests / polluting the surefire-shared {@code target/test-state-home/}.
  */
+/**
+ * 回归测试：HarnessAgent 默认使用的 AgentStateStore 现已更换为
+ * {@link io.agentscope.core.state.JsonFileAgentStateStore}，根目录为~/.agentscope/state/<agentId>/，
+ * 不再采用工作空间域会话存储。
+ *
+ * <p>每项测试都会将系统属性 agentscope.state.home 指向全新临时目录，
+ * 以此实现两点需求：(a)校验状态文件存放路径符合预期；(b)防止测试间状态互相干扰，避免污染surefire共用目录target/test-state-home/。
+ */
 class JsonSessionDefaultLocationTest {
 
     @TempDir Path stateHome;

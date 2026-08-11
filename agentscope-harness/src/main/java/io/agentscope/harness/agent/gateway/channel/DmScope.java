@@ -28,6 +28,18 @@ package io.agentscope.harness.agent.gateway.channel;
  *       useful for multi-account (multi-bot) deployments on the same channel platform.
  * </ul>
  */
+/**
+ * 控制 DM（{@link PeerKind#DIRECT}）会话键的作用域。
+ *
+ * <ul>
+ *   <li>{@link #MAIN} —— 某智能体的所有私聊共享一个会话。适合单用户或共享助手场景。
+ *   <li>{@link #PER_PEER} —— 每个对端 ID 一个会话。多用户部署最常见。
+ *   <li>{@link #PER_CHANNEL_PEER} —— 类似 {@code PER_PEER} 但键中包含通道名，
+ *       用于区分同一对端在不同通道的会话。
+ *   <li>{@link #PER_ACCOUNT_CHANNEL_PEER} —— 在 {@code PER_CHANNEL_PEER} 基础上
+ *       增加账号 ID，适合同一通道平台上的多账号（多机器人）部署。
+ * </ul>
+ */
 public enum DmScope {
     MAIN,
     PER_PEER,
@@ -35,6 +47,7 @@ public enum DmScope {
     PER_ACCOUNT_CHANNEL_PEER;
 
     /** Default scope used when none is configured. */
+    /** 未配置时使用的默认作用域。 */
     public static DmScope defaultScope() {
         return MAIN;
     }

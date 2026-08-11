@@ -27,6 +27,16 @@ import java.util.Objects;
  * @param to delivery address in {@code "channel:peerId"} format (e.g. {@code "telegram:12345"})
  * @param threadId optional thread context for threaded replies (nullable)
  */
+/**
+ * 出站（主动）消息的投递目标。由 {@link ChannelRouter} 在入站路由时构造，
+ * 并由网关存为该会话的"最近路由"，使主动回复（例如子智能体完成公告）
+ * 能投递回正确的通道与对端。
+ *
+ * @param channelId 用于投递的通道适配器（例如 {@code "chatui"}、{@code "slack"}）
+ * @param accountId 可选的多账号标识（单账号通道可为 null）
+ * @param to {@code "channel:peerId"} 格式的投递地址（例如 {@code "telegram:12345"}）
+ * @param threadId 可选的话题上下文，用于话题内回复（可为 null）
+ */
 public record OutboundAddress(String channelId, String accountId, String to, String threadId) {
 
     public OutboundAddress {
@@ -35,11 +45,13 @@ public record OutboundAddress(String channelId, String accountId, String to, Str
     }
 
     /** Creates an address for a direct (non-threaded) message. */
+    /** 创建非话题的直接消息地址。 */
     public static OutboundAddress direct(String channelId, String to) {
         return new OutboundAddress(channelId, null, to, null);
     }
 
     /** Creates an address with account context. */
+    /** 创建带账号上下文的地址。 */
     public static OutboundAddress withAccount(String channelId, String accountId, String to) {
         return new OutboundAddress(channelId, accountId, to, null);
     }

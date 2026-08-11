@@ -46,6 +46,7 @@ public class WaitAsyncResultsTool {
 
     private final MessageBus messageBus;
 
+    /** 构造器：注入消息总线，用于检查会话收件箱是否有新消息。 */
     public WaitAsyncResultsTool(MessageBus messageBus) {
         this.messageBus = messageBus;
     }
@@ -65,6 +66,13 @@ public class WaitAsyncResultsTool {
                     Integer timeoutSeconds,
             RuntimeContext runtimeContext)
             throws InterruptedException {}
+     */
+    /**
+     * {@code wait_async_results} 工具方法：轮询等待会话收件箱中出现异步结果。
+     *
+     * <p>实现机制：以 3 秒为间隔轮询 {@code messageBus.inboxHasMessages}，
+     * 有消息到达即成功返回（结果由下一轮推理的 InboxMiddleware 注入上下文）；
+     * 超过超时时间（默认 60 秒）则返回超时提示，智能体可继续其他工作或再次等待。
      */
     @Tool(
             name = "wait_async_results",
@@ -111,6 +119,7 @@ public class WaitAsyncResultsTool {
                         + "the results will be injected into your context automatically.";
             }
             // Cap sleep to the remaining budget so the tool never overshoots the caller's timeout.
+            // 将休眠时长限制在剩余预算内，保证工具不会超出调用方设定的超时。
             Thread.sleep(Math.min(POLL_INTERVAL_MS, remainingMs));
         }
 

@@ -35,6 +35,19 @@ import java.util.Objects;
  *     DmScope#MAIN}
  * @param bindings ordered list of binding rules; evaluated in list order within each priority tier
  */
+/**
+ * 通道路由配置：默认智能体回退、DM 会话作用域，以及供
+ * {@link ChannelRouter} 评估的有序绑定规则。
+ *
+ * <p>供 {@link Channel} 实现用于参数化路由，避免在适配器代码中
+ * 硬编码智能体 ID 或会话形态。
+ *
+ * @param channelId 本配置适用的逻辑通道标识（必须与 {@link Channel#channelId()} 一致）
+ * @param defaultAgentId 无绑定命中时的回退智能体 ID；为 null 时使用全局默认智能体
+ *     （通过 {@link io.agentscope.harness.agent.gateway.Gateway#bindMainAgent} 注册）
+ * @param dmScope 控制 DM（{@link PeerKind#DIRECT}）会话的键粒度；默认 {@link DmScope#MAIN}
+ * @param bindings 有序的绑定规则列表；在每个优先级层级内按列表顺序评估
+ */
 public record ChannelConfig(
         String channelId, String defaultAgentId, DmScope dmScope, List<ChannelBinding> bindings) {
 
@@ -45,20 +58,24 @@ public record ChannelConfig(
     }
 
     /** Minimal config: channel id only, using global agent default and {@link DmScope#MAIN}. */
+    /** 最小配置：仅通道 ID，使用全局默认智能体与 {@link DmScope#MAIN}。 */
     public static ChannelConfig of(String channelId) {
         return new ChannelConfig(channelId, null, DmScope.MAIN, List.of());
     }
 
     /** Config with explicit default agent (no binding rules). */
+    /** 带显式默认智能体的配置（无绑定规则）。 */
     public static ChannelConfig of(String channelId, String defaultAgentId) {
         return new ChannelConfig(channelId, defaultAgentId, DmScope.MAIN, List.of());
     }
 
     /** Returns a builder for constructing channel configs fluently. */
+    /** 返回用于流式构建通道配置的构建器。 */
     public static Builder builder(String channelId) {
         return new Builder(channelId);
     }
 
+    /** 通道配置的流式构建器。 */
     public static final class Builder {
         private final String channelId;
         private String defaultAgentId;

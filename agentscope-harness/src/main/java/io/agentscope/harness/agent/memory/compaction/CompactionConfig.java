@@ -119,7 +119,8 @@ public class CompactionConfig {
             </primary_objective>
 
             <objective_information>
-            当前输入token量即将达到上限，你必须从对话历史筛选核心关键信息。提取出的内容将直接替换原有对话记录，因此仅保留对完成整体目标至关重要的信息。
+            当前输入token量即将达到上限，你必须从对话历史筛选核心关键信息。
+            提取出的内容将直接替换原有对话记录，因此仅保留对完成整体目标至关重要的信息。
             </objective_information>
 
             <instructions>

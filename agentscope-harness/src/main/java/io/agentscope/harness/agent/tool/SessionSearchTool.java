@@ -53,6 +53,7 @@ public class SessionSearchTool {
 
     private final WorkspaceManager workspaceManager;
 
+    /** 构造器：注入工作空间管理器，用于定位会话目录与读取会话文件。 */
     public SessionSearchTool(WorkspaceManager workspaceManager) {
         this.workspaceManager = workspaceManager;
     }
@@ -77,6 +78,13 @@ public class SessionSearchTool {
                             description = "最大返回结果数量（默认：10）",
                             required = false)
                     Integer maxResults) {}
+     */
+    /**
+     * {@code session_search} 工具方法：在历史会话记录中检索关键词或短语。
+     *
+     * <p>执行流程：收集目标智能体（或全部智能体）的 {@code .log.jsonl} 文件 →
+     * 逐文件加载对应 {@link SessionTree} 做大小写不敏感子串匹配 →
+     * 命中条目附文件路径、消息 ID、角色与内容预览（截断至 200 字符）。
      */
     @Tool(
             name = "session_search",
@@ -139,6 +147,10 @@ public class SessionSearchTool {
             @ToolParam(name = "agentId", description = "待列举会话的智能体ID")
                     String agentId) {}
      */
+    /**
+     * {@code session_list} 工具方法：列出指定智能体的可用会话。
+     * 优先读取结构化会话存储索引文件；不存在时回退到扫描本地缓存目录。
+     */
     @Tool(
             name = "session_list",
             readOnly = true,
@@ -154,6 +166,7 @@ public class SessionSearchTool {
         RuntimeContext rc = runtimeContext != null ? runtimeContext : RuntimeContext.empty();
 
         // Prefer the structured session-store index (already two-layer: remote then local).
+        // 优先使用结构化会话存储索引（已实现双层查询：先远端后本地）。
         String storeContent =
                 workspaceManager.readManagedWorkspaceFileUtf8(
                         rc,
@@ -169,6 +182,7 @@ public class SessionSearchTool {
         }
 
         // List sessions from local cache only — remote sync is handled at write time.
+        // 仅从本地缓存列举会话——远端同步在写入链路中处理。
         Path sessionDir = workspaceManager.getSessionDir(rc, agentId);
         if (!Files.isDirectory(sessionDir)) {
             return "No sessions found for agent: " + agentId;
@@ -216,6 +230,13 @@ public class SessionSearchTool {
                             description = "需要返回的最近消息条数（默认：20）",
                             required = false)
                     Integer lastN) {}
+     */
+    /**
+     * {@code session_history} 工具方法：获取指定会话的对话历史。
+     *
+     * <p>执行流程：定位会话上下文文件 → 缺失时回退到旧版 {@code .json} 会话文件 →
+     * 加载 {@link SessionTree} 取最近 lastN 条消息 →
+     * 单条内容超 500 字符时截断，以 {@code "[角色]: 内容"} 格式输出。
      */
     @Tool(
             name = "session_history",
@@ -312,6 +333,7 @@ public class SessionSearchTool {
         return files;
     }
 
+    /** 收集指定会话目录下的 {@code .log.jsonl} 日志文件到收集器列表。 */
     private void collectLogFiles(Path sessionDir, List<Path> collector) {
         if (!Files.isDirectory(sessionDir)) {
             return;
@@ -325,6 +347,11 @@ public class SessionSearchTool {
         }
     }
 
+    /**
+     * 在单个会话日志文件内检索：由日志文件名推导对应上下文文件，
+     * 加载 {@link SessionTree} 后逐条消息做小写子串匹配；
+     * 损坏的文件静默跳过。
+     */
     private void searchInSessionFile(
             Path logFile, String lowerQuery, List<String> results, int limit) {
         try {
@@ -358,6 +385,7 @@ public class SessionSearchTool {
         }
     }
 
+    /** 读取旧版 {@code .json} 会话文件：按行返回最近 limit 条记录（兼容历史格式）。 */
     private String readLegacySession(Path file, int limit) {
         try {
             String content = Files.readString(file);
