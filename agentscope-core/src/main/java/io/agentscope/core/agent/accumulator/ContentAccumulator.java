@@ -25,7 +25,7 @@ import io.agentscope.core.message.ContentBlock;
  * Different content types (text, thinking, tool calls) have different accumulation strategies.
  * 此接口定义了从流响应中累积内容块的契约。
  * 不同的内容类型（文本、思维、工具调用）有不同的积累策略。类型参数：<T>要累积的内容块的类型
- * 
+ *
  * @hidden
  * @param <T> The type of content block to accumulate  要累积的内容块类型
  */

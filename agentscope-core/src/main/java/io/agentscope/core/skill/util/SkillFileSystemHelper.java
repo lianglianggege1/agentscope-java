@@ -43,10 +43,7 @@ import org.slf4j.LoggerFactory;
  * deleting skills on the file system. It is designed to be shared by multiple
  * repositories such as file system and Git based repositories.
  *
- * @deprecated since 2.0.0. The skill package is removed; manage markdown skill catalogs in
- *     application code.
  */
-@Deprecated(since = "2.0.0")
 public final class SkillFileSystemHelper {
 
     private static final Logger logger = LoggerFactory.getLogger(SkillFileSystemHelper.class);
@@ -56,7 +53,7 @@ public final class SkillFileSystemHelper {
 
     /**
      * Loads a skill by name from the given base directory.
-     * 
+     *
      *
      * @param baseDir The base directory containing skill folders
      * @param skillName The skill name to load

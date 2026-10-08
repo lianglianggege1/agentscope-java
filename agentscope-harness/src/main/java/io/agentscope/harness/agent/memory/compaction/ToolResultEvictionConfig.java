@@ -36,8 +36,8 @@ import java.util.Set;
  * <ul>
  *   <li>Trigger at 80,000 characters (~20 K tokens at 4 chars/token)</li>
  *   <li>Preview: first + last 2,000 characters of the original output</li>
- *   <li>Eviction path prefix: {@code /large_tool_results}</li>
- *   <li>Excluded tools: filesystem read/write/edit/list + memory tools (small or self-paginating)</li>
+ *   <li>Eviction path prefix: {@code large_tool_results} (relative to the workspace)</li>
+ *   <li>Excluded tools: filesystem read/write/edit + memory tools (small or self-paginating)</li>
  * </ul>
  */
 /**
@@ -71,9 +71,9 @@ public class ToolResultEvictionConfig {
     /** 逐出占位预览中首尾展示的字符数量。 */
     public static final int DEFAULT_PREVIEW_CHARS = 2_000;
 
-    /** Root path prefix under which evicted results are stored. */
+    /** Workspace-relative path prefix under which evicted results are stored. */
     /** 被逐出结果的存储根路径前缀。 */
-    public static final String DEFAULT_EVICTION_PATH = "/large_tool_results";
+    public static final String DEFAULT_EVICTION_PATH = "large_tool_results";
 
     /**
      * Tools excluded from eviction by default.
@@ -81,7 +81,7 @@ public class ToolResultEvictionConfig {
      * <ul>
      *   <li>{@code read_file} — evicting would cause re-read loops; pagination handles size</li>
      *   <li>{@code write_file}, {@code edit_file} — return tiny success messages</li>
-     *   <li>{@code grep_files}, {@code glob_files}, {@code list_files} — self-limiting outputs</li>
+     *   <li>Search/list tools have bounded previews and remain eligible for eviction.</li>
      *   <li>{@code memory_search}, {@code memory_get}, {@code session_search} — small/paginated results</li>
      * </ul>
      *
@@ -104,9 +104,6 @@ public class ToolResultEvictionConfig {
                     "read_file",
                     "write_file",
                     "edit_file",
-                    "grep_files",
-                    "glob_files",
-                    "list_files",
                     "memory_search",
                     "memory_get",
                     "session_search");
@@ -141,6 +138,7 @@ public class ToolResultEvictionConfig {
         return previewChars;
     }
 
+    /** Root path under which evicted files are written (e.g. {@code large_tool_results}). */
     /** Root path under which evicted files are written (e.g. {@code /large_tool_results}). */
     /** 逐出文件的存储根路径（例如 {@code /large_tool_results}）。 */
     public String getEvictionPath() {

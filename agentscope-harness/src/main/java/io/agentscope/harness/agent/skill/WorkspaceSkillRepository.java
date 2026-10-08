@@ -19,6 +19,7 @@ import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.skill.AgentSkill;
 import io.agentscope.core.skill.repository.AgentSkillRepository;
 import io.agentscope.core.skill.repository.AgentSkillRepositoryInfo;
+import io.agentscope.core.skill.repository.RuntimeContextSkillRepository;
 import io.agentscope.core.skill.util.SkillUtil;
 import io.agentscope.harness.agent.filesystem.AbstractFilesystem;
 import io.agentscope.harness.agent.filesystem.model.FileDownloadResponse;
@@ -38,7 +39,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.DumperOptions;
@@ -56,8 +56,8 @@ import org.yaml.snakeyaml.Yaml;
  * harness skill runtime when {@code load_skill_through_path} misses the in-memory map.
  *
  * <p>Per-user namespacing and sandbox routing are honored transparently because every
- * filesystem call passes the current {@link RuntimeContext}. The supplier pattern from the
- * legacy class is retained so each invocation observes whatever context the caller has merged.
+ * filesystem call passes the explicitly supplied {@link RuntimeContext}. Context-less operations
+ * use the default namespace and never infer a user from another active agent call.
  *
  * <p>Deletes are non-destructive: skill directories are moved under
  * {@code .archive/<name>-<ts>/} rather than removed, matching the curator's never-delete
@@ -79,7 +79,8 @@ import org.yaml.snakeyaml.Yaml;
  * 遵循管理器“永不彻底销毁数据”的约束规范。
  */
 @SuppressWarnings("deprecation")
-public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResourceCapable {
+public class WorkspaceSkillRepository
+        implements RuntimeContextSkillRepository, LazyResourceCapable {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceSkillRepository.class);
 
@@ -89,56 +90,36 @@ public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResou
 
     private final AbstractFilesystem filesystem;
     private final String skillsRelativeDir;
-    private final Supplier<RuntimeContext> contextSupplier;
+
     private final String source;
 
     private volatile boolean writable;
 
     /**
-     * Creates a read-only repository.
-     *
-     * @param filesystem        backing filesystem (non-null)
-     * @param skillsRelativeDir relative directory holding {@code <skill>/SKILL.md} (non-null)
-     * @param contextSupplier   supplies the {@link RuntimeContext} on each call (non-null)
+     * Creates a read-only repository scoped to the default namespace; context-less operations
+     * resolve to {@link RuntimeContext#empty()} unless a request context is passed explicitly.
      */
     /**
      * 创建只读仓库实例。
-     *
-     * @param filesystem        底层文件系统（不可为null）
-     * @param skillsRelativeDir 存放 {@code <skill>/SKILL.md} 的相对目录（不可为null）
-     * @param contextSupplier   每次调用时提供 {@link RuntimeContext} 的供给器（不可为null）
      */
-    public WorkspaceSkillRepository(
-            AbstractFilesystem filesystem,
-            String skillsRelativeDir,
-            Supplier<RuntimeContext> contextSupplier) {
-        this(filesystem, skillsRelativeDir, contextSupplier, null, false);
+    public WorkspaceSkillRepository(AbstractFilesystem filesystem, String skillsRelativeDir) {
+        this(filesystem, skillsRelativeDir, null, false);
     }
 
     /**
      * Creates a writable repository (matches the legacy
-     * {@code WritableFilesystemSkillRepository} default).
+     * {@code WritableFilesystemSkillRepository} default), scoped to the default namespace.
      */
     /**
      * 创建可写仓库实例（兼容旧版 {@code WritableFilesystemSkillRepository} 默认行为）。
      */
     public WorkspaceSkillRepository(
-            AbstractFilesystem filesystem,
-            String skillsRelativeDir,
-            Supplier<RuntimeContext> contextSupplier,
-            String source) {
-        this(filesystem, skillsRelativeDir, contextSupplier, source, true);
+            AbstractFilesystem filesystem, String skillsRelativeDir, String source) {
+        this(filesystem, skillsRelativeDir, source, true);
     }
 
     /**
-     * Creates a repository with explicit source and writability.
-     *
-     * @param filesystem        backing filesystem (non-null)
-     * @param skillsRelativeDir relative directory holding {@code <skill>/SKILL.md} (non-null)
-     * @param contextSupplier   supplies the {@link RuntimeContext} on each call (non-null)
-     * @param source            source identifier attached to loaded skills; falls back to
-     *                          {@code "workspace"} when null or blank
-     * @param writable          whether {@link #save} and {@link #delete} are permitted
+     * Creates a repository with explicit source and writability, scoped to the default namespace.
      */
     /**
      * 创建仓库实例，显式指定数据源与可写属性。
@@ -152,12 +133,10 @@ public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResou
     public WorkspaceSkillRepository(
             AbstractFilesystem filesystem,
             String skillsRelativeDir,
-            Supplier<RuntimeContext> contextSupplier,
             String source,
             boolean writable) {
         this.filesystem = Objects.requireNonNull(filesystem, "filesystem");
         this.skillsRelativeDir = Objects.requireNonNull(skillsRelativeDir, "skillsRelativeDir");
-        this.contextSupplier = Objects.requireNonNull(contextSupplier, "contextSupplier");
         this.source = (source == null || source.isBlank()) ? DEFAULT_SOURCE : source;
         this.writable = writable;
     }
@@ -191,7 +170,15 @@ public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResou
 
     @Override
     public List<AgentSkill> getAllSkills() {
-        RuntimeContext ctx = currentContext();
+        return getAllSkills(RuntimeContext.empty());
+    }
+
+    /**
+     * Lists skills using the caller's request-scoped context.
+     */
+    @Override
+    public List<AgentSkill> getAllSkills(RuntimeContext context) {
+        RuntimeContext ctx = context != null ? context : RuntimeContext.empty();
         GlobResult glob;
         try {
             glob = filesystem.glob(ctx, SKILL_FILE, skillsRelativeDir);
@@ -233,6 +220,11 @@ public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResou
         return getSkill(skillName) != null;
     }
 
+    /** Variant of {@link #skillExists(String)} scoped to the supplied request context; {@code null} uses the default namespace. */
+    public boolean skillExists(String skillName, RuntimeContext context) {
+        return getSkill(skillName, context != null ? context : RuntimeContext.empty()) != null;
+    }
+
     @Override
     public AgentSkillRepositoryInfo getRepositoryInfo() {
         return new AgentSkillRepositoryInfo("filesystem", skillsRelativeDir, writable);
@@ -272,6 +264,11 @@ public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResou
 
     @Override
     public boolean save(List<AgentSkill> skills, boolean force) {
+        return save(skills, force, null);
+    }
+
+    /** Variant of {@link #save(List, boolean)} scoped to the supplied request context; {@code null} uses the default namespace. */
+    public boolean save(List<AgentSkill> skills, boolean force, RuntimeContext context) {
         if (!writable) {
             log.warn("WorkspaceSkillRepository is currently read-only; save() ignored");
             return false;
@@ -279,19 +276,20 @@ public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResou
         if (skills == null || skills.isEmpty()) {
             return false;
         }
+        RuntimeContext ctx = context != null ? context : RuntimeContext.empty();
         boolean allOk = true;
         for (AgentSkill skill : skills) {
             if (skill == null || skill.getName() == null || skill.getName().isBlank()) {
                 allOk = false;
                 continue;
             }
-            if (!force && skillExists(skill.getName())) {
+            if (!force && getSkill(skill.getName(), ctx) != null) {
                 log.debug("Skill '{}' already exists; skipping (force=false)", skill.getName());
                 allOk = false;
                 continue;
             }
             try {
-                writeSkill(skill);
+                writeSkill(skill, ctx);
             } catch (Exception e) {
                 log.warn("Failed to save skill '{}': {}", skill.getName(), e.getMessage());
                 allOk = false;
@@ -302,6 +300,11 @@ public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResou
 
     @Override
     public boolean delete(String skillName) {
+        return delete(skillName, null);
+    }
+
+    /** Variant of {@link #delete(String)} scoped to the supplied request context; {@code null} uses the default namespace. */
+    public boolean delete(String skillName, RuntimeContext context) {
         if (!writable) {
             log.warn("WorkspaceSkillRepository is currently read-only; delete() ignored");
             return false;
@@ -309,11 +312,11 @@ public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResou
         if (skillName == null || skillName.isBlank()) {
             return false;
         }
-        AgentSkill existing = getSkill(skillName);
+        RuntimeContext ctx = context != null ? context : RuntimeContext.empty();
+        AgentSkill existing = getSkill(skillName, ctx);
         if (existing == null) {
             return false;
         }
-        RuntimeContext ctx = currentContext();
         String src = skillDirRelative(skillName);
         String archiveDest = archiveDestRelative(skillName);
         try {
@@ -347,12 +350,18 @@ public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResou
      * 文件不存在或读取失败时返回 {@code null}。
      */
     public String readSkillFile(String skillName, String relPath) {
+        return readSkillFile(skillName, relPath, null);
+    }
+
+    /** Variant of {@link #readSkillFile(String, String)} scoped to the supplied request context; {@code null} uses the default namespace. */
+    public String readSkillFile(String skillName, String relPath, RuntimeContext context) {
         if (skillName == null || skillName.isBlank() || relPath == null || relPath.isBlank()) {
             return null;
         }
         String path = skillDirRelative(skillName) + "/" + relPath;
         try {
-            ReadResult rr = filesystem.read(currentContext(), path, 0, 0);
+            ReadResult rr =
+                    filesystem.read(context != null ? context : RuntimeContext.empty(), path, 0, 0);
             if (rr.isSuccess() && rr.fileData() != null) {
                 return rr.fileData().content();
             }
@@ -372,6 +381,12 @@ public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResou
      * 调用方负责校验 {@code relPath}（允许的子目录、路径穿越防护、大小限制）。写入成功返回 {@code true}。
      */
     public boolean writeSkillFile(String skillName, String relPath, String content) {
+        return writeSkillFile(skillName, relPath, content, null);
+    }
+
+    /** Variant of {@link #writeSkillFile(String, String, String)} scoped to the supplied request context; {@code null} uses the default namespace. */
+    public boolean writeSkillFile(
+            String skillName, String relPath, String content, RuntimeContext context) {
         if (!writable) {
             return false;
         }
@@ -385,7 +400,7 @@ public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResou
         String path = skillDirRelative(skillName) + "/" + relPath;
         try {
             filesystem.uploadFiles(
-                    currentContext(),
+                    context != null ? context : RuntimeContext.empty(),
                     List.of(
                             new AbstractMap.SimpleImmutableEntry<>(
                                     path, content.getBytes(StandardCharsets.UTF_8))));
@@ -401,6 +416,11 @@ public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResou
      * Idempotent: missing files are treated as success.
      */
     public boolean deleteSkillFile(String skillName, String relPath) {
+        return deleteSkillFile(skillName, relPath, null);
+    }
+
+    /** Variant of {@link #deleteSkillFile(String, String)} scoped to the supplied request context; {@code null} uses the default namespace. */
+    public boolean deleteSkillFile(String skillName, String relPath, RuntimeContext context) {
         if (!writable) {
             return false;
         }
@@ -409,7 +429,8 @@ public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResou
         }
         String path = skillDirRelative(skillName) + "/" + relPath;
         try {
-            WriteResult r = filesystem.delete(currentContext(), path);
+            WriteResult r =
+                    filesystem.delete(context != null ? context : RuntimeContext.empty(), path);
             return r.isSuccess();
         } catch (Exception e) {
             log.warn("deleteSkillFile({}, {}) failed: {}", skillName, relPath, e.getMessage());
@@ -434,16 +455,11 @@ public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResou
         return skillsRelativeDir;
     }
 
-    public RuntimeContext resolveContext() {
-        return currentContext();
-    }
-
     // =========================================================================
     //  Internals
     // =========================================================================
 
-    private void writeSkill(AgentSkill skill) {
-        RuntimeContext ctx = currentContext();
+    private void writeSkill(AgentSkill skill, RuntimeContext ctx) {
         String skillMd = toMarkdown(skill);
         String skillDir = skillDirRelative(skill.getName());
         String skillMdPath = skillDir + "/" + SKILL_FILE;
@@ -488,11 +504,6 @@ public class WorkspaceSkillRepository implements AgentSkillRepository, LazyResou
                         .withZone(ZoneOffset.UTC)
                         .format(Instant.now());
         return skillsRelativeDir + "/" + ARCHIVE_PREFIX + "/" + name + "-" + ts;
-    }
-
-    private RuntimeContext currentContext() {
-        RuntimeContext ctx = contextSupplier.get();
-        return ctx != null ? ctx : RuntimeContext.empty();
     }
 
     /**

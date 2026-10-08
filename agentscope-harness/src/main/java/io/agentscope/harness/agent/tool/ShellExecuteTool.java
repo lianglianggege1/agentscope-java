@@ -58,7 +58,7 @@ public class ShellExecuteTool {
      */
     /**
      * @param runtimeContext per-call agent runtime injected by the framework (not an LLM argument);
-     *     may be {@code null} when no merged context is available
+     *                       may be {@code null} when no merged context is available
      */
     /**
      * @param runtimeContext 框架注入的单次调用智能体运行时上下文（不属于大模型入参）；
@@ -75,17 +75,23 @@ public class ShellExecuteTool {
     @Tool(
             description =
                     "Execute a shell command. Use for git, npm, build, test, and other terminal"
-                            + " operations. Returns combined output and exit code.")
+                        + " operations. Returns combined output and exit code. If a dedicated tool"
+                        + " exists (e.g., read_file, write_file), you MUST use it instead of shell"
+                        + " commands.")
     public String execute(
             RuntimeContext runtimeContext,
             @ToolParam(name = "command", description = "Shell command to execute") String command,
             @ToolParam(
                             name = "working_directory",
                             description =
-                                    "Working directory (relative to workspace root, optional)")
+                                    "Working directory (relative to workspace root, optional)",
+                            required = false)
                     String workingDirectory,
-            @ToolParam(name = "timeout", description = "Timeout in seconds (default: 30)")
-                    int timeout) {
+            @ToolParam(
+                            name = "timeout",
+                            description = "Timeout in seconds (default: 30)",
+                            required = false)
+                    Integer timeout) {
         String effectiveCommand = command;
         if (workingDirectory != null && !workingDirectory.isBlank()) {
             String wd = workingDirectory.strip();
@@ -94,12 +100,16 @@ public class ShellExecuteTool {
                 return "Error: working_directory must be a relative path within the workspace"
                         + " (absolute paths, '~', and '..' are not allowed).";
             }
-            // 对目录中的单引号做 shell 转义后拼接 cd 前缀。
-            effectiveCommand = "cd '" + wd.replace("'", "'\\''") + "' && " + command;
+            // 对目录中的单引号做 shell 转义后拼接 cd 前缀（Windows 使用 cd /d 形式）。
+            effectiveCommand =
+                    commandWithWorkingDirectory(
+                            wd,
+                            command,
+                            System.getProperty("os.name").toLowerCase().contains("win"));
         }
 
-        ExecuteResponse result =
-                sandbox.execute(runtimeContext, effectiveCommand, timeout > 0 ? timeout : 30);
+        int timeoutSeconds = timeout != null && timeout > 0 ? timeout : 30;
+        ExecuteResponse result = sandbox.execute(runtimeContext, effectiveCommand, timeoutSeconds);
 
         StringBuilder sb = new StringBuilder();
         sb.append("Exit code: ").append(result.exitCode()).append("\n");
@@ -110,5 +120,13 @@ public class ShellExecuteTool {
             sb.append("\n(output was truncated)");
         }
         return sb.toString();
+    }
+
+    static String commandWithWorkingDirectory(
+            String workingDirectory, String command, boolean windows) {
+        if (windows) {
+            return "cd /d \"" + workingDirectory.replace("\"", "\"\"") + "\" && " + command;
+        }
+        return "cd '" + workingDirectory.replace("'", "'\\''") + "' && " + command;
     }
 }

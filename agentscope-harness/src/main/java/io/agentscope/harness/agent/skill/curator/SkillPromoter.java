@@ -30,7 +30,7 @@ import reactor.core.publisher.Mono;
  * Orchestrates the promotion pipeline: locate draft → run security scan → call gate →
  * physically move {@code _drafts/<name>/} to {@code skills/<name>/} → update sidecar.
  *
- * <p>Surfaced via {@code ReActAgent.promoteSkill(name, reviewerId)}; standalone here so it can
+ * <p>Surfaced via {@code HarnessAgent.promoteSkill(name, reviewerId, ctx)}; standalone here so it can
  * be unit tested without spinning up a full agent.
  */
 /**
@@ -102,9 +102,10 @@ public class SkillPromoter {
         if (name == null || name.isBlank()) {
             return Mono.just(PromotionResult.invalid("name is required"));
         }
+        RuntimeContext effectiveCtx = ctx != null ? ctx : RuntimeContext.empty();
         AgentSkill draft;
         try {
-            draft = draftsRepo.getSkill(name);
+            draft = draftsRepo.getSkill(name, effectiveCtx);
         } catch (Exception e) {
             return Mono.just(PromotionResult.invalid("failed to load draft: " + e.getMessage()));
         }
@@ -117,7 +118,7 @@ public class SkillPromoter {
         //    {@code getSkill(name)} only loads SKILL.md.
         // 1. 安全扫描（必执行，即便 SkillManageTool 已完成扫描，这也是上线前最后一道关卡）。
         //    直接从磁盘读取资源文件，仓库的 {@code getSkill(name)} 仅加载 SKILL.md。
-        java.util.Map<String, String> resources = loadDraftResources(name);
+        java.util.Map<String, String> resources = loadDraftResources(name, effectiveCtx);
         SkillSecurityScanner.ScanResult scan =
                 SkillSecurityScanner.scan(name, mdOf(draft), resources);
         if (!SkillSecurityScanner.shouldAllow(
@@ -130,15 +131,16 @@ public class SkillPromoter {
         // 2. Build candidate package and call the gate.
         // 2. 构建候选技能包并调用评审网关。
         SkillCandidate candidate = buildCandidate(draft, scan);
-        return gate.review(candidate, ctx)
-                .map(decision -> applyDecision(name, reviewerId, decision, scan));
+        return gate.review(candidate, effectiveCtx)
+                .map(decision -> applyDecision(name, reviewerId, decision, scan, effectiveCtx));
     }
 
     private PromotionResult applyDecision(
             String name,
             String reviewerId,
             SkillPromotionGate.PromotionDecision decision,
-            SkillSecurityScanner.ScanResult scan) {
+            SkillSecurityScanner.ScanResult scan,
+            RuntimeContext ctx) {
         if (decision instanceof SkillPromotionGate.PromotionDecision.Reject reject) {
             return PromotionResult.rejected(
                     "gate rejected: " + reject.reason() + " (by " + reject.reviewerId() + ")",
@@ -158,7 +160,7 @@ public class SkillPromoter {
         if (workspaceManager == null) {
             return PromotionResult.invalid("workspaceManager is null; cannot move directory");
         }
-        boolean moved = workspaceManager.moveSkill(RuntimeContext.empty(), src, dst);
+        boolean moved = workspaceManager.moveSkill(ctx, src, dst);
         if (!moved) {
             return PromotionResult.invalid("failed to move draft directory");
         }
@@ -255,7 +257,7 @@ public class SkillPromoter {
      * 读取草稿技能下所有配套文件（scripts/、references/、templates/、assets/），
      * 使安全扫描器能够获取完整负载；仓库提供的 {@code getSkill} 仅会反序列化 SKILL.md。
      */
-    private java.util.Map<String, String> loadDraftResources(String skillName) {
+    private java.util.Map<String, String> loadDraftResources(String skillName, RuntimeContext ctx) {
         java.util.Map<String, String> out = new java.util.LinkedHashMap<>();
         for (String sub : new String[] {"scripts", "references", "templates", "assets"}) {
             // Read each known support directory under <draftsDir>/<name>/<sub>/.
@@ -265,10 +267,7 @@ public class SkillPromoter {
             // 无法通过只读仓库API直接枚举文件，因此调用底层文件系统，在该子目录范围内执行通配匹配。
             String relDir = draftsDir + "/" + skillName + "/" + sub;
             try {
-                var glob =
-                        draftsRepo
-                                .filesystem()
-                                .glob(io.agentscope.core.agent.RuntimeContext.empty(), "*", relDir);
+                var glob = draftsRepo.filesystem().glob(ctx, "*", relDir);
                 if (!glob.isSuccess() || glob.matches() == null) {
                     continue;
                 }
@@ -281,14 +280,7 @@ public class SkillPromoter {
                     int idx = pathSlash.indexOf("/" + sub + "/");
                     if (idx < 0) continue;
                     String relPath = pathSlash.substring(idx + 1);
-                    var rr =
-                            draftsRepo
-                                    .filesystem()
-                                    .read(
-                                            io.agentscope.core.agent.RuntimeContext.empty(),
-                                            path,
-                                            0,
-                                            0);
+                    var rr = draftsRepo.filesystem().read(ctx, path, 0, 0);
                     if (rr.isSuccess() && rr.fileData() != null) {
                         out.put(relPath, rr.fileData().content());
                     }

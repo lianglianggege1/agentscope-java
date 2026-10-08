@@ -28,6 +28,9 @@ import java.util.concurrent.ExecutorService;
  * - Custom ExecutorService (optional) 自定义执行器服务（可选）
  * - Execution configuration for timeout and retry 超时和重试的执行配置
  *
+ * <p>By default, multiple tool calls in one turn run in parallel on Reactor's Schedulers.
+ * The default execution config provides 5-minute timeout with no retry (1 attempt).
+ * Pass {@code parallel(false)} to serialize tool execution.
  * <p>By default, all tool execution is asynchronous using Reactor's Schedulers.
  *    默认情况下，所有工具的执行都是异步的，使用 Reactor 的调度器。
  * The default execution config provides 5-minute timeout with no retry (1 attempt).
@@ -92,7 +95,7 @@ public class ToolkitConfig {
     /**
      * Check if tool deletion is allowed.
      * 检查是否允许删除工具。
-     * 
+     *
      * @return true if tool deletion is allowed (default), false otherwise
      */
     public boolean isAllowToolDeletion() {
@@ -122,6 +125,7 @@ public class ToolkitConfig {
     }
 
     /**
+     * Get the default configuration (parallel execution using Reactor).
      * Get the default configuration (sequential execution using Reactor).
      * 获取默认配置（使用 Reactor 进行顺序执行）。
      *
@@ -135,7 +139,7 @@ public class ToolkitConfig {
      * Builder for ToolkitConfig.
      */
     public static class Builder {
-        private boolean parallel = false;
+        private boolean parallel = true;
         private ExecutorService executorService;
         private ExecutionConfig executionConfig;
         private boolean allowToolDeletion = true;

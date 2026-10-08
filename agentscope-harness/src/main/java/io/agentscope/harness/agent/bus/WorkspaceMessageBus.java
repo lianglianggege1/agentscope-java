@@ -36,8 +36,9 @@ import reactor.core.scheduler.Schedulers;
 /**
  * {@link MessageBus} implementation backed by {@link AbstractFilesystem}.
  *
- * <p>Works with any filesystem backend (local, remote, sandbox). Suitable for cross-process
- * scenarios where multiple JVMs share the same workspace directory.
+ * <p>Works with any filesystem backend (local, remote, sandbox). Cross-process delivery only
+ * works when the filesystem backend is actually shared (for example a remote/KV-backed store);
+ * a pure local disk backend remains single-process.
  *
  * <p>Mode D (pub/sub) is degraded to polling: {@link #subscribe} returns a {@code Flux} that emits
  * an empty signal every 3 seconds; {@link #publish} is a no-op.
@@ -71,15 +72,19 @@ import reactor.core.scheduler.Schedulers;
 public class WorkspaceMessageBus implements MessageBus {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceMessageBus.class);
+
     /** 文件系统操作使用的空 RuntimeContext（总线操作不依赖调用上下文）。 */
     private static final RuntimeContext RC = RuntimeContext.empty();
+
     /** D 模式降级轮询的间隔时间（每 3 秒发出一次空信号）。 */
     private static final Duration POLL_INTERVAL = Duration.ofSeconds(3);
 
     /** 底层文件系统抽象（本地/远端/沙箱均可）。 */
     private final AbstractFilesystem fs;
+
     /** 总线数据根目录（末尾斜杠已在构造时去除）。 */
     private final String busRoot;
+
     /** 条目 ID 序列生成器，以启动时刻纳秒值为种子保证多进程下尽量不冲突。 */
     private final AtomicLong seq = new AtomicLong(System.nanoTime());
 

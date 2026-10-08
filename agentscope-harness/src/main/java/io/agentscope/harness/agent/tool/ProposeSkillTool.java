@@ -162,7 +162,7 @@ public class ProposeSkillTool implements AgentTool {
                             // Step 2: optional scripts. Delegate sequentially via skill_manage
                             // write_file (same staging / scan / sidecar plumbing).
                             // 第二步：处理可选脚本列表。按序委托 skill_manage write_file 逐个上传
-                            //（复用同一套暂存、扫描与遥测机制）。
+                            // （复用同一套暂存、扫描与遥测机制）。
                             @SuppressWarnings("unchecked")
                             List<Map<String, Object>> scripts =
                                     (List<Map<String, Object>>) input.get("scripts");

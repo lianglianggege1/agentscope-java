@@ -24,6 +24,7 @@ import com.anthropic.models.messages.TextBlockParam;
 import com.anthropic.models.messages.ToolResultBlockParam;
 import com.anthropic.models.messages.ToolUseBlockParam;
 import io.agentscope.core.message.ContentBlock;
+import io.agentscope.core.message.DataBlock;
 import io.agentscope.core.message.HintBlock;
 import io.agentscope.core.message.ImageBlock;
 import io.agentscope.core.message.Msg;
@@ -33,6 +34,7 @@ import io.agentscope.core.message.ThinkingBlock;
 import io.agentscope.core.message.ToolResultBlock;
 import io.agentscope.core.message.ToolUseBlock;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -53,6 +55,8 @@ import org.slf4j.LoggerFactory;
 public class AnthropicMessageConverter {
 
     private static final Logger log = LoggerFactory.getLogger(AnthropicMessageConverter.class);
+    private static final AnthropicServerToolHelper SERVER_TOOL_HELPER =
+            AnthropicServerToolHelper.instance();
 
     private final AnthropicMediaConverter mediaConverter;
     private final Function<List<ContentBlock>, String> toolResultConverter;
@@ -84,6 +88,18 @@ public class AnthropicMessageConverter {
             Msg msg = messages.get(i);
             boolean isFirstMessage = (i == 0);
 
+            if (msg.getRole() == MsgRole.ASSISTANT && clientToolUses(msg).size() > 1) {
+                SplitToolResultSequence splitResults = collectSplitToolResults(messages, i + 1);
+                if (shouldSplitParallelToolCalls(msg, splitResults)) {
+                    result.addAll(convertParallelToolCalls(msg, splitResults));
+                    i += splitResults.consumedMessages();
+                    continue;
+                }
+            }
+
+            // Special handling for tool results - they create separate user messages.
+            // Server tool results (e.g. web_search_tool_result) stay inline in the
+            // assistant message instead.
             // Special handling for tool results - they create separate user messages
             // 工具结果需特殊处理——它们会创建单独的用户消息。
             if (msg.hasContentBlocks(ToolResultBlock.class)) {
@@ -92,7 +108,7 @@ public class AnthropicMessageConverter {
                 List<ToolResultBlock> toolResults = new ArrayList<>();
 
                 for (ContentBlock block : msg.getContent()) {
-                    if (block instanceof ToolResultBlock tr) {
+                    if (block instanceof ToolResultBlock tr && !tr.isServerTool()) {
                         toolResults.add(tr);
                     } else {
                         nonToolBlocks.add(block);
@@ -120,6 +136,129 @@ public class AnthropicMessageConverter {
         }
 
         return result;
+    }
+
+    /**
+     * Decide whether the current assistant message should be expanded into Anthropic's required
+     * tool-use/tool-result alternation.
+     *
+     * <p>Splitting is enabled only when all of the following are true:
+     *
+     * <ul>
+     *   <li>The current message role is {@link MsgRole#ASSISTANT}.
+     *   <li>At least one following pure tool-result message was discovered.
+     *   <li>The current message contains two or more {@link ToolUseBlock}s.
+     *   <li>Every tool-use id is present and non-blank.
+     *   <li>The number of collected tool results equals the number of tool uses, and every
+     *       tool-use id has a corresponding result.
+     * </ul>
+     */
+    private boolean shouldSplitParallelToolCalls(Msg msg, SplitToolResultSequence splitResults) {
+        if (msg.getRole() != MsgRole.ASSISTANT || splitResults.consumedMessages() == 0) {
+            return false;
+        }
+
+        List<ToolUseBlock> toolUses = clientToolUses(msg);
+        if (toolUses.size() <= 1) {
+            return false;
+        }
+
+        List<String> toolUseIds = toolUses.stream().map(ToolUseBlock::getId).toList();
+        if (toolUseIds.stream().anyMatch(id -> id == null || id.isBlank())) {
+            return false;
+        }
+
+        return splitResults.resultsById().size() == toolUseIds.size()
+                && toolUseIds.stream().allMatch(id -> splitResults.resultsById().containsKey(id));
+    }
+
+    /**
+     * Collect the consecutive pure tool-result messages that immediately follow an assistant
+     * message.
+     *
+     * <p>Scanning starts at {@code startIndex}, which is normally the message right after the
+     * assistant message being inspected. The scan continues only across messages whose content is
+     * made entirely of {@link ToolResultBlock}s. It stops as soon as a message has no tool results
+     * or contains any non-tool-result content, because such a message must be preserved in its
+     * original position rather than consumed into the split sequence.
+     */
+    private SplitToolResultSequence collectSplitToolResults(List<Msg> messages, int startIndex) {
+        Map<String, ToolResultBlock> byId = new LinkedHashMap<>();
+        int consumed = 0;
+
+        for (int i = startIndex; i < messages.size(); i++) {
+            Msg msg = messages.get(i);
+            List<ToolResultBlock> toolResults = msg.getContentBlocks(ToolResultBlock.class);
+            if (toolResults.isEmpty() || hasNonToolResultContent(msg)) {
+                break;
+            }
+
+            consumed++;
+            for (ToolResultBlock toolResult : toolResults) {
+                if (toolResult.getId() != null) {
+                    byId.putIfAbsent(toolResult.getId(), toolResult);
+                }
+            }
+        }
+
+        return new SplitToolResultSequence(byId, consumed);
+    }
+
+    private boolean hasNonToolResultContent(Msg msg) {
+        return msg.getContent().stream().anyMatch(block -> !(block instanceof ToolResultBlock));
+    }
+
+    /**
+     * Expand one assistant message with parallel tool uses into alternating Anthropic messages.
+     *
+     * <p>Each {@link ToolUseBlock} from the original assistant message is wrapped in its own
+     * assistant message and immediately followed by the matching user tool-result message. Any
+     * leading assistant content, such as explanatory text before the tool calls, is attached only
+     * to the first split assistant message so it is not duplicated across the generated sequence.
+     */
+    private List<MessageParam> convertParallelToolCalls(
+            Msg assistantMsg, SplitToolResultSequence splitResults) {
+        List<MessageParam> converted = new ArrayList<>();
+        // Server tool blocks (use + result) stay with the leading content; only client tool
+        // calls participate in the tool-use/tool-result alternation.
+        List<ContentBlock> leadingBlocks =
+                assistantMsg.getContent().stream()
+                        .filter(block -> !(block instanceof ToolUseBlock tub) || tub.isServerTool())
+                        .toList();
+        List<ToolUseBlock> toolUses = clientToolUses(assistantMsg);
+
+        for (int i = 0; i < toolUses.size(); i++) {
+            ToolUseBlock toolUse = toolUses.get(i);
+            List<ContentBlock> assistantBlocks = new ArrayList<>();
+            if (i == 0) {
+                assistantBlocks.addAll(leadingBlocks);
+            }
+            assistantBlocks.add(toolUse);
+
+            MessageParam assistantParam =
+                    convertMessageContent(assistantMsg, assistantBlocks, false);
+            if (assistantParam != null) {
+                converted.add(assistantParam);
+            }
+
+            ToolResultBlock toolResult = splitResults.resultsById().get(toolUse.getId());
+            converted.add(convertToolResult(toolResult));
+        }
+
+        return converted;
+    }
+
+    private record SplitToolResultSequence(
+            Map<String, ToolResultBlock> resultsById, int consumedMessages) {}
+
+    /**
+     * Tool calls that are executed by the local toolkit (i.e. excluding provider server tools
+     * such as Anthropic's web_search, which are executed on the server side).
+     */
+    private List<ToolUseBlock> clientToolUses(Msg msg) {
+        return msg.getContentBlocks(ToolUseBlock.class).stream()
+                .filter(toolUse -> !toolUse.isServerTool())
+                .toList();
     }
 
     /**
@@ -162,20 +301,47 @@ public class AnthropicMessageConverter {
                                                             + "]")
                                             .build()));
                 }
+            } else if (block instanceof DataBlock db) {
+                try {
+                    ImageBlockParam imageParam = mediaConverter.convertDataBlock(db);
+                    contentBlocks.add(ContentBlockParam.ofImage(imageParam));
+                } catch (Exception e) {
+                    log.warn("Failed to process DataBlock: {}", e.getMessage());
+                    contentBlocks.add(
+                            ContentBlockParam.ofText(
+                                    TextBlockParam.builder()
+                                            .text(
+                                                    "[Media - processing failed: "
+                                                            + e.getMessage()
+                                                            + "]")
+                                            .build()));
+                }
             } else if (block instanceof ToolUseBlock tub) {
-                contentBlocks.add(
-                        ContentBlockParam.ofToolUse(
-                                ToolUseBlockParam.builder()
-                                        .id(tub.getId())
-                                        .name(tub.getName())
-                                        .input(
-                                                JsonValue.from(
-                                                        tub.getInput() != null
-                                                                ? tub.getInput()
-                                                                : Map.of()))
-                                        .build()));
+                if (tub.isServerTool()) {
+                    // Server tool calls are echoed back as server_tool_use blocks
+                    contentBlocks.add(
+                            ContentBlockParam.ofServerToolUse(SERVER_TOOL_HELPER.encodeUse(tub)));
+                } else {
+                    contentBlocks.add(
+                            ContentBlockParam.ofToolUse(
+                                    ToolUseBlockParam.builder()
+                                            .id(tub.getId())
+                                            .name(tub.getName())
+                                            .input(
+                                                    JsonValue.from(
+                                                            tub.getInput() != null
+                                                                    ? tub.getInput()
+                                                                    : Map.of()))
+                                            .build()));
+                }
+            } else if (block instanceof ToolResultBlock trb && trb.isServerTool()) {
+                // Server tool results stay inline in the assistant message, echoed verbatim
+                ContentBlockParam param = SERVER_TOOL_HELPER.encodeResult(trb);
+                if (param != null) {
+                    contentBlocks.add(param);
+                }
             }
-            // ToolResultBlock is handled separately in convert() method
+            // Client ToolResultBlock is handled separately in convert() method
         }
 
         if (contentBlocks.isEmpty()) {
@@ -215,6 +381,13 @@ public class AnthropicMessageConverter {
                             blocks.add(ToolResultBlockParam.Content.Block.ofImage(imageParam));
                         } catch (Exception e) {
                             log.warn("Failed to process ImageBlock in tool result: {}", e);
+                        }
+                    } else if (cb instanceof DataBlock db) {
+                        try {
+                            ImageBlockParam imageParam = mediaConverter.convertDataBlock(db);
+                            blocks.add(ToolResultBlockParam.Content.Block.ofImage(imageParam));
+                        } catch (Exception e) {
+                            log.warn("Failed to process DataBlock in tool result: {}", e);
                         }
                     }
                 }

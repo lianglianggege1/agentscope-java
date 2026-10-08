@@ -28,13 +28,15 @@ import java.util.Map;
  * <p>Two responsibilities:
  *
  * <ul>
- *   <li>{@link #allow} / {@link #deny} — filter the harness's built-in tool surface.
+ *   <li>{@link #allow} / {@link #deny} — filter the <em>product catalog</em> tool surface
+ *       (filesystem, shell, web, …).
  *   <li>{@link #mcpServers} — declare additional tools served by external MCP servers.
  * </ul>
  *
- * <p>Filter semantics: when {@code allow} is non-empty, only tools whose names appear in it are
- * kept; {@code deny} always wins regardless of {@code allow}. Empty/absent values mean "no
- * filtering on this side".
+ * <p>Filter semantics: when {@code allow} is non-empty, catalogued tools not listed are removed;
+ * {@link HarnessPlatformTools} (subagents, teams, tasks, plan, skills, memory helpers, …) always
+ * survive {@code allow}. {@code deny} always wins. Empty/absent values mean "no filtering on this
+ * side".
  */
 /**
  * 从 {@code workspace/tools.json} 加载的工作空间级工具配置。
@@ -54,6 +56,7 @@ import java.util.Map;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ToolsConfig {
 
+    /** When non-empty, catalogued tools not listed here are hidden (platform tools exempt). */
     /** When non-empty, only tools whose name is in this list are exposed to the model. */
     /** 当列表非空时，仅向模型暴露名称存在于此列表内的工具。 */
     @JsonProperty("allow")
@@ -68,6 +71,25 @@ public class ToolsConfig {
     /** MCP服务标识至连接配置、工具白名单配置的映射。 */
     @JsonProperty("mcpServers")
     private Map<String, McpServerConfig> mcpServers;
+
+    private boolean defaultToolsEnabled = true;
+    private boolean strictAllow;
+
+    public boolean isStrictAllow() {
+        return strictAllow;
+    }
+
+    public void setStrictAllow(boolean value) {
+        strictAllow = value;
+    }
+
+    public boolean isDefaultToolsEnabled() {
+        return defaultToolsEnabled;
+    }
+
+    public void setDefaultToolsEnabled(boolean value) {
+        defaultToolsEnabled = value;
+    }
 
     public List<String> getAllow() {
         return allow;

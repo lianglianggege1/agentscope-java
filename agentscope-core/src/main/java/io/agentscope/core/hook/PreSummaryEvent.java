@@ -46,7 +46,7 @@ import java.util.Objects;
  * <p><b>Use Cases:</b>
  * <ul>
  *   <li>Inject additional context into the summary prompt</li>
- *       在摘要提示中添加更多上下文信息 
+ *       在摘要提示中添加更多上下文信息
  *   <li>Modify the summary system instructions</li>
  *       修改摘要系统指令
  *   <li>Change generation parameters for summary</li>

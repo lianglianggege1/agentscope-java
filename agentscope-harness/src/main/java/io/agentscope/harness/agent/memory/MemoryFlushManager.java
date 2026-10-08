@@ -24,17 +24,14 @@ import io.agentscope.core.message.ToolResultBlock;
 import io.agentscope.core.message.ToolUseBlock;
 import io.agentscope.core.model.Model;
 import io.agentscope.core.util.JsonUtils;
-import io.agentscope.harness.agent.memory.session.SessionEntry;
-import io.agentscope.harness.agent.memory.session.SessionTree;
+import io.agentscope.harness.agent.memory.compaction.ConversationCompactor;
+import io.agentscope.harness.agent.memory.session.SessionTranscriptWriter;
 import io.agentscope.harness.agent.workspace.WorkspaceConstants;
 import io.agentscope.harness.agent.workspace.WorkspaceManager;
-import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,26 +69,26 @@ public class MemoryFlushManager {
     （例如追加项目专属约束）。
     */
     /*public static final String DEFAULT_FLUSH_PROMPT =
-            """
-            你是记忆提取助手。分析下方对话内容，提取需要留存至后续会话的重要事实、决策、偏好与上下文信息。
+    """
+    你是记忆提取助手。分析下方对话内容，提取需要留存至后续会话的重要事实、决策、偏好与上下文信息。
 
-            仅以Markdown无序列表形式输出提取出的记忆内容。
-            每条内容为简洁且独立完整的信息；存在日期(dates)、人名(names)、具体细节(specifics)时一并保留。
+    仅以Markdown无序列表形式输出提取出的记忆内容。
+    每条内容为简洁且独立完整的信息；存在日期(dates)、人名(names)、具体细节(specifics)时一并保留。
 
-            若无值得记忆的内容，严格输出：NO_REPLY
+    若无值得记忆的内容，严格输出：NO_REPLY
 
-            提取准则(Guidelines)：
-            - 提取用户偏好(user preferences)、个人信息(personal)、项目相关决议(project decisions)
-            - 记录关键技术决策及其背后理由(Capture important technical decisions and their rationale)
-            - 记下所有承诺、截止时间与待执行事项(Note any commitments, deadlines, or action items)
-            - 留存人员协作信息（分工、团队架构）(Record relationship context (who works on what, team structure))
-            - 忽略常规问候、工具调用、临时状态信息(Ignore routine greetings, tool invocations, and ephemeral status updates)
+    提取准则(Guidelines)：
+    - 提取用户偏好(user preferences)、个人信息(personal)、项目相关决议(project decisions)
+    - 记录关键技术决策及其背后理由(Capture important technical decisions and their rationale)
+    - 记下所有承诺、截止时间与待执行事项(Note any commitments, deadlines, or action items)
+    - 留存人员协作信息（分工、团队架构）(Record relationship context (who works on what, team structure))
+    - 忽略常规问候、工具调用、临时状态信息(Ignore routine greetings, tool invocations, and ephemeral status updates)
 
-            重要写入规则（目标文件为追加模式）：
-            - 你写入的是**当日每日记忆账本（memory/YYYY-MM-DD.md）**，而非MEMORY.md。每日账本仅支持追加，你的输出会新增至已有记录末尾。
-            - MEMORY.md 是经过整理的长期记忆文件，仅作为只读上下文提供参考。不要重复记录MEMORY.md或今日已存在的条目；后续独立的整合任务会定期将新增账本内容合并至MEMORY.md。
-            - 每条记录保持独立完整，支持单独检索。
-            """;*/
+    重要写入规则（目标文件为追加模式）：
+    - 你写入的是**当日每日记忆账本（memory/YYYY-MM-DD.md）**，而非MEMORY.md。每日账本仅支持追加，你的输出会新增至已有记录末尾。
+    - MEMORY.md 是经过整理的长期记忆文件，仅作为只读上下文提供参考。不要重复记录MEMORY.md或今日已存在的条目；后续独立的整合任务会定期将新增账本内容合并至MEMORY.md。
+    - 每条记录保持独立完整，支持单独检索。
+    """;*/
 
     /**
      * Default prompt for the memory extraction step. Exposed publicly so callers can extend
@@ -99,33 +96,33 @@ public class MemoryFlushManager {
      * {@link io.agentscope.harness.agent.memory.MemoryConfig}.
      */
     public static final String DEFAULT_FLUSH_PROMPT =
-    """
-    You are a memory extraction assistant. Analyze the conversation below and extract \
-    important facts, decisions, preferences, and contextual information that should be \
-    remembered for future conversations.
+            """
+            You are a memory extraction assistant. Analyze the conversation below and extract \
+            important facts, decisions, preferences, and contextual information that should be \
+            remembered for future conversations.
 
-    Output ONLY the extracted memories as a markdown bullet list. Each item should be \
-    a concise, self-contained fact. Include dates, names, and specifics when available.
+            Output ONLY the extracted memories as a markdown bullet list. Each item should be \
+            a concise, self-contained fact. Include dates, names, and specifics when available.
 
-    If there is nothing worth remembering, respond with exactly: NO_REPLY
+            If there is nothing worth remembering, respond with exactly: NO_REPLY
 
-    Guidelines:
-    - Extract user preferences, personal information, project decisions
-    - Capture important technical decisions and their rationale
-    - Note any commitments, deadlines, or action items
-    - Record relationship context (who works on what, team structure)
-    - Ignore routine greetings, tool invocations, and ephemeral status updates
+            Guidelines:
+            - Extract user preferences, personal information, project decisions
+            - Capture important technical decisions and their rationale
+            - Note any commitments, deadlines, or action items
+            - Record relationship context (who works on what, team structure)
+            - Ignore routine greetings, tool invocations, and ephemeral status updates
 
-    IMPORTANT — write target and append-only rules:
-    - You are writing to TODAY'S daily memory ledger (memory/YYYY-MM-DD.md), NOT to \
-    MEMORY.md. The daily ledger is append-only — your output will be appended after the \
-    entries already shown below.
-    - MEMORY.md is the curated long-term memory and is shown ONLY as read-only context. \
-    Do NOT restate facts already covered by MEMORY.md or by today's earlier entries; a \
-    separate consolidation step periodically merges new daily entries into MEMORY.md.
-    - Keep each bullet point independent and self-contained so entries can be searched \
-    individually.\
-    """;
+            IMPORTANT — write target and append-only rules:
+            - You are writing to TODAY'S daily memory ledger (memory/YYYY-MM-DD.md), NOT to \
+            MEMORY.md. The daily ledger is append-only — your output will be appended after the \
+            entries already shown below.
+            - MEMORY.md is the curated long-term memory and is shown ONLY as read-only context. \
+            Do NOT restate facts already covered by MEMORY.md or by today's earlier entries; a \
+            separate consolidation step periodically merges new daily entries into MEMORY.md.
+            - Keep each bullet point independent and self-contained so entries can be searched \
+            individually.\
+            """;
 
     private final WorkspaceManager workspaceManager;
 
@@ -240,141 +237,39 @@ public class MemoryFlushManager {
      * Returns the string path of the session JSONL file where messages for the given agent and
      * session are offloaded. Used by the compaction layer to embed the archive location in the
      * summary message so the agent can retrieve full history if needed.
+     *
+     * @deprecated Prefer {@link SessionTranscriptWriter#resolveContextPath}.
      */
     /**
      * 返回会话JSONL文件的字符串路径，指定智能体与会话的消息将转储至该文件。
      * 压缩层使用该路径，将归档位置嵌入摘要消息，以便智能体在需要时读取完整历史记录。
      */
+    @Deprecated
     public String resolveOffloadPath(RuntimeContext rc, String agentId, String sessionId) {
-        try {
-            Path p = workspaceManager.resolveSessionContextFile(rc, agentId, sessionId);
-            return p != null ? p.toString() : "";
-        } catch (Exception e) {
-            log.debug(
-                    "Could not resolve offload path for agent={}, session={}: {}",
-                    agentId,
-                    sessionId,
-                    e.getMessage());
-            return "";
-        }
+        return new SessionTranscriptWriter(workspaceManager)
+                .resolveContextPath(rc, agentId, sessionId);
     }
 
     /**
      * Offloads raw messages to the JSONL session tree.
+     *
+     * @deprecated Prefer {@link SessionTranscriptWriter#appendMessages}. Kept as a thin
+     *     delegate so compaction / overflow-recovery call sites keep compiling during the
+     *     migration; new code should use {@link SessionTranscriptWriter} directly.
      */
     /**
      * 将原始消息转储至JSONL会话目录树。
      */
+    @Deprecated
     public void offloadMessages(
             RuntimeContext rc, List<Msg> messages, String agentId, String sessionId) {
-        offloadToSessionTree(rc, messages, agentId, sessionId);
-
+        new SessionTranscriptWriter(workspaceManager)
+                .appendMessages(rc, messages, agentId, sessionId);
         log.debug(
                 "Offloaded {} messages for agent={}, session={}",
                 messages.size(),
                 agentId,
                 sessionId);
-        workspaceManager.updateSessionIndex(rc, agentId, sessionId, "conversation offloaded");
-    }
-
-    private void offloadToSessionTree(
-            RuntimeContext rc, List<Msg> messages, String agentId, String sessionId) {
-        try {
-            Path contextFile = workspaceManager.resolveSessionContextFile(rc, agentId, sessionId);
-            String contextRelPath =
-                    WorkspaceConstants.AGENTS_DIR
-                            + "/"
-                            + agentId
-                            + "/"
-                            + WorkspaceConstants.SESSIONS_DIR
-                            + "/"
-                            + sessionId
-                            + WorkspaceConstants.SESSION_CONTEXT_EXT;
-            SessionTree tree =
-                    new SessionTree(
-                                    contextFile,
-                                    workspaceManager.getWorkspace(),
-                                    workspaceManager.getFilesystem(),
-                                    workspaceManager.getIndex(),
-                                    contextRelPath)
-                            .setRuntimeContext(rc);
-            tree.load();
-            // Sync from remote before appending so that entries written by a previous replica
-            // (cross-machine handoff) are included in the merged file pushed to remote.
-            // 追加数据前先从远端同步，确保上一副本（跨机器交接场景）写入的条目
-            // 能够纳入合并后的文件并推送至远端。
-            tree.syncFromRemote();
-
-            List<SessionEntry> existingEntries = new ArrayList<>(tree.getAllEntries());
-            Set<String> existingIds =
-                    existingEntries.stream()
-                            .map(SessionEntry::getId)
-                            .collect(Collectors.toCollection(HashSet::new));
-            String lastId =
-                    existingEntries.isEmpty()
-                            ? null
-                            : existingEntries.get(existingEntries.size() - 1).getId();
-
-            // The caller passes the full conversation on every turn. Use the stable Msg IDs
-            // to keep the session JSONL append-only and idempotent across repeated offloads.
-            // 调用方每一轮都会传入完整对话。依靠稳定的消息ID，
-            // 保障会话JSONL文件仅支持追加写入，且多次转储操作具备幂等性。
-            for (Msg msg : messages) {
-                if (msg.getRole() == null || isSessionContextMessage(msg)) {
-                    continue;
-                }
-                String rendered = renderContentBlocks(msg);
-                if (rendered == null || rendered.isBlank()) {
-                    continue;
-                }
-                String entryId = normalizeEntryId(msg.getId());
-                if (entryId == null) {
-                    log.warn(
-                            "Msg without stable ID encountered (role={}); dedup skipped",
-                            msg.getRole());
-                }
-                if (entryId != null && existingIds.contains(entryId)) {
-                    continue;
-                }
-                String toolCallId = extractToolCallId(msg);
-                SessionEntry.MessageEntry entry =
-                        new SessionEntry.MessageEntry(
-                                entryId, lastId, null, msg.getRole().name(), rendered, toolCallId);
-                tree.append(entry);
-                existingIds.add(entry.getId());
-                lastId = entry.getId();
-            }
-
-            tree.flush();
-        } catch (Exception e) {
-            log.warn("Failed to offload to JSONL session tree: {}", e.getMessage());
-        }
-    }
-
-    /**
-     * Extracts a representative tool call ID from a message, if present.
-     * For TOOL messages, returns the first ToolResultBlock's id.
-     * For ASSISTANT messages with tool calls, returns the first ToolUseBlock's id.
-     */
-    /**
-     * 从消息中提取具有代表性的工具调用ID（如有）。
-     * 若为工具消息，返回首个工具结果块的ID。
-     * 若为携带工具调用的助手消息，返回首个工具调用块的ID。
-     */
-    private static String extractToolCallId(Msg msg) {
-        for (ContentBlock block : msg.getContent()) {
-            if (block instanceof ToolResultBlock tr && tr.getId() != null) {
-                return tr.getId();
-            }
-            if (block instanceof ToolUseBlock tu && tu.getId() != null) {
-                return tu.getId();
-            }
-        }
-        return null;
-    }
-
-    private static String normalizeEntryId(String id) {
-        return id != null && !id.isBlank() ? id : null;
     }
 
     /**
@@ -418,8 +313,8 @@ public class MemoryFlushManager {
      * Serializes all messages into a textual representation for the memory extraction model.
      * Includes USER, ASSISTANT, and TOOL messages. Assistant tool-call blocks and tool-result
      * blocks are rendered as concise text so the model can extract memories from tool interactions.
-     * The injected {@code <session_context>} user message is skipped as it contains only
-     * environment metadata, not real conversation content.
+     * Internal context messages are skipped because they are generated from existing context,
+     * not new user/assistant/tool facts.
      */
     /**
      * 将所有消息序列化为文本形式，供记忆抽取模型使用。
@@ -430,10 +325,18 @@ public class MemoryFlushManager {
     private String serializeMessages(List<Msg> messages) {
         return messages.stream()
                 .filter(m -> m.getRole() != null && m.getRole() != MsgRole.SYSTEM)
-                .filter(m -> !isSessionContextMessage(m))
+                .filter(m -> !isInternalContextMessage(m))
                 .map(this::renderMessage)
                 .filter(s -> s != null && !s.isBlank())
                 .collect(Collectors.joining("\n"));
+    }
+
+    private static boolean isInternalContextMessage(Msg msg) {
+        return isSessionContextMessage(msg) || isCompactionSummaryMessage(msg);
+    }
+
+    private static boolean isCompactionSummaryMessage(Msg msg) {
+        return msg != null && ConversationCompactor.SUMMARY_MSG_NAME.equals(msg.getName());
     }
 
     private static boolean isSessionContextMessage(Msg msg) {

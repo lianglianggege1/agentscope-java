@@ -37,6 +37,8 @@ import io.agentscope.core.message.ToolUseBlock;
 import io.agentscope.core.model.ChatResponse;
 import io.agentscope.core.model.Model;
 import io.agentscope.harness.agent.filesystem.local.LocalFilesystem;
+import io.agentscope.harness.agent.testing.HarnessQuiescence;
+import java.net.http.HttpClient;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -61,6 +63,7 @@ import reactor.core.publisher.Flux;
  * child → parent turn 2) yields the appropriate {@link ChatResponse}. This mirrors how
  * {@code buildDeclaredFactory} captures {@code this.model} for child agents.
  */
+@HarnessQuiescence
 /**
  * 验证同步本地子代理调用会将子代理产生的{@link Event}转发至父代理
  * {@link HarnessAgent#stream(List, StreamOptions, RuntimeContext)} 流水线，
@@ -80,6 +83,8 @@ class HarnessAgentSubagentStreamTest {
     // "parent" agent's persisted AgentState from leaking between cases.
     @TempDir Path stateHome;
 
+    private HarnessAgent parent;
+    private HarnessAgent agent;
     private String previousStateHome;
 
     @BeforeEach
@@ -90,6 +95,12 @@ class HarnessAgentSubagentStreamTest {
 
     @AfterEach
     void restoreStateHome() {
+        if (parent != null) {
+            parent.close();
+        }
+        if (agent != null) {
+            agent.close();
+        }
         if (previousStateHome != null) {
             System.setProperty("agentscope.state.home", previousStateHome);
         } else {
@@ -205,7 +216,7 @@ class HarnessAgentSubagentStreamTest {
                 // Turn 3 (parent): final summary
                 .thenReturn(Flux.just(stopChunk("p2", "summary done")));
 
-        HarnessAgent parent =
+        parent =
                 HarnessAgent.builder()
                         .name("parent")
                         .model(model)
@@ -302,7 +313,7 @@ class HarnessAgentSubagentStreamTest {
                 // parent final
                 .thenReturn(Flux.just(stopChunk("p2", "all done")));
 
-        HarnessAgent parent =
+        parent =
                 HarnessAgent.builder()
                         .name("parent")
                         .model(model)
@@ -386,7 +397,7 @@ class HarnessAgentSubagentStreamTest {
                 .thenReturn(Flux.just(stopChunk("c1", "analysis complete")))
                 .thenReturn(Flux.just(stopChunk("p2", "result obtained")));
 
-        HarnessAgent parent =
+        parent =
                 HarnessAgent.builder()
                         .name("parent")
                         .model(model)
@@ -403,6 +414,66 @@ class HarnessAgentSubagentStreamTest {
         assertNotNull(reply, "reply must not be null");
         assertTrue(
                 reply.getTextContent().contains("result obtained"),
+                "final reply text mismatch; got: " + reply.getTextContent());
+    }
+
+    /**
+     * A custom {@link java.net.http.HttpClient} configured on the parent builder must be inherited
+     * by spawned subagents: {@code buildDeclaredFactory} captures {@code b.webHttpClient} and
+     * forwards it onto the child builder.
+     */
+    @Test
+    void call_localSubagent_inheritsCustomWebHttpClient() throws Exception {
+        String childId = "webclient-child";
+        Files.createDirectories(workspace.resolve("subagents"));
+        Files.writeString(
+                workspace.resolve("subagents/" + childId + ".md"),
+                """
+                ---
+                description: Web client child
+                ---
+                You are a helper.
+                """);
+
+        Model model = mock(Model.class);
+        when(model.getModelName()).thenReturn("stub");
+        when(model.stream(anyList(), any(), any()))
+                .thenReturn(
+                        Flux.just(
+                                toolCallChunk(
+                                        "p1",
+                                        "agent_spawn",
+                                        Map.of(
+                                                "agent_id",
+                                                childId,
+                                                "task",
+                                                "check",
+                                                "timeout_seconds",
+                                                60))))
+                .thenReturn(Flux.just(stopChunk("c1", "child done")))
+                .thenReturn(Flux.just(stopChunk("p2", "parent done")));
+
+        parent =
+                HarnessAgent.builder()
+                        .name("parent")
+                        .model(model)
+                        .workspace(workspace)
+                        .abstractFilesystem(new LocalFilesystem(workspace))
+                        .webHttpClient(
+                                HttpClient.newBuilder()
+                                        .version(HttpClient.Version.HTTP_1_1)
+                                        .build())
+                        .build();
+
+        Msg reply =
+                parent.call(
+                                List.of(Msg.builder().role(MsgRole.USER).textContent("go").build()),
+                                RuntimeContext.builder().sessionId("sess-webclient").build())
+                        .block();
+
+        assertNotNull(reply, "reply must not be null");
+        assertTrue(
+                reply.getTextContent().contains("parent done"),
                 "final reply text mismatch; got: " + reply.getTextContent());
     }
 
@@ -479,7 +550,7 @@ class HarnessAgentSubagentStreamTest {
         Model model = mock(Model.class);
         when(model.getModelName()).thenReturn("stub");
 
-        HarnessAgent agent =
+        agent =
                 HarnessAgent.builder()
                         .name("diag-parent")
                         .model(model)

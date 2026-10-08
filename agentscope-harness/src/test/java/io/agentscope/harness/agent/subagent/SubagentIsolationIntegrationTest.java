@@ -24,6 +24,7 @@ import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.agent.test.MockModel;
 import io.agentscope.harness.agent.HarnessAgent;
 import io.agentscope.harness.agent.middleware.SubagentEntry;
+import io.agentscope.harness.agent.testing.HarnessQuiescence;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -37,6 +38,7 @@ import org.junit.jupiter.api.io.TempDir;
  * (userId, sessionId), distinct IDs are sufficient to guarantee state isolation across all
  * configured AgentStateStore stores.
  */
+@HarnessQuiescence
 /**
  * 端到端 B-0 阶段隔离性验证：在不同父 {@link RuntimeContext} 下创建同一 {@code SubagentDeclaration}，
  * 校验每个子 {@link ReActAgent} 最终获得独立的会话ID。

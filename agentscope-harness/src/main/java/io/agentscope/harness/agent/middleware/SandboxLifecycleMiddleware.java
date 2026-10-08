@@ -21,7 +21,9 @@ import io.agentscope.harness.agent.sandbox.Sandbox;
 import io.agentscope.harness.agent.sandbox.SandboxAcquireResult;
 import io.agentscope.harness.agent.sandbox.SandboxContext;
 import io.agentscope.harness.agent.sandbox.SandboxManager;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.EnumSet;
+import java.util.Set;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,19 +35,25 @@ import org.slf4j.LoggerFactory;
  *   <li>Read {@link SandboxContext} from the current {@link RuntimeContext}</li>
  *   <li>Acquire a session via {@link SandboxManager}</li>
  *   <li>Start the session (4-branch workspace init)</li>
- *   <li>Inject the live session into the {@link SandboxBackedFilesystem} proxy</li>
+ *   <li>Bind the live session on the per-call {@link RuntimeContext} for the
+ *       {@link SandboxBackedFilesystem} proxy to resolve</li>
  * </ol>
  *
  * <h2>doFinally</h2>
  * <ol>
+ *   <li>Release the session via {@link SandboxManager} (stop + optional shutdown)</li>
  *   <li>Persist sandbox session state via {@link SandboxManager} and
  *       {@link io.agentscope.harness.agent.sandbox.SessionSandboxStateStore}</li>
- *   <li>Release the session via {@link SandboxManager} (stop + optional shutdown)</li>
- *   <li>Clear the session reference from the filesystem proxy</li>
+ *   <li>Clear this call's session binding from the {@link RuntimeContext}</li>
  * </ol>
  *
  * <p>Post-call failures (persist, release) are logged but do not propagate — this ensures
  * the agent call result is always returned to the caller even if sandbox cleanup fails.
+ *
+ * <p>The sandbox is bound <em>per call</em> on the invocation's {@link RuntimeContext} rather than
+ * on a shared agent-level slot: distinct {@code (userId, sessionId)} sessions run in parallel on
+ * the same agent bean, so a shared slot would let concurrent calls corrupt each other's binding
+ * (issue #2490).
  */
 /**
  * 中间件，在每次智能体调用前后管理沙箱会话的生命周期。
@@ -79,13 +87,7 @@ public class SandboxLifecycleMiddleware implements HarnessRuntimeMiddleware {
     /** 沙箱文件系统代理，持有当前可用会话，智能体的文件操作经它路由进沙箱。 */
     private final SandboxBackedFilesystem filesystemProxy;
 
-    /**
-     * 当前调用持有的沙箱获取结果（包含沙箱实例与租约）。
-     * 使用 {@link AtomicReference} 便于在释放时通过 {@code getAndSet(null)} 原子地取出并清空，
-     * 防止重复释放。
-     */
-    private final AtomicReference<SandboxAcquireResult> currentAcquireResult =
-            new AtomicReference<>();
+    private volatile Consumer<RuntimeContext> beforeStartCallback;
 
     /**
      * @param sandboxManager 沙箱管理器，负责会话获取与释放
@@ -95,6 +97,27 @@ public class SandboxLifecycleMiddleware implements HarnessRuntimeMiddleware {
             SandboxManager sandboxManager, SandboxBackedFilesystem filesystemProxy) {
         this.sandboxManager = sandboxManager;
         this.filesystemProxy = filesystemProxy;
+    }
+
+    /**
+     * Session lifecycle is driven explicitly by HarnessAgent; participates at no point.
+     * Subclasses overriding hooks must re-declare.
+     */
+    @Override
+    public Set<ExtensionPoint> activePoints() {
+        return EnumSet.noneOf(ExtensionPoint.class);
+    }
+
+    /**
+     * Registers a callback that runs after the sandbox session is acquired but before
+     * {@link io.agentscope.harness.agent.sandbox.Sandbox#start()} applies workspace projection.
+     * This allows callers to materialise resources on the host workspace (e.g.
+     * {@code .skills-cache/}) so that projection picks them up in the same call.
+     *
+     * @param callback receives the per-call {@link RuntimeContext}; may be {@code null} to clear
+     */
+    public void setBeforeStartCallback(Consumer<RuntimeContext> callback) {
+        this.beforeStartCallback = callback;
     }
 
     /**
@@ -124,20 +147,39 @@ public class SandboxLifecycleMiddleware implements HarnessRuntimeMiddleware {
             return;
         }
         try {
+            Consumer<RuntimeContext> cb = beforeStartCallback;
+            if (cb != null) {
+                try {
+                    cb.accept(ctx);
+                } catch (Exception e) {
+                    log.warn(
+                            "[sandbox-mw] beforeStartCallback failed; proceeding with sandbox"
+                                    + " start: {}",
+                            e.getMessage(),
+                            e);
+                }
+            }
             // 获取沙箱会话（含租约）
             SandboxAcquireResult result = sandboxManager.acquire(sandboxContext, ctx);
             Sandbox sandbox = result.getSandbox();
             try {
                 // 启动沙箱（含工作区初始化）并注入文件系统代理供本次调用使用
                 sandbox.start();
+                // Bind the acquired sandbox per-call on this invocation's RuntimeContext rather
+                // than only on a shared agent-level slot. Distinct (userId, sessionId) sessions
+                // run in parallel on the same agent bean, so a shared slot lets concurrent calls
+                // corrupt each other's binding (issue #2490). The filesystem proxy resolves the
+                // sandbox from this context first; the field below is a best-effort fallback for
+                // context-free callers (e.g. WorkspaceMessageBus) that do not thread a per-call.
+                ctx.put(SandboxAcquireResult.class, result);
                 filesystemProxy.setSandbox(sandbox);
-                currentAcquireResult.set(result);
                 log.debug(
                         "[sandbox-mw] Acquired sandbox {}",
                         sandbox.getState() != null ? sandbox.getState().getSessionId() : "?");
             } catch (Exception e) {
                 // 启动或注入失败：清理代理引用，回滚释放会话与租约，再向外抛出
-                filesystemProxy.setSandbox(null);
+                ctx.put(SandboxAcquireResult.class, null);
+                filesystemProxy.clearSandboxIfCurrent(sandbox);
                 try {
                     sandboxManager.release(result);
                 } catch (Exception releaseErr) {
@@ -172,27 +214,36 @@ public class SandboxLifecycleMiddleware implements HarnessRuntimeMiddleware {
      * @param ctx 单次调用的运行上下文（获取阶段捕获的同一个上下文）
      */
     public void releaseForCall(RuntimeContext ctx) {
-        // 原子取出并置空：保证同一结果只会被释放一次
-        SandboxAcquireResult result = currentAcquireResult.getAndSet(null);
+        if (ctx == null) {
+            return;
+        }
+        // Read back the binding this same call established in acquireForCall, so a call only ever
+        // tears down its own sandbox — never a concurrent session's (issue #2490).
+        SandboxAcquireResult result = ctx.get(SandboxAcquireResult.class);
         if (result == null) {
             // 本次调用未获取沙箱（或已释放），无需清理
             return;
         }
-        SandboxContext sandboxContext = ctx != null ? ctx.get(SandboxContext.class) : null;
-        try {
-            // 持久化沙箱会话状态，供下次调用恢复现场
-            sandboxManager.persistState(result, sandboxContext, ctx);
-        } catch (Exception e) {
-            log.warn("[sandbox-mw] Failed to persist sandbox state: {}", e.getMessage(), e);
-        }
+        ctx.put(SandboxAcquireResult.class, null);
+        // Compare-and-clear the fallback field so a releasing call never nulls a concurrent
+        // sibling's binding (issue #2490); it only clears the field when it still points here.
+        filesystemProxy.clearSandboxIfCurrent(result.getSandbox());
+        SandboxContext sandboxContext = ctx.get(SandboxContext.class);
+        // Release (stop/persist workspace) first so state mutations made during stop — e.g.
+        // workspaceRootReady or per-session snapshot records — are captured by the persist below.
         try {
             // 释放会话（停止会话，视配置决定是否关闭沙箱实例）
             sandboxManager.release(result);
         } catch (Exception e) {
             log.warn("[sandbox-mw] Failed to release sandbox session: {}", e.getMessage(), e);
         }
+        try {
+            // 持久化沙箱会话状态，供下次调用恢复现场
+            sandboxManager.persistState(result, sandboxContext, ctx);
+        } catch (Exception e) {
+            log.warn("[sandbox-mw] Failed to persist sandbox state: {}", e.getMessage(), e);
+        }
         // 关闭租约并清除代理引用，避免后续误用已释放的沙箱
         result.getLease().close();
-        filesystemProxy.setSandbox(null);
     }
 }

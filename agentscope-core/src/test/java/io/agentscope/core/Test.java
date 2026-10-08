@@ -1,6 +1,6 @@
 package io.agentscope.core;
 
-//滴滴的面试
+// 滴滴的面试
 public class Test {
 
     // DAG编排使用的链表
@@ -17,6 +17,7 @@ public class Test {
         // exec 执行任务
         exec(a);
     }
+
     public static void exec(Node node) {
         if (node == null) {
             return;
@@ -24,13 +25,11 @@ public class Test {
         System.out.println(node.task);
         exec(node.next);
     }
-
 }
-
 
 class Node {
 
-    public String task; //表示任务的执行
+    public String task; // 表示任务的执行
 
     public Node next; // 表示下一个任务
 
@@ -39,5 +38,4 @@ class Node {
     Node(String task) {
         this.task = task;
     }
-
 }

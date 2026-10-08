@@ -24,16 +24,19 @@ import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.Model;
 import io.agentscope.core.model.ModelRegistry;
 import io.agentscope.core.model.ToolSchema;
-import io.agentscope.core.skill.AgentSkill;
-import io.agentscope.core.skill.SkillBox;
 import io.agentscope.core.skill.SkillFilter;
 import io.agentscope.core.skill.repository.AgentSkillRepository;
 import io.agentscope.core.skill.repository.FileSystemSkillRepository;
 import io.agentscope.core.tool.Toolkit;
+import io.agentscope.harness.agent.coordination.LocalPeriodicGate;
+import io.agentscope.harness.agent.coordination.PeriodicGate;
+import io.agentscope.harness.agent.coordination.StoreBackedPeriodicGate;
 import io.agentscope.harness.agent.filesystem.AbstractFilesystem;
+import io.agentscope.harness.agent.filesystem.remote.store.BaseStore;
 import io.agentscope.harness.agent.filesystem.remote.store.NamespaceFactory;
 import io.agentscope.harness.agent.filesystem.sandbox.SandboxBackedFilesystem;
 import io.agentscope.harness.agent.filesystem.spec.LocalFilesystemSpec;
+import io.agentscope.harness.agent.memory.MemoryConfig;
 import io.agentscope.harness.agent.memory.compaction.CompactionConfig;
 import io.agentscope.harness.agent.memory.compaction.ToolResultEvictionConfig;
 import io.agentscope.harness.agent.middleware.DynamicSubagentsMiddleware;
@@ -51,11 +54,10 @@ import io.agentscope.harness.agent.workspace.WorkspaceManager;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,34 +89,34 @@ final class HarnessAgentBuilderSupport {
      * 任务本体将作为首条用户消息传入，不在此处重复携带。
      */
     /*static final String SUBAGENT_CONTEXT_SECTION =
-            """
-             # 子代理上下文
+    """
+     # 子代理上下文
 
-             你是主代理为特定任务而生成的一个**子代理**。
+     你是主代理为特定任务而生成的一个**子代理**。
 
-             ## 你的角色
-             - 完成分配的任务。这是你的全部目的。
-             - 你不是主要代理人。不要试图成为主要代理人。
+     ## 你的角色
+     - 完成分配的任务。这是你的全部目的。
+     - 你不是主要代理人。不要试图成为主要代理人。
 
-             ## 规则
-             1. **保持专注** — 专注于完成分配给你的任务，不要分心
-             2. **完成任务** — 您的最终消息将自动报告给主代理
-             3. **不要主动** — 不要主动示好，不要主动采取行动，不要主动做额外任务
-             4. **短暂存在** — 任务完成后，你可能会被终止。这没关系。
-             5. **从截断的工具输出中恢复** — 如果您看到“[截断：输出超出上下文限制]”，请使用较小的数据块（使用偏移量/限制读取，或使用有针对性的grep/head/tail）重新读取您需要的内容，而不是全部重新读取
+     ## 规则
+     1. **保持专注** — 专注于完成分配给你的任务，不要分心
+     2. **完成任务** — 您的最终消息将自动报告给主代理
+     3. **不要主动** — 不要主动示好，不要主动采取行动，不要主动做额外任务
+     4. **短暂存在** — 任务完成后，你可能会被终止。这没关系。
+     5. **从截断的工具输出中恢复** — 如果您看到“[截断：输出超出上下文限制]”，请使用较小的数据块（使用偏移量/限制读取，或使用有针对性的grep/head/tail）重新读取您需要的内容，而不是全部重新读取
 
-             ## 输出格式
-             完成后，你的最终回复应包括：
-             - 你所取得的成就或发现
-             - 主要代理人应了解的任何相关细节
-             - 保持简洁但信息丰富
+     ## 输出格式
+     完成后，你的最终回复应包括：
+     - 你所取得的成就或发现
+     - 主要代理人应了解的任何相关细节
+     - 保持简洁但信息丰富
 
-             ## 你不应该做的事
-             - 无用户对话（这是主要代理人的职责）
-             - 不再生成更多子代理 — 你是一名基层工作者
-             - 不要假装自己是主要行动者
-             - 返回纯文本结果；让主代理将它们传递给用户
-            """;*/
+     ## 你不应该做的事
+     - 无用户对话（这是主要代理人的职责）
+     - 不再生成更多子代理 — 你是一名基层工作者
+     - 不要假装自己是主要行动者
+     - 返回纯文本结果；让主代理将它们传递给用户
+    """;*/
 
     // @formatter:off
     /**
@@ -173,9 +175,19 @@ final class HarnessAgentBuilderSupport {
         return base.isEmpty() ? SUBAGENT_CONTEXT_SECTION : base + "\n\n" + SUBAGENT_CONTEXT_SECTION;
     }
 
-    /** Custom-supplied subagent factory entry: name + factory function from name to Agent. */
-    /** 用户自定义子智能体工厂条目：包含名称以及根据名称生成智能体的工厂函数。 */
-    record SubagentFactoryEntry(String name, Function<String, Agent> factory) {}
+    /**
+     * Custom-supplied subagent factory entry: name + optional description + factory function from
+     * name to Agent.
+     *
+     * <p>用户自定义子智能体工厂条目：包含名称、可选描述，以及根据名称生成智能体的工厂函数。
+     */
+    record SubagentFactoryEntry(String name, String description, Function<String, Agent> factory) {
+
+        /** Description shown to the orchestrator, falling back to the name when unset. */
+        String displayDescription() {
+            return description != null && !description.isBlank() ? description : name;
+        }
+    }
 
     // -----------------------------------------------------------------
     //  Filesystem
@@ -278,11 +290,11 @@ final class HarnessAgentBuilderSupport {
                         buildGeneralPurposeFactory(b, resolvedWorkspace, sandboxFs),
                         null));
         /*entries.add(
-                new SubagentEntry(
-                        "general-purpose",
-                        "通用子智能体，具备与主智能体相同的全部能力，可用于各类能够全权委派的独立任务。",
-                        buildGeneralPurposeFactory(b, resolvedWorkspace, sandboxFs),
-                        null));*/
+        new SubagentEntry(
+                "general-purpose",
+                "通用子智能体，具备与主智能体相同的全部能力，可用于各类能够全权委派的独立任务。",
+                buildGeneralPurposeFactory(b, resolvedWorkspace, sandboxFs),
+                null));*/
 
         // 编程式声明 + 目录声明统一物化为条目
         for (SubagentDeclaration decl : allDeclarations) {
@@ -298,7 +310,7 @@ final class HarnessAgentBuilderSupport {
             entries.add(
                     new SubagentEntry(
                             custom.name(),
-                            custom.name(),
+                            custom.displayDescription(),
                             // custom factory uses Function<String, Agent> — pre-B-0 signature
                             // doesn't accept RuntimeContext. Bridge by ignoring rc here; users
                             // that need parent-aware isolation should register a programmatic
@@ -330,19 +342,19 @@ final class HarnessAgentBuilderSupport {
         List<SubagentEntry> entries = new ArrayList<>();
 
         entries.add(
-        new SubagentEntry(
-                "general-purpose",
-                "General-purpose subagent with same capabilities as the main agent."
-                        + " Use for any isolated task that can be fully delegated.",
-                buildGeneralPurposeFactory(b, resolvedWorkspace, sandboxFs),
-                null));
-
-        /*entries.add(
                 new SubagentEntry(
                         "general-purpose",
-                        "通用子智能体，能力与主智能体完全一致，适用于各类可完整委派的独立任务。",
+                        "General-purpose subagent with same capabilities as the main agent."
+                                + " Use for any isolated task that can be fully delegated.",
                         buildGeneralPurposeFactory(b, resolvedWorkspace, sandboxFs),
-                        null));*/
+                        null));
+
+        /*entries.add(
+        new SubagentEntry(
+                "general-purpose",
+                "通用子智能体，能力与主智能体完全一致，适用于各类可完整委派的独立任务。",
+                buildGeneralPurposeFactory(b, resolvedWorkspace, sandboxFs),
+                null));*/
 
         for (SubagentDeclaration decl : b.subagentDeclarations) {
             entries.add(
@@ -357,7 +369,7 @@ final class HarnessAgentBuilderSupport {
             entries.add(
                     new SubagentEntry(
                             custom.name(),
-                            custom.name(),
+                            custom.displayDescription(),
                             // custom factory uses Function<String, Agent> — pre-B-0 signature
                             // doesn't accept RuntimeContext. Bridge by ignoring rc here; users
                             // that need parent-aware isolation should register a programmatic
@@ -368,6 +380,26 @@ final class HarnessAgentBuilderSupport {
         }
 
         return entries;
+    }
+
+    private static io.agentscope.harness.agent.tools.ToolsConfig childToolsConfig(
+            io.agentscope.harness.agent.tools.ToolsConfig parent, List<String> allow) {
+        if (allow == null || allow.isEmpty()) return parent;
+        var child = new io.agentscope.harness.agent.tools.ToolsConfig();
+        child.setStrictAllow(true);
+        child.setDefaultToolsEnabled(false);
+        child.setAllow(
+                allow.stream()
+                        .filter(
+                                name ->
+                                        io.agentscope.harness.agent.tools.ToolFilter.isAllowed(
+                                                name, parent))
+                        .toList());
+        if (parent != null) {
+            child.setDeny(parent.getDeny());
+            child.setMcpServers(parent.getMcpServers());
+        }
+        return child;
     }
 
     /**
@@ -381,7 +413,17 @@ final class HarnessAgentBuilderSupport {
         // 构建期快照：把父级 Builder 的配置冻结为 final 局部变量，
         // 供 spawn 时刻（lambda 执行时）使用，避免构建后父配置继续变化影响子智能体。
         final Model capturedModel = b.model;
-        final Toolkit capturedParentToolkit = b.toolkit != null ? b.toolkit.copy() : new Toolkit();
+        final var capturedToolsConfig = b.toolsConfigOverride;
+        final var capturedSkillFilter = b.skillFilter;
+        final var capturedPermissions = b.permissionContextOverride;
+        final var capturedDisableDefaultSkills = b.disableDefaultWorkspaceSkills;
+        final var capturedSandboxSpec = b.sandboxFilesystemSpec;
+        final var capturedRemoteSpec = b.remoteFilesystemSpec;
+        final var capturedRoutes = Map.copyOf(b.filesystemRoutes);
+
+        final boolean capturedPendingToolRecovery = b.enablePendingToolRecovery;
+        final Toolkit capturedParentToolkit =
+                b.toolkit != null ? b.toolkit.copy() : HarnessAgent.Builder.newDefaultToolkit();
         final AbstractFilesystem capturedBackend =
                 sandboxFs != null ? sandboxFs : b.abstractFilesystem;
         final int capturedMaxIters = b.maxIters;
@@ -389,6 +431,7 @@ final class HarnessAgentBuilderSupport {
         final ExecutionConfig capturedToolExec = b.toolExecutionConfig;
         final GenerateOptions capturedGenOpts = b.generateOptions;
         final String capturedEnvMemory = b.environmentMemory;
+        final MemoryConfig capturedMemoryConfig = b.memoryConfig;
         final List<Hook> capturedHooks = List.copyOf(b.hooks);
         // L486: 构建时快照父 Builder 上的用户中间
         final List<MiddlewareBase> capturedMiddlewares = List.copyOf(b.middlewares);
@@ -399,8 +442,12 @@ final class HarnessAgentBuilderSupport {
         final boolean capturedDisableShellTool = b.disableShellTool;
         final boolean capturedDisableMemoryTools = b.disableMemoryTools;
         final boolean capturedDisableMemoryHooks = b.disableMemoryHooks;
+        final var capturedWebHttpClient = b.webHttpClient;
         final boolean capturedDisableSessionPersistence = b.disableSessionPersistence;
         final boolean capturedDisableWorkspaceContext = b.disableWorkspaceContext;
+        final boolean capturedPlanModeEnabled = b.planModeEnabled;
+        final boolean capturedPlanModeAllowShell = b.planModeAllowShell;
+        final String capturedPlanFileDir = b.planFileDir;
         final CompactionConfig capturedCompactionConfig = b.compactionConfig;
         final boolean capturedDisableCompaction = b.disableCompaction;
         final ToolResultEvictionConfig capturedToolResultEvictionConfig =
@@ -427,6 +474,7 @@ final class HarnessAgentBuilderSupport {
             HarnessAgent.Builder sub =
                     HarnessAgent.builder()
                             .name("general-purpose-subagent")
+                            .enablePendingToolRecovery(capturedPendingToolRecovery)
                             .description("General-purpose subagent for isolated task execution")
                             .sysPrompt(buildSubagentSysPrompt(null))
                             .model(capturedModel)
@@ -435,18 +483,31 @@ final class HarnessAgentBuilderSupport {
                             .asLeafSubagent()
                             .maxIters(capturedMaxIters)
                             .environmentMemory(capturedEnvMemory)
+                            .memory(capturedMemoryConfig)
                             .useLegacyXmlWorkspaceContext(capturedUseLegacyXmlWorkspaceContext)
                             .enableAgentTracingLog(capturedAgentTracingLogEnabled)
                             .maxContextTokens(capturedMaxContextTokens);
 
+            if (capturedPermissions != null) sub.permissionContext(capturedPermissions);
+            if (capturedDisableDefaultSkills) sub.disableDefaultWorkspaceSkills();
+            if (capturedSkillFilter != null) sub.skillFilter(capturedSkillFilter);
             capturedAdditionalContextFiles.forEach(sub::additionalContextFile);
+            if (capturedToolsConfig != null) sub.toolsConfig(capturedToolsConfig);
+            capturedRoutes.forEach(sub::filesystemRoute);
+            if (capturedBackend == null && capturedRemoteSpec != null)
+                sub.filesystem(capturedRemoteSpec);
+            if (capturedBackend == null && capturedSandboxSpec != null)
+                sub.filesystem(capturedSandboxSpec);
 
             if (capturedDisableFilesystemTools) sub.disableFilesystemTools();
             if (capturedDisableShellTool) sub.disableShellTool();
             if (capturedDisableMemoryTools) sub.disableMemoryTools();
             if (capturedDisableMemoryHooks) sub.disableMemoryHooks();
+            if (capturedWebHttpClient != null) sub.webHttpClient(capturedWebHttpClient);
             if (capturedDisableSessionPersistence) sub.disableSessionPersistence();
             if (capturedDisableWorkspaceContext) sub.disableWorkspaceContext();
+            configurePlanMode(
+                    sub, capturedPlanModeEnabled, capturedPlanModeAllowShell, capturedPlanFileDir);
 
             if (!capturedSkillRepos.isEmpty()) sub.skillRepositories(capturedSkillRepos);
             if (capturedProjectGlobalSkillsDir != null) {
@@ -488,19 +549,43 @@ final class HarnessAgentBuilderSupport {
             Path mainWorkspace,
             SandboxBackedFilesystem sandboxFs) {
         final Model capturedModel = b.model;
-        final Toolkit capturedParentToolkit = b.toolkit != null ? b.toolkit.copy() : new Toolkit();
+        final var capturedToolsConfig = b.toolsConfigOverride;
+        final var capturedSkillFilter = b.skillFilter;
+        final var capturedPermissions = b.permissionContextOverride;
+        final var capturedDisableDefaultSkills = b.disableDefaultWorkspaceSkills;
+        final var capturedSandboxSpec = b.sandboxFilesystemSpec;
+        final var capturedRemoteSpec = b.remoteFilesystemSpec;
+        final var capturedRoutes = Map.copyOf(b.filesystemRoutes);
+
+        final boolean capturedPendingToolRecovery =
+                decl.getEnablePendingToolRecovery() != null
+                        ? decl.getEnablePendingToolRecovery()
+                        : b.enablePendingToolRecovery;
+        final Toolkit capturedParentToolkit =
+                b.toolkit != null ? b.toolkit.copy() : HarnessAgent.Builder.newDefaultToolkit();
         final Function<String, Model> capturedResolver = b.modelResolver;
         // L486: 构建时快照父 Builder 上的用户中间
         final List<MiddlewareBase> capturedMiddlewares = List.copyOf(b.middlewares);
         final AbstractFilesystem capturedSharedBackend =
                 sandboxFs != null ? sandboxFs : b.abstractFilesystem;
+        final MemoryConfig capturedMemoryConfig = b.memoryConfig;
         final boolean capturedUseLegacyXmlWorkspaceContext = b.useLegacyXmlWorkspaceContext;
         final boolean capturedDisableFilesystemTools = b.disableFilesystemTools;
         final boolean capturedDisableShellTool = b.disableShellTool;
         final boolean capturedDisableMemoryTools = b.disableMemoryTools;
         final boolean capturedDisableMemoryHooks = b.disableMemoryHooks;
+        final var capturedWebHttpClient = b.webHttpClient;
         final boolean capturedDisableSessionPersistence = b.disableSessionPersistence;
+        final boolean capturedPlanModeEnabled = b.planModeEnabled;
+        final boolean capturedPlanModeAllowShell = b.planModeAllowShell;
+        final String capturedPlanFileDir = b.planFileDir;
         final GenerateOptions capturedGenOpts = b.generateOptions;
+        // See buildGeneralPurposeFactory: propagate the parent's model/tool execution configs so
+        // declared subagents honor the parent's timeouts. Without this they fall back to
+        // ExecutionConfig defaults (e.g. the 5-minute tool timeout), ignoring a longer timeout
+        // configured on the main agent.
+        final ExecutionConfig capturedModelExec = b.modelExecutionConfig;
+        final ExecutionConfig capturedToolExec = b.toolExecutionConfig;
         // Snapshot of main agent's Local filesystem configuration. ISOLATED subagents get a
         // fresh spec carrying the same project / additionalRoots / mode so PathPolicy stays in
         // sync; without this, every isolated subagent would default to project=${user.dir} and
@@ -548,6 +633,7 @@ final class HarnessAgentBuilderSupport {
             HarnessAgent.Builder sub =
                     HarnessAgent.builder()
                             .name(decl.getName())
+                            .enablePendingToolRecovery(capturedPendingToolRecovery)
                             .description(decl.getDescription())
                             .model(effectiveModel)
                             .toolkit(
@@ -557,6 +643,7 @@ final class HarnessAgentBuilderSupport {
                             .defaultSessionId(childSessionId)
                             .maxIters(decl.getSteps())
                             .asLeafSubagent()
+                            .memory(capturedMemoryConfig)
                             .useLegacyXmlWorkspaceContext(capturedUseLegacyXmlWorkspaceContext)
                             .sysPrompt(buildSubagentSysPrompt(sysPromptBase));
 
@@ -581,10 +668,17 @@ final class HarnessAgentBuilderSupport {
                 sub.generateOptions(capturedGenOpts);
             }
 
+            var childTools = childToolsConfig(capturedToolsConfig, decl.getTools());
+            if (childTools != null) sub.toolsConfig(childTools);
+            capturedRoutes.forEach(sub::filesystemRoute);
             // 文件系统选择：SHARED 模式直接复用父级共享后端；
             // 其他模式克隆一份本地规格（保留白名单但工作空间独立）。
             if (decl.getWorkspaceMode() == WorkspaceMode.SHARED && capturedSharedBackend != null) {
                 sub.abstractFilesystem(capturedSharedBackend);
+            } else if (capturedSandboxSpec != null) {
+                sub.filesystem(capturedSandboxSpec);
+            } else if (capturedRemoteSpec != null) {
+                sub.filesystem(capturedRemoteSpec);
             } else if (decl.getWorkspaceMode() != WorkspaceMode.SHARED
                     && capturedLocalFilesystemSpec != null) {
                 sub.filesystem(cloneLocalSpecForSubagent(capturedLocalFilesystemSpec));
@@ -594,26 +688,65 @@ final class HarnessAgentBuilderSupport {
                 sub.stateStore(capturedStateStore);
             }
 
+            if (capturedModelExec != null) sub.modelExecutionConfig(capturedModelExec);
+            if (capturedToolExec != null) sub.toolExecutionConfig(capturedToolExec);
+
             if (capturedDisableFilesystemTools) sub.disableFilesystemTools();
             if (capturedDisableShellTool) sub.disableShellTool();
             if (capturedDisableMemoryTools) sub.disableMemoryTools();
             if (capturedDisableMemoryHooks) sub.disableMemoryHooks();
+            if (capturedWebHttpClient != null) sub.webHttpClient(capturedWebHttpClient);
             if (capturedDisableSessionPersistence) sub.disableSessionPersistence();
+            configurePlanMode(
+                    sub, capturedPlanModeEnabled, capturedPlanModeAllowShell, capturedPlanFileDir);
 
             if (!capturedSkillRepos.isEmpty()) sub.skillRepositories(capturedSkillRepos);
             if (capturedProjectGlobalSkillsDir != null) {
                 sub.projectGlobalSkillsDir(capturedProjectGlobalSkillsDir);
             }
 
+            if (capturedPermissions != null) sub.permissionContext(capturedPermissions);
+            if (capturedDisableDefaultSkills) sub.disableDefaultWorkspaceSkills();
+            if (capturedSkillFilter != null) sub.skillFilter(capturedSkillFilter);
             List<String> skillAllowlist = decl.getSkills();
             if (!skillAllowlist.isEmpty()) {
-                sub.skillFilter(SkillFilter.only(skillAllowlist.toArray(new String[0])));
+                sub.skillFilter(
+                        SkillFilter.only(
+                                skillAllowlist.stream()
+                                        .filter(
+                                                name ->
+                                                        capturedSkillFilter == null
+                                                                || capturedSkillFilter.isAllowed(
+                                                                        name))
+                                        .toArray(String[]::new)));
             }
 
             // L605: 物化子 agent 时注
             sub.middlewares(capturedMiddlewares);
             return sub.build();
         };
+    }
+
+    /**
+     * Propagates build-time plan-mode capabilities to an automatically constructed subagent.
+     *
+     * <p>Copying the parent's explicit middleware list is not sufficient: {@code
+     * PlanModeMiddleware} and {@code PlanModeManager} are installed dynamically by {@link
+     * HarnessAgent.Builder#build()}. The child must therefore receive the builder configuration
+     * before it is built; setting only {@code AgentState.planActive} later would expose the state
+     * without installing the write-operation guard.
+     */
+    private static void configurePlanMode(
+            HarnessAgent.Builder sub,
+            boolean planModeEnabled,
+            boolean planModeAllowShell,
+            String planFileDir) {
+        if (!planModeEnabled) {
+            return;
+        }
+        sub.enablePlanMode()
+                .planFileDirectory(planFileDir)
+                .allowShellInPlanMode(planModeAllowShell);
     }
 
     /**
@@ -647,7 +780,10 @@ final class HarnessAgentBuilderSupport {
     /** Returns a defensive copy of inherited parent tools filtered by the optional allowlist. */
     /** 返回父级工具集的保护性拷贝；若声明了工具白名单，则移除白名单之外的工具。 */
     static Toolkit allowlistedInheritedToolkit(Toolkit parentToolkit, List<String> allowlist) {
-        Toolkit toolkit = parentToolkit != null ? parentToolkit.copy() : new Toolkit();
+        Toolkit toolkit =
+                parentToolkit != null
+                        ? parentToolkit.copy()
+                        : HarnessAgent.Builder.newDefaultToolkit();
         if (allowlist == null || allowlist.isEmpty()) {
             return toolkit;
         }
@@ -883,22 +1019,49 @@ final class HarnessAgentBuilderSupport {
         if (b.taskRepository != null) {
             return b.taskRepository;
         }
+        if (b.distributedStore != null) {
+            TaskRepository distributed = b.distributedStore.taskRepository();
+            if (distributed != null) {
+                return distributed;
+            }
+        }
         Objects.requireNonNull(
                 wsManager,
                 "WorkspaceManager must be non-null when resolving the default TaskRepository;"
-                        + " HarnessAgent.build() always constructs one. Pass an explicit"
-                        + " .taskRepository(...) if you need a non-workspace-backed implementation.");
+                    + " HarnessAgent.build() always constructs one. Pass an explicit"
+                    + " .taskRepository(...) if you need a non-workspace-backed implementation.");
 
-//        Objects.requireNonNull(
-//                wsManager,
-//                "解析默认任务仓库时，工作空间管理器不可为空；HarnessAgent.build()方法会自动创建该实例。"
-//                        + "若需脱离工作空间的自定义实现，请手动调用.taskRepository(...)指定实例。");
+        //        Objects.requireNonNull(
+        //                wsManager,
+        //                "解析默认任务仓库时，工作空间管理器不可为空；HarnessAgent.build()方法会自动创建该实例。"
+        //                        + "若需脱离工作空间的自定义实现，请手动调用.taskRepository(...)指定实例。");
 
         String taskAgentId =
                 b.agentId != null && !b.agentId.isBlank()
                         ? b.agentId
                         : (b.name != null && !b.name.isBlank() ? b.name : "ReActAgent");
-        return new WorkspaceTaskRepository(wsManager, taskAgentId);
+        return new WorkspaceTaskRepository(wsManager, taskAgentId, resolvePeriodicGate(b));
+    }
+
+    /**
+     * Resolves a {@link PeriodicGate} for workspace-backed orphan sweeping: prefer the
+     * {@link DistributedStore}'s {@link BaseStore}, then a store attached to
+     * {@code RemoteFilesystemSpec}, otherwise a process-local gate.
+     */
+    private static PeriodicGate resolvePeriodicGate(HarnessAgent.Builder b) {
+        if (b.distributedStore != null) {
+            BaseStore store = b.distributedStore.baseStore();
+            if (store != null) {
+                return new StoreBackedPeriodicGate(store);
+            }
+        }
+        if (b.remoteFilesystemSpec != null) {
+            BaseStore store = b.remoteFilesystemSpec.store();
+            if (store != null) {
+                return new StoreBackedPeriodicGate(store);
+            }
+        }
+        return new LocalPeriodicGate();
     }
 
     // -----------------------------------------------------------------
@@ -912,10 +1075,7 @@ final class HarnessAgentBuilderSupport {
      * 组装本次构建使用的技能仓库有序列表（低优先级 → 高优先级，后者覆盖前者同名技能）。
      */
     static List<AgentSkillRepository> composeSkillRepositories(
-            HarnessAgent.Builder b,
-            WorkspaceManager wsManager,
-            AbstractFilesystem filesystem,
-            Supplier<RuntimeContext> currentRcSupplier) {
+            HarnessAgent.Builder b, WorkspaceManager wsManager, AbstractFilesystem filesystem) {
         List<AgentSkillRepository> ordered = new ArrayList<>();
 
         // Layer 1 (lowest priority): project-global skills directory.
@@ -958,55 +1118,9 @@ final class HarnessAgentBuilderSupport {
         if (filesystem != null && !b.disableDefaultWorkspaceSkills) {
             ordered.add(
                     new io.agentscope.harness.agent.skill.WorkspaceSkillRepository(
-                            filesystem,
-                            "skills",
-                            currentRcSupplier,
-                            "workspace-namespaced",
-                            false));
+                            filesystem, "skills", "workspace-namespaced", false));
         }
 
         return ordered;
-    }
-
-    /**
-     * Eagerly assembles a static {@link SkillBox} from {@code repos} (low-to-high priority) so
-     * callers using {@code disableDynamicSkills()} keep the legacy {@code SkillHook} path while
-     * still benefiting from the additive composition.
-     */
-    /**
-     * 从仓库列表（低优先级 → 高优先级）预先装配静态技能箱：
-     * 同名技能按顺序覆盖合并。供 {@code disableDynamicSkills()} 场景走旧版
-     * SkillHook 路径时仍享受多层叠加的组合能力。
-     */
-    static SkillBox staticSkillBoxFromRepos(
-            List<AgentSkillRepository> repos, Toolkit agentToolkit) {
-        LinkedHashMap<String, AgentSkill> merged = new LinkedHashMap<>();
-        for (AgentSkillRepository repo : repos) {
-            try {
-                List<AgentSkill> skills = repo.getAllSkills();
-                if (skills == null) {
-                    continue;
-                }
-                for (AgentSkill skill : skills) {
-                    if (skill != null && skill.getName() != null) {
-                        merged.put(skill.getName(), skill);
-                    }
-                }
-            } catch (Exception e) {
-                log.warn(
-                        "Failed to load skills from {}: {}",
-                        repo.getClass().getSimpleName(),
-                        e.getMessage());
-            }
-        }
-        if (merged.isEmpty()) {
-            return null;
-        }
-        SkillBox box = new SkillBox(agentToolkit);
-        for (AgentSkill skill : merged.values()) {
-            box.registerSkill(skill);
-        }
-        log.info("Loaded {} skills from {} repositories (static)", merged.size(), repos.size());
-        return box;
     }
 }

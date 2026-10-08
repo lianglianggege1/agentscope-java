@@ -91,6 +91,7 @@ public class SkillManageTool implements AgentTool {
     static final int MAX_SKILL_CONTENT_CHARS = 100_000;
     static final int MAX_SKILL_FILE_BYTES = 1_048_576; // 1 MiB
     static final Pattern VALID_NAME_RE = Pattern.compile("^[a-z0-9][a-z0-9._-]*$");
+
     /** 附属文件仅允许存放于这四个子目录。 */
     static final Set<String> ALLOWED_SUBDIRS =
             Set.of("references", "templates", "scripts", "assets");
@@ -290,23 +291,24 @@ public class SkillManageTool implements AgentTool {
         }
         switch (action) {
             case "create":
-                return doCreate(name, stringOf(input, "content"), sessionIdOf(ctx));
+                return doCreate(name, stringOf(input, "content"), sessionIdOf(ctx), ctx);
             case "edit":
-                return doEdit(name, stringOf(input, "content"));
+                return doEdit(name, stringOf(input, "content"), ctx);
             case "patch":
                 return doPatch(
                         name,
                         stringOf(input, "old_string"),
                         stringOf(input, "new_string"),
                         stringOf(input, "file_path"),
-                        boolOf(input, "replace_all"));
+                        boolOf(input, "replace_all"),
+                        ctx);
             case "write_file":
                 return doWriteFile(
-                        name, stringOf(input, "file_path"), stringOf(input, "file_content"));
+                        name, stringOf(input, "file_path"), stringOf(input, "file_content"), ctx);
             case "remove_file":
-                return doRemoveFile(name, stringOf(input, "file_path"));
+                return doRemoveFile(name, stringOf(input, "file_path"), ctx);
             case "delete":
-                return doDelete(name, stringOf(input, "absorbed_into"));
+                return doDelete(name, stringOf(input, "absorbed_into"), ctx);
             default:
                 return ToolResultBlock.error("Unknown action: " + action);
         }
@@ -336,7 +338,8 @@ public class SkillManageTool implements AgentTool {
      * 按 autoPromote 写入正式或草稿仓库 → 写入后安全扫描
      * （判定 DANGEROUS 时回滚归档）→ 记录遥测溯源 → 追加审计日志。
      */
-    private ToolResultBlock doCreate(String name, String content, String sessionId) {
+    private ToolResultBlock doCreate(
+            String name, String content, String sessionId, RuntimeContext ctx) {
         if (content == null || content.isBlank()) {
             return ToolResultBlock.error(
                     "Missing 'content' parameter (full SKILL.md including frontmatter).");
@@ -347,7 +350,7 @@ public class SkillManageTool implements AgentTool {
         }
         // Reject if a skill with this name already exists in either repo.
         // 任一仓库（正式/草稿）已存在同名技能则拒绝创建。
-        if (mainRepo.skillExists(name) || draftsRepo.skillExists(name)) {
+        if (mainRepo.skillExists(name, ctx) || draftsRepo.skillExists(name, ctx)) {
             return ToolResultBlock.error(
                     "A skill named '" + name + "' already exists. Use action=edit to update it.");
         }
@@ -376,7 +379,7 @@ public class SkillManageTool implements AgentTool {
         }
 
         WorkspaceSkillRepository target = config.autoPromote() ? mainRepo : draftsRepo;
-        boolean ok = target.save(List.of(skill), false);
+        boolean ok = target.save(List.of(skill), false, ctx);
         if (!ok) {
             return ToolResultBlock.error(
                     "Failed to write skill '" + name + "'. Check logs for details.");
@@ -388,7 +391,7 @@ public class SkillManageTool implements AgentTool {
                     SkillSecurityScanner.scan(name, content, skill.getResources());
             if (!SkillSecurityScanner.shouldAllow(
                     SkillSecurityScanner.TrustLevel.AGENT_CREATED, scan.verdict())) {
-                target.delete(name); // best-effort rollback (archives the bad draft)
+                target.delete(name, ctx); // best-effort rollback (archives the bad draft)
                 // 尽力而为的回滚（把有问题的草稿归档）
                 return ToolResultBlock.error(
                         "Security scan blocked this skill ("
@@ -438,7 +441,7 @@ public class SkillManageTool implements AgentTool {
      * 写入前暂存旧内容，安全扫描判定 DANGEROUS 时回滚到旧版本；
      * 成功后递增补丁版本号。
      */
-    private ToolResultBlock doEdit(String name, String content) {
+    private ToolResultBlock doEdit(String name, String content, RuntimeContext ctx) {
         if (content == null || content.isBlank()) {
             return ToolResultBlock.error("Missing 'content' parameter (full SKILL.md).");
         }
@@ -446,7 +449,7 @@ public class SkillManageTool implements AgentTool {
         if (contentErr != null) {
             return ToolResultBlock.error(contentErr);
         }
-        WorkspaceSkillRepository target = locate(name);
+        WorkspaceSkillRepository target = locate(name, ctx);
         if (target == null) {
             return ToolResultBlock.error("Skill '" + name + "' not found.");
         }
@@ -462,8 +465,8 @@ public class SkillManageTool implements AgentTool {
         }
         // Stash the previous SKILL.md so we can roll back on a DANGEROUS scan verdict.
         // 暂存旧版 SKILL.md，便于安全扫描判定 DANGEROUS 时回滚。
-        String previous = target.readSkillFile(name, "SKILL.md");
-        boolean ok = target.save(List.of(skill), true /* force = overwrite */);
+        String previous = target.readSkillFile(name, "SKILL.md", ctx);
+        boolean ok = target.save(List.of(skill), true /* force = overwrite */, ctx);
         if (!ok) {
             return ToolResultBlock.error("Failed to edit skill '" + name + "'.");
         }
@@ -473,7 +476,7 @@ public class SkillManageTool implements AgentTool {
             if (!SkillSecurityScanner.shouldAllow(
                     SkillSecurityScanner.TrustLevel.AGENT_CREATED, scan.verdict())) {
                 if (previous != null) {
-                    target.writeSkillFile(name, "SKILL.md", previous);
+                    target.writeSkillFile(name, "SKILL.md", previous, ctx);
                 }
                 return ToolResultBlock.error(
                         "Security scan blocked this edit ("
@@ -495,7 +498,12 @@ public class SkillManageTool implements AgentTool {
      * 写入后经安全扫描校验，失败则回滚。
      */
     private ToolResultBlock doPatch(
-            String name, String oldString, String newString, String filePath, boolean replaceAll) {
+            String name,
+            String oldString,
+            String newString,
+            String filePath,
+            boolean replaceAll,
+            RuntimeContext ctx) {
         if (oldString == null) {
             return ToolResultBlock.error("Missing 'old_string' for patch.");
         }
@@ -503,7 +511,7 @@ public class SkillManageTool implements AgentTool {
             return ToolResultBlock.error(
                     "Missing 'new_string' for patch (use empty string to delete matched text).");
         }
-        WorkspaceSkillRepository target = locate(name);
+        WorkspaceSkillRepository target = locate(name, ctx);
         if (target == null) {
             return ToolResultBlock.error("Skill '" + name + "' not found.");
         }
@@ -517,7 +525,7 @@ public class SkillManageTool implements AgentTool {
             }
             relPath = filePath;
         }
-        String existing = target.readSkillFile(name, relPath);
+        String existing = target.readSkillFile(name, relPath, ctx);
         if (existing == null) {
             return ToolResultBlock.error(
                     "File not found: " + relPath + " (in skill '" + name + "')");
@@ -575,7 +583,7 @@ public class SkillManageTool implements AgentTool {
             return ToolResultBlock.error(
                     "Patched content exceeds " + MAX_SKILL_CONTENT_CHARS + " chars.");
         }
-        boolean ok = target.writeSkillFile(name, relPath, updated);
+        boolean ok = target.writeSkillFile(name, relPath, updated, ctx);
         if (!ok) {
             return ToolResultBlock.error("Failed to write patched file.");
         }
@@ -584,7 +592,7 @@ public class SkillManageTool implements AgentTool {
                     SkillSecurityScanner.scanSingleFile(relPath, updated);
             if (!SkillSecurityScanner.shouldAllow(
                     SkillSecurityScanner.TrustLevel.AGENT_CREATED, scan.verdict())) {
-                target.writeSkillFile(name, relPath, existing); // rollback
+                target.writeSkillFile(name, relPath, existing, ctx); // rollback
                 return ToolResultBlock.error(
                         "Security scan blocked this patch ("
                                 + scan.verdict()
@@ -620,7 +628,8 @@ public class SkillManageTool implements AgentTool {
      * （仅限 references/templates/scripts/assets 四个子目录）。
      * 写入前暂存旧内容，安全扫描失败时恢复旧文件或删除新文件。
      */
-    private ToolResultBlock doWriteFile(String name, String filePath, String fileContent) {
+    private ToolResultBlock doWriteFile(
+            String name, String filePath, String fileContent, RuntimeContext ctx) {
         if (filePath == null || filePath.isBlank()) {
             return ToolResultBlock.error("Missing 'file_path' for write_file.");
         }
@@ -635,12 +644,12 @@ public class SkillManageTool implements AgentTool {
             return ToolResultBlock.error(
                     "file_content exceeds " + MAX_SKILL_FILE_BYTES + " bytes.");
         }
-        WorkspaceSkillRepository target = locate(name);
+        WorkspaceSkillRepository target = locate(name, ctx);
         if (target == null) {
             return ToolResultBlock.error("Skill '" + name + "' not found.");
         }
-        String previous = target.readSkillFile(name, filePath);
-        boolean ok = target.writeSkillFile(name, filePath, fileContent);
+        String previous = target.readSkillFile(name, filePath, ctx);
+        boolean ok = target.writeSkillFile(name, filePath, fileContent, ctx);
         if (!ok) {
             return ToolResultBlock.error("Failed to write " + filePath + ".");
         }
@@ -650,9 +659,9 @@ public class SkillManageTool implements AgentTool {
             if (!SkillSecurityScanner.shouldAllow(
                     SkillSecurityScanner.TrustLevel.AGENT_CREATED, scan.verdict())) {
                 if (previous != null) {
-                    target.writeSkillFile(name, filePath, previous);
+                    target.writeSkillFile(name, filePath, previous, ctx);
                 } else {
-                    target.deleteSkillFile(name, filePath);
+                    target.deleteSkillFile(name, filePath, ctx);
                 }
                 return ToolResultBlock.error(
                         "Security scan blocked write_file ("
@@ -666,7 +675,7 @@ public class SkillManageTool implements AgentTool {
     }
 
     /** {@code remove_file} 动作：删除技能的单个附属文件（路径须通过子目录校验）。 */
-    private ToolResultBlock doRemoveFile(String name, String filePath) {
+    private ToolResultBlock doRemoveFile(String name, String filePath, RuntimeContext ctx) {
         if (filePath == null || filePath.isBlank()) {
             return ToolResultBlock.error("Missing 'file_path' for remove_file.");
         }
@@ -674,11 +683,11 @@ public class SkillManageTool implements AgentTool {
         if (filePathErr != null) {
             return ToolResultBlock.error(filePathErr);
         }
-        WorkspaceSkillRepository target = locate(name);
+        WorkspaceSkillRepository target = locate(name, ctx);
         if (target == null) {
             return ToolResultBlock.error("Skill '" + name + "' not found.");
         }
-        boolean ok = target.deleteSkillFile(name, filePath);
+        boolean ok = target.deleteSkillFile(name, filePath, ctx);
         if (!ok) {
             return ToolResultBlock.error("Failed to remove " + filePath + ".");
         }
@@ -691,8 +700,8 @@ public class SkillManageTool implements AgentTool {
      * absorbed_into 非空时校验目标技能存在且不能是自身，
      * 供策展器后续区分"合并吸收"与"纯裁剪"；同时把遥测状态置为 ARCHIVED。
      */
-    private ToolResultBlock doDelete(String name, String absorbedInto) {
-        WorkspaceSkillRepository target = locate(name);
+    private ToolResultBlock doDelete(String name, String absorbedInto, RuntimeContext ctx) {
+        WorkspaceSkillRepository target = locate(name, ctx);
         if (target == null) {
             return ToolResultBlock.error("Skill '" + name + "' not found.");
         }
@@ -705,14 +714,14 @@ public class SkillManageTool implements AgentTool {
             if (trimmed.equals(name)) {
                 return ToolResultBlock.error("absorbed_into cannot equal the skill being deleted.");
             }
-            if (!mainRepo.skillExists(trimmed) && !draftsRepo.skillExists(trimmed)) {
+            if (!mainRepo.skillExists(trimmed, ctx) && !draftsRepo.skillExists(trimmed, ctx)) {
                 return ToolResultBlock.error(
                         "absorbed_into='"
                                 + trimmed
                                 + "' does not exist. Create or edit the umbrella skill first.");
             }
         }
-        boolean ok = target.delete(name);
+        boolean ok = target.delete(name, ctx);
         if (!ok) {
             return ToolResultBlock.error(
                     "Failed to archive skill '" + name + "'. Check logs for details.");
@@ -754,11 +763,11 @@ public class SkillManageTool implements AgentTool {
 
     /** Locate the repository that owns a skill by name; drafts win on collision. */
     /** 按名称定位技能所属仓库；同名冲突时草稿仓库优先。 */
-    private WorkspaceSkillRepository locate(String name) {
-        if (draftsRepo.skillExists(name)) {
+    private WorkspaceSkillRepository locate(String name, RuntimeContext ctx) {
+        if (draftsRepo.skillExists(name, ctx)) {
             return draftsRepo;
         }
-        if (mainRepo.skillExists(name)) {
+        if (mainRepo.skillExists(name, ctx)) {
             return mainRepo;
         }
         return null;
@@ -788,7 +797,8 @@ public class SkillManageTool implements AgentTool {
         }
         // Must look like frontmatter: starts with "---" on first line and contains closing "---".
         // 必须符合 frontmatter 形态：首行为 "---" 且包含闭合的 "---" 行。
-        String trimmed = content.stripLeading();
+        String trimmed = content.startsWith("\uFEFF") ? content.substring(1) : content;
+        trimmed = trimmed.stripLeading();
         if (!trimmed.startsWith("---")) {
             return "SKILL.md must start with '---' (YAML frontmatter).";
         }

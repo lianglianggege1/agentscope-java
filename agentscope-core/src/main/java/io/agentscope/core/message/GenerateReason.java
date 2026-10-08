@@ -76,11 +76,23 @@ public enum GenerateReason {
      */
     MIDDLEWARE_STOP_REQUESTED,
 
+    /**
+     * All tool calls were denied by the user and a hook requested the agent to stop.
+     *
+     * <p>Fired when every tool call from the most recent reasoning step was denied via HITL
+     * permission confirmation and an {@code AllToolsDeniedEvent} hook
+     * handler called {@code stopAgent()}.
+     */
+    ALL_TOOLS_DENIED,
+
     /** Agent was interrupted. */
     // 智能体被中断 类似claude code的 `esc` 指令
     INTERRUPTED,
 
     /** Maximum iterations reached. */
     // 最大迭代次数
-    MAX_ITERATIONS
+    MAX_ITERATIONS,
+
+    /** Tool result returned directly to the caller without a follow-up model call. */
+    TOOL_RETURN_DIRECT
 }

@@ -15,12 +15,19 @@
  */
 package io.agentscope.core.skill;
 
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
+ * Pure storage layer for {@link AgentSkill}s, keyed by skill id.
+ *
+ * <p>The skill activation state is not stored here: it is the per-session {@code activatedGroups}
+ * on {@link io.agentscope.core.state.ToolContextState}.
+ *
+ * <p>This is a pure storage layer: parameters are assumed non-null and validation is performed at
+ * the {@code Toolkit} layer.
  * Registry for managing skill registration and activation state.
  * 用于管理技能注册和激活状态的注册表。
  *
@@ -44,12 +51,14 @@ import java.util.concurrent.ConcurrentHashMap;
 class SkillRegistry {
     // 技能就存在线程安全的集合中
     private final Map<String, AgentSkill> skills = new ConcurrentHashMap<>();
-    // 已经注册的技能也存在线程安全的集合中
-    private final Map<String, RegisteredSkill> registeredSkills = new ConcurrentHashMap<>();
 
     // ==================== Registration ====================
 
     /**
+     * Registers a skill, replacing any existing skill with the same id.
+     *
+     * @param skillId The unique skill identifier (must not be null)
+     * @param skill The skill implementation (must not be null)
      * Registers a skill with its metadata.
      * 注册技能及其元数据。
      *
@@ -60,35 +69,8 @@ class SkillRegistry {
      * @param skill The skill implementation (must not be null) 技能实现（不能为空）
      * @param registered The registered skill wrapper containing metadata (must not be null) 已注册的技能包装器包含元数据（不能为空）
      */
-    void registerSkill(String skillId, AgentSkill skill, RegisteredSkill registered) {
+    void registerSkill(String skillId, AgentSkill skill) {
         skills.put(skillId, skill);
-        registeredSkills.put(skillId, registered);
-    }
-
-    // ==================== Activation Management ====================
-
-    /**
-     * Sets the activation state of a skill.
-     * 设置技能的激活状态。
-     *
-     * @param skillId The skill ID (must not be null) 技能 ID（不能为空）
-     * @param active Whether to activate the skill 是否激活该技能
-     */
-    void setSkillActive(String skillId, boolean active) {
-        RegisteredSkill registered = registeredSkills.get(skillId);
-        if (registered != null) {
-            registered.setActive(active);
-        }
-    }
-
-    /**
-     * Sets the activation state of all skills.
-     * 设置所有技能的激活状态。
-     *
-     * @param active Whether to activate all skills
-     */
-    void setAllSkillsActive(boolean active) {
-        registeredSkills.values().forEach(r -> r.setActive(active));
     }
 
     // ==================== Query Operations ====================
@@ -104,22 +86,12 @@ class SkillRegistry {
     }
 
     /**
-     * Gets a registered skill by ID.
-     *
-     * @param skillId The skill ID (must not be null)
-     * @return The registered skill, or null if not found
-     */
-    RegisteredSkill getRegisteredSkill(String skillId) {
-        return registeredSkills.get(skillId);
-    }
-
-    /**
      * Gets all skill IDs.
      *
      * @return Set of skill IDs (never null, may be empty)
      */
     Set<String> getSkillIds() {
-        return new HashSet<>(skills.keySet());
+        return new TreeSet<>(skills.keySet());
     }
 
     /**
@@ -132,15 +104,6 @@ class SkillRegistry {
         return skills.containsKey(skillId);
     }
 
-    /**
-     * Gets all registered skills.
-     *
-     * @return Map of skill IDs to registered skills (never null, may be empty)
-     */
-    Map<String, RegisteredSkill> getAllRegisteredSkills() {
-        return new ConcurrentHashMap<>(registeredSkills);
-    }
-
     // ==================== Removal Operations ====================
 
     /**
@@ -150,6 +113,5 @@ class SkillRegistry {
      */
     void removeSkill(String skillId) {
         skills.remove(skillId);
-        registeredSkills.remove(skillId);
     }
 }

@@ -21,6 +21,7 @@ import io.agentscope.core.tool.ToolParam;
 import io.agentscope.harness.agent.workspace.WorkspaceManager;
 import java.util.List;
 import java.util.StringJoiner;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,7 +51,7 @@ public class MemorySearchTool {
         this.workspaceManager = workspaceManager;
     }
 
-    /*
+    /* 中文译文（当前未启用，保留备查；旧签名不含 matchMode，已由英文描述取代）
     @Tool(
             name = "memory_search",
             readOnly = true,
@@ -62,6 +63,10 @@ public class MemorySearchTool {
             @ToolParam(name = "query", description = "在记忆文件中进行检索的关键词")
                     String query) {}
      */
+    public String memorySearch(RuntimeContext runtimeContext, String query) {
+        return memorySearch(runtimeContext, query, null);
+    }
+
     /**
      * {@code memory_search} 工具方法：在长期记忆文件中按关键词检索。
      * 校验查询词非空后委托 {@link #keywordSearch} 执行实际检索。
@@ -75,27 +80,52 @@ public class MemorySearchTool {
                             + " work, decisions, dates, people, preferences, or todos.")
     public String memorySearch(
             RuntimeContext runtimeContext,
-            @ToolParam(name = "query", description = "Keywords to search for in memory files")
-                    String query) {
+            @ToolParam(
+                            name = "query",
+                            description =
+                                    "Literal phrase, or whitespace-separated keywords when"
+                                            + " matchMode is all/any; no automatic Chinese word"
+                                            + " segmentation")
+                    String query,
+            @ToolParam(
+                            name = "matchMode",
+                            description =
+                                    "phrase (default): exact substring; all: every keyword in the"
+                                            + " same memory line; any: at least one keyword in that"
+                                            + " line. Case-insensitive literal matching.",
+                            required = false)
+                    String matchMode) {
         if (query == null || query.isBlank()) {
             return "No query provided";
         }
 
         RuntimeContext rc = runtimeContext != null ? runtimeContext : RuntimeContext.empty();
-        return keywordSearch(rc, query);
+        Predicate<String> matcher;
+        try {
+            matcher =
+                    KeywordMatcher.compile(
+                            query,
+                            matchMode,
+                            term ->
+                                    Pattern.compile(Pattern.quote(term), Pattern.CASE_INSENSITIVE)
+                                            .asPredicate());
+        } catch (IllegalArgumentException e) {
+            return "Error: " + e.getMessage();
+        }
+        return keywordSearch(rc, query, matcher);
     }
 
     /**
-     * 关键词检索核心实现：遍历所有记忆文件，逐行做大小写不敏感的
-     * 字面量子串匹配（{@link Pattern#quote} 转义避免正则注入），
+     * 关键词检索核心实现：遍历所有记忆文件，逐行交给 {@code matcher} 判定命中
+     *（由 {@link KeywordMatcher} 编译，支持 phrase/all/any 三种模式，大小写不敏感；
+     * 字面量匹配前经 {@link Pattern#quote} 转义，避免正则注入），
      * 命中行以 {@code "Source: 路径#行号: 内容"} 格式汇总返回。
      */
-    private String keywordSearch(RuntimeContext rc, String query) {
+    private String keywordSearch(RuntimeContext rc, String query, Predicate<String> matcher) {
         StringJoiner results = new StringJoiner("\n");
         int matchCount = 0;
 
         List<String> memoryPaths = workspaceManager.listMemoryFilePaths(rc);
-        Pattern pattern = Pattern.compile(Pattern.quote(query), Pattern.CASE_INSENSITIVE);
 
         for (String relativePath : memoryPaths) {
             String content = workspaceManager.readManagedWorkspaceFileUtf8(rc, relativePath);
@@ -104,7 +134,7 @@ public class MemorySearchTool {
             }
             String[] lines = content.split("\n", -1);
             for (int i = 0; i < lines.length; i++) {
-                if (pattern.matcher(lines[i]).find()) {
+                if (matcher.test(lines[i])) {
                     results.add(String.format("Source: %s#%d: %s", relativePath, i + 1, lines[i]));
                     matchCount++;
                 }

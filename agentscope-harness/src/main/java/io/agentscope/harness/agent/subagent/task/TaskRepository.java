@@ -41,6 +41,9 @@ import java.util.List;
  */
 public interface TaskRepository {
 
+    /** RuntimeContext flag for callers that retain execution ownership and collect results themselves. */
+    String SUPPRESS_COMPLETION_CALLBACK = "harness.suppressTaskCompletionCallback";
+
     /**
      * Retrieve a background task by session and task ID, or {@code null} if not found.
      *
@@ -88,26 +91,6 @@ public interface TaskRepository {
             String subAgentId,
             String sessionId,
             TaskRunSpec spec);
-
-    /**
-     * Remove a task from the repository.
-     *
-     * @param rc the current call's runtime context; may be {@link RuntimeContext#empty()}
-     * @param sessionId the parent session scope
-     * @param taskId unique task identifier
-     */
-    /**
-     * 从仓储中删除指定任务。
-     *
-     * @param rc 当前调用运行时上下文，可传入 {@link RuntimeContext#empty()}
-     * @param sessionId 父会话隔离标识
-     * @param taskId 任务唯一标识
-     */
-    void removeTask(RuntimeContext rc, String sessionId, String taskId);
-
-    /** Clear all tasks across all sessions. */
-    /** 清空全部会话下的所有任务。 */
-    void clear();
 
     /**
      * List all tracked tasks for the given session, optionally filtered by status.
@@ -198,5 +181,44 @@ public interface TaskRepository {
      */
     default boolean isDelivered(RuntimeContext rc, String sessionId, String taskId) {
         return false;
+    }
+
+    /**
+     * Registers a callback invoked when any task reaches a terminal state (COMPLETED or FAILED).
+     * Used by {@link io.agentscope.harness.agent.middleware.SubagentsMiddleware} to push results
+     * to the session inbox and enqueue a wakeup signal. The {@code result} argument is {@code null}
+     * for failed tasks.
+     *
+     * <p>Callers retaining execution ownership can set {@link #SUPPRESS_COMPLETION_CALLBACK}
+     * in their RuntimeContext to suppress inbox/wakeup callbacks while preserving durable results.
+     * Implementations supporting this callback should honor the flag.
+     * <p>Default is a no-op. Implementations that support push delivery should override.
+     */
+    default void setCompletionCallback(TaskCompletionCallback callback) {
+        // no-op
+    }
+
+    /** Shuts down background executors owned by this repository. Default is a no-op. */
+    default void shutdown() {
+        // no-op
+    }
+
+    /**
+     * Callback invoked when a background task reaches a terminal state (COMPLETED or FAILED).
+     * {@code result} is {@code null} when the task failed.
+     */
+    /**
+     * 后台任务抵达终态（完成/失败）时触发的回调接口。
+     * 实现类通常将任务结果推送至会话收件箱并加入唤醒信号。
+     * 任务失败时result参数为null；调用方需读取持久化的{@link TaskRecord}获取异常信息。
+     */
+    @FunctionalInterface
+    interface TaskCompletionCallback {
+        void onCompleted(
+                RuntimeContext rc,
+                String taskId,
+                String subAgentId,
+                String sessionId,
+                String result);
     }
 }

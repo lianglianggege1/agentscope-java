@@ -58,6 +58,7 @@ public final class StoreBackedSubagentRegistry implements SubagentRegistry {
 
     /** 记录存储命名空间：["subagents", "exposed"]。 */
     private static final List<String> NAMESPACE = List.of("subagents", "exposed");
+
     /** 按父会话撤销时扫描存储的分页大小。 */
     private static final int SCAN_PAGE_SIZE = 1000;
 

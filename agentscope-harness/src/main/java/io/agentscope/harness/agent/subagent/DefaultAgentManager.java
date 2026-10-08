@@ -76,6 +76,7 @@ public final class DefaultAgentManager {
         this.workspaceManager = workspaceManager;
     }
 
+    /** Replaces the current set of entries with a new snapshot. */
     /**
      * Replaces the current set of entries with a new snapshot. Called per-call from
      * {@link io.agentscope.harness.agent.middleware.SubagentsMiddleware} to reflect per-user subagent

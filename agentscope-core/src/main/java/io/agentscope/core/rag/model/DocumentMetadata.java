@@ -29,7 +29,7 @@ import java.util.Map;
  * (which can be text, image, video, etc.), document ID, chunk ID, and optional
  * custom payload fields.
  * 此类存储有关文档块的元数据，包括内容（可以是文本、图像、视频等）、文档ID、块ID和可选的自定义有效载荷字段。
- * 
+ *
  *
  * <p>The content field uses {@link ContentBlock} which is a sealed hierarchy
  * supporting different content types (TextBlock, ImageBlock, VideoBlock, etc.).
@@ -78,7 +78,7 @@ public class DocumentMetadata {
      * 提供此构造函数是为了向后兼容。
      * 对于新代码，如果需要添加自定义元数据字段，可以考虑使用带有payload参数的构造函数或构建器模式。
      *
-     * @param content the content block (text, image, video, etc.) 
+     * @param content the content block (text, image, video, etc.)
      * @param docId the document ID
      * @param chunkId the chunk ID within the document
      */
@@ -156,7 +156,7 @@ public class DocumentMetadata {
      * The map is never null but may be empty if no payload was provided.
      * 返回一个不可修改的元数据字段映射。这个映射包含业务特定的字段，如文件名、部门、作者、标签等。
      *
-     * @return an unmodifiable map of custom metadata fields (never null) 
+     * @return an unmodifiable map of custom metadata fields (never null)
      * 返回不可修改的元数据字段映射（从不为null）
      */
     public Map<String, Object> getPayload() {

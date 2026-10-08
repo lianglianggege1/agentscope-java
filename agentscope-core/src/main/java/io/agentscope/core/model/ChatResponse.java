@@ -26,7 +26,7 @@ import java.util.UUID;
  * <p>This immutable data class contains the response content, usage information,
  * and optional metadata returned by the model after processing a chat request.
  * 该不可变数据类包含模型在处理聊天请求后返回的响应内容、使用信息和可选元数据。
- * 
+ *
  */
 public class ChatResponse {
 

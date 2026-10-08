@@ -22,7 +22,7 @@ import java.util.Set;
 /**
  * Represents a named group of tools with activation state.
  * 表示一组具有激活状态的命名工具。
- * 
+ *
  *
  * <p>Tool groups allow organizing tools into logical categories and controlling their availability
  * dynamically. Only tools from active groups are made available to agents.

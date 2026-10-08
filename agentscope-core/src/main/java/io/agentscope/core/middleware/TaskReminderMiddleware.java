@@ -24,8 +24,10 @@ import io.agentscope.core.message.TextBlock;
 import io.agentscope.core.state.AgentState;
 import io.agentscope.core.state.Task;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -80,7 +82,8 @@ public class TaskReminderMiddleware implements MiddlewareBase {
             block as the source of truth for task status.\
             """;
 
-    /*private static final String GROUNDING =
+    /* 中文译文（当前未启用，保留备查）
+    private static final String GROUNDING =
             """
 
             ## 任务清单
@@ -89,6 +92,12 @@ public class TaskReminderMiddleware implements MiddlewareBase {
             并随着推进更新完整清单。当前任务清单（如有）会在每一轮思考前通过 `<system-reminder>` 区块展示给你，
             请以此区块内容作为任务状态的唯一可信依据。
             """;*/
+
+    /** Narrow declaration: subclasses overriding more hooks must extend this set. */
+    @Override
+    public Set<ExtensionPoint> activePoints() {
+        return EnumSet.of(ExtensionPoint.ON_SYSTEM_PROMPT, ExtensionPoint.ON_REASONING);
+    }
 
     @Override
     public Mono<String> onSystemPrompt(Agent agent, RuntimeContext ctx, String currentPrompt) {

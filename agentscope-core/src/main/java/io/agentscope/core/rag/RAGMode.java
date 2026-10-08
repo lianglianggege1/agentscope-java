@@ -18,7 +18,7 @@ package io.agentscope.core.rag;
 /**
  * RAG (Retrieval-Augmented Generation) mode enumeration.
  * RAG（检索增强生成）模式枚举。
- * 
+ *
  *
  * <p>Defines how knowledge retrieval is integrated with the agent:
  *    定义知识检索如何与代理集成：

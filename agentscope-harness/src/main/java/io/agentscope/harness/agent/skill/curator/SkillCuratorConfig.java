@@ -32,28 +32,21 @@ public final class SkillCuratorConfig {
         DISABLED,
         /** Run the LLM umbrella pass but never invoke skill_manage; emit a report only. */
         /** 执行大模型汇总扫描，但不会调用 skill_manage，仅生成报告。 */
-        DRY_RUN_ONLY,
-        /** Live LLM umbrella pass (consolidations + prunings actually applied). */
-        /** 正式运行大模型汇总扫描（会实际执行技能合并与清理操作）。 */
-        LIVE
+        DRY_RUN_ONLY
     }
 
     private final boolean enabled;
     private final int intervalHours;
-    private final int minIdleHours;
     private final int staleAfterDays;
     private final int archiveAfterDays;
     private final UmbrellaPassMode umbrellaPassMode;
-    private final int backupRetention;
 
     private SkillCuratorConfig(Builder b) {
         this.enabled = b.enabled;
         this.intervalHours = b.intervalHours;
-        this.minIdleHours = b.minIdleHours;
         this.staleAfterDays = b.staleAfterDays;
         this.archiveAfterDays = b.archiveAfterDays;
         this.umbrellaPassMode = b.umbrellaPassMode;
-        this.backupRetention = b.backupRetention;
     }
 
     public boolean enabled() {
@@ -62,10 +55,6 @@ public final class SkillCuratorConfig {
 
     public int intervalHours() {
         return intervalHours;
-    }
-
-    public int minIdleHours() {
-        return minIdleHours;
     }
 
     public int staleAfterDays() {
@@ -80,10 +69,6 @@ public final class SkillCuratorConfig {
         return umbrellaPassMode;
     }
 
-    public int backupRetention() {
-        return backupRetention;
-    }
-
     public static SkillCuratorConfig defaults() {
         return builder().build();
     }
@@ -95,11 +80,9 @@ public final class SkillCuratorConfig {
     public static final class Builder {
         private boolean enabled = true;
         private int intervalHours = 24 * 7; // 7 days
-        private int minIdleHours = 2;
         private int staleAfterDays = 30;
         private int archiveAfterDays = 90;
         private UmbrellaPassMode umbrellaPassMode = UmbrellaPassMode.DRY_RUN_ONLY;
-        private int backupRetention = 5;
 
         private Builder() {}
 
@@ -110,11 +93,6 @@ public final class SkillCuratorConfig {
 
         public Builder intervalHours(int v) {
             this.intervalHours = Math.max(1, v);
-            return this;
-        }
-
-        public Builder minIdleHours(int v) {
-            this.minIdleHours = Math.max(0, v);
             return this;
         }
 
@@ -130,11 +108,6 @@ public final class SkillCuratorConfig {
 
         public Builder umbrellaPassMode(UmbrellaPassMode mode) {
             this.umbrellaPassMode = mode != null ? mode : UmbrellaPassMode.DRY_RUN_ONLY;
-            return this;
-        }
-
-        public Builder backupRetention(int v) {
-            this.backupRetention = Math.max(0, v);
             return this;
         }
 

@@ -86,8 +86,37 @@ public class WakeupDispatcher implements AutoCloseable {
         /** 指定会话当前是否有执行在进行。 */
         boolean isSessionRunning(String sessionId);
 
+        /**
+         * Triggers a wakeup run without an owning user id.
+         *
+         * @param sessionId the session to wake up
+         * @return the agent's response, or {@link Mono#empty()} if the session is unknown
+         * @deprecated implementers should override {@link #runWakeup(String, String)} instead, so
+         *     the dispatcher can propagate the owning user id. Required for runtimes that isolate
+         *     agent state by {@code (userId, sessionId)}: without it, a wakeup-driven round loads
+         *     state from an anonymous slot and the original conversation is lost. This overload is
+         *     retained for backward compatibility and defaults to ignoring the user id.
+         */
+        @Deprecated
         /** 对空闲会话发起一次唤醒驱动的推理执行。 */
         Mono<Msg> runWakeup(String sessionId);
+
+        /**
+         * Triggers a wakeup run for an idle session, carrying the owning user id when present.
+         *
+         * <p>Called by {@link WakeupDispatcher} when a background task completes or a team message
+         * arrives. Implementations should set the user id on the agent runtime context when
+         * non-blank, so agent state is loaded from the same {@code (userId, sessionId)} slot as
+         * the original user-driven run.
+         *
+         * @param userId the owning user id carried by the wakeup entry; {@code null} or blank when
+         *     the producer had none (e.g. single-tenant runtimes)
+         * @param sessionId the session to wake up
+         * @return the agent's response, or {@link Mono#empty()} if the session is unknown
+         */
+        default Mono<Msg> runWakeup(String userId, String sessionId) {
+            return runWakeup(sessionId);
+        }
     }
 
     public WakeupDispatcher(MessageBus messageBus, WakeupTarget target) {
@@ -155,6 +184,7 @@ public class WakeupDispatcher implements AutoCloseable {
      * 否则异步触发 {@link WakeupTarget#runWakeup}。
      */
     private void dispatch(Map<String, Object> payload) {
+        String userId = getString(payload, "userId");
         String sessionId = getString(payload, "sessionId");
         String agentId = getString(payload, "agentId");
 
@@ -171,8 +201,12 @@ public class WakeupDispatcher implements AutoCloseable {
             return;
         }
 
-        log.info("WakeupDispatcher: waking idle session {}, agentId={}", sessionId, agentId);
-        target.runWakeup(sessionId)
+        log.info(
+                "WakeupDispatcher: waking idle session {}, userId={}, agentId={}",
+                sessionId,
+                userId,
+                agentId);
+        target.runWakeup(userId, sessionId)
                 .subscribe(
                         msg ->
                                 log.debug(

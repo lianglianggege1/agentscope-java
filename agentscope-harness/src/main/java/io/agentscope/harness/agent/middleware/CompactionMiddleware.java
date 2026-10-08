@@ -24,16 +24,21 @@ import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.middleware.ReasoningInput;
 import io.agentscope.core.model.Model;
 import io.agentscope.core.state.AgentState;
+import io.agentscope.core.util.ExceptionUtils;
 import io.agentscope.harness.agent.memory.MemoryFlushManager;
 import io.agentscope.harness.agent.memory.compaction.CompactionConfig;
 import io.agentscope.harness.agent.memory.compaction.ConversationCompactor;
 import io.agentscope.harness.agent.workspace.WorkspaceManager;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 /**
  * Middleware that performs conversation compaction before each LLM reasoning call.
@@ -95,6 +100,12 @@ public class CompactionMiddleware implements HarnessRuntimeMiddleware {
         this.config = config;
     }
 
+    /** Narrow declaration: subclasses overriding more hooks must extend this set. */
+    @Override
+    public Set<ExtensionPoint> activePoints() {
+        return EnumSet.of(ExtensionPoint.ON_REASONING);
+    }
+
     /**
      * 推理前压缩检查。用 Flux.defer 保证每次订阅都重新求值（读取最新输入消息）。
      * 流程：拆分系统消息与会话正文 → 解析有效配置 → 调 compactIfNeeded
@@ -141,8 +152,22 @@ public class CompactionMiddleware implements HarnessRuntimeMiddleware {
                             new ConversationCompactor(model, flushManager);
                     final Msg sys = systemMsg;
 
+                    // Only compaction may degrade; downstream reasoning errors must propagate.
+                    // 容错兜底：压缩失败（如摘要 LLM 调用出错）不阻断主流程，
+                    // 记录警告后按原始上下文继续推理；中断异常除外，需向上传播
                     return compactor
                             .compactIfNeeded(rc, conversation, effectiveConfig, agentId, sessionId)
+                            .onErrorResume(
+                                    error -> {
+                                        if (ExceptionUtils.containsInterruptedException(error)) {
+                                            return Mono.error(error);
+                                        }
+                                        log.warn(
+                                                "Compaction failed, continuing without compaction:"
+                                                        + " {}",
+                                                error.getMessage());
+                                        return Mono.just(Optional.empty());
+                                    })
                             .flatMapMany(
                                     optResult -> {
                                         if (optResult.isEmpty()) {
@@ -168,16 +193,6 @@ public class CompactionMiddleware implements HarnessRuntimeMiddleware {
                                                         newMessages,
                                                         input.tools(),
                                                         input.options()));
-                                    })
-                            .onErrorResume(
-                                    e -> {
-                                        // 容错兜底：压缩失败（如摘要 LLM 调用出错）不阻断主流程，
-                                        // 记录警告后按原始上下文继续推理
-                                        log.warn(
-                                                "Compaction failed, continuing without compaction:"
-                                                        + " {}",
-                                                e.getMessage());
-                                        return next.apply(input);
                                     });
                 });
     }

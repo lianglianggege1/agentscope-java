@@ -20,17 +20,20 @@ import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.middleware.AgentInput;
 import io.agentscope.harness.agent.IsolationScope;
+import io.agentscope.harness.agent.coordination.LocalPeriodicGate;
+import io.agentscope.harness.agent.coordination.PeriodicGate;
 import io.agentscope.harness.agent.filesystem.AbstractFilesystem;
 import io.agentscope.harness.agent.filesystem.model.FileInfo;
 import io.agentscope.harness.agent.filesystem.model.GlobResult;
+import io.agentscope.harness.agent.memory.MemoryBackgroundTasks;
 import io.agentscope.harness.agent.memory.MemoryConsolidator;
 import io.agentscope.harness.agent.workspace.WorkspaceConstants;
 import io.agentscope.harness.agent.workspace.WorkspaceManager;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,9 +44,10 @@ import reactor.core.scheduler.Schedulers;
 /**
  * Middleware that performs periodic memory maintenance after each agent call.
  *
- * <p>Fires on the agent invocation completion (via {@code onAgent concatWith}, after
+ * <p>Fires on the agent invocation completion (via {@code onAgent doOnComplete}, after
  * {@link MemoryFlushMiddleware}) and is throttled by a configurable minimum gap so it
- * does not run on every single call.
+ * does not run on every single call. The maintenance is <em>fire-and-forget</em>: the agent
+ * stream completes immediately while the maintenance runs on a background scheduler.
  *
  * <p>Maintenance steps executed in order:
  * <ol>
@@ -110,21 +114,7 @@ public class MemoryMaintenanceMiddleware implements HarnessRuntimeMiddleware {
     /** 隔离范围，决定限流窗口按用户、会话还是整个智能体实例划分。 */
     private final IsolationScope isolationScope;
 
-    /**
-     * Per-isolation-key maintenance timestamps. The key is derived from {@link #isolationScope}
-     * and the per-call {@link RuntimeContext} so the throttle window matches the memory data
-     * namespace (see {@link MemoryFlushMiddleware} for the identical pattern).
-     */
-    /**
-     * 按隔离键记录的上次维护执行时间戳。键由 {@link #isolationScope} 和每次调用的
-     * {@link RuntimeContext} 派生，因此限流窗口与记忆数据的命名空间保持一致
-     * （相同模式可参考 {@link MemoryFlushMiddleware}）。
-     *
-     * <p>使用 {@link AtomicReference} 包装是为了通过 CAS 操作保证并发调用时
-     * 只有一个线程能真正触发维护（见 {@link #maybeRunMaintenance}）。
-     */
-    private final ConcurrentHashMap<String, AtomicReference<Instant>> lastRunAtByKey =
-            new ConcurrentHashMap<>();
+    private final PeriodicGate periodicGate;
 
     /**
      * 构造维护中间件，隔离范围默认为 {@link IsolationScope#USER}（按用户限流）。
@@ -147,7 +137,8 @@ public class MemoryMaintenanceMiddleware implements HarnessRuntimeMiddleware {
                 dailyFileRetentionDays,
                 sessionRetentionDays,
                 minGap,
-                IsolationScope.USER);
+                IsolationScope.USER,
+                new LocalPeriodicGate());
     }
 
     /**
@@ -162,12 +153,31 @@ public class MemoryMaintenanceMiddleware implements HarnessRuntimeMiddleware {
             int sessionRetentionDays,
             Duration minGap,
             IsolationScope isolationScope) {
+        this(
+                workspaceManager,
+                consolidator,
+                dailyFileRetentionDays,
+                sessionRetentionDays,
+                minGap,
+                isolationScope,
+                new LocalPeriodicGate());
+    }
+
+    public MemoryMaintenanceMiddleware(
+            WorkspaceManager workspaceManager,
+            MemoryConsolidator consolidator,
+            int dailyFileRetentionDays,
+            int sessionRetentionDays,
+            Duration minGap,
+            IsolationScope isolationScope,
+            PeriodicGate periodicGate) {
         this.workspaceManager = workspaceManager;
         this.consolidator = consolidator;
         this.dailyFileRetentionDays = dailyFileRetentionDays;
         this.sessionRetentionDays = sessionRetentionDays;
         this.minGap = minGap != null ? minGap : DEFAULT_MIN_GAP;
         this.isolationScope = isolationScope != null ? isolationScope : IsolationScope.USER;
+        this.periodicGate = periodicGate != null ? periodicGate : new LocalPeriodicGate();
     }
 
     /**
@@ -179,14 +189,21 @@ public class MemoryMaintenanceMiddleware implements HarnessRuntimeMiddleware {
         this(workspaceManager, consolidator, 90, 180, DEFAULT_MIN_GAP);
     }
 
+    /** Narrow declaration: subclasses overriding more hooks must extend this set. */
+    @Override
+    public Set<ExtensionPoint> activePoints() {
+        return EnumSet.of(ExtensionPoint.ON_AGENT);
+    }
+
     /**
      * 中间件钩子：包裹智能体调用链。
      *
-     * <p>通过 {@code concatWith} 在智能体正常事件流（{@code next.apply(input)}）<b>结束后</b>
+     * <p>通过 {@code doOnComplete} 在智能体正常事件流（{@code next.apply(input)}）<b>结束后</b>
      * 追加一次维护动作，因此不影响智能体本身的输出事件顺序。维护逻辑：
      * <ul>
-     *   <li>订阅在 {@code boundedElastic} 调度器上执行，避免阻塞事件流线程；</li>
-     *   <li>{@code onErrorResume} 兜底，维护失败只记录警告日志，不会让智能体调用报错。</li>
+     *   <li>维护体（含限流抢占）在 {@code boundedElastic} 调度器上执行，避免阻塞事件流线程；
+     *       调度前先登记 {@link MemoryBackgroundTasks}，保证静默检查不会漏看在途任务。</li>
+     *   <li>订阅时兜底错误处理，维护失败只记录警告日志，不会让智能体调用报错。</li>
      * </ul>
      */
     @Override
@@ -196,58 +213,52 @@ public class MemoryMaintenanceMiddleware implements HarnessRuntimeMiddleware {
             AgentInput input,
             Function<AgentInput, Flux<AgentEvent>> next) {
         final RuntimeContext rc = ctx != null ? ctx : RuntimeContext.empty();
+        // The maintenance body — including the gate claim, which is remote I/O under a
+        // store-backed gate — runs on the background scheduler. Only the in-flight counter is
+        // updated synchronously, so a quiescence check can never observe an empty in-flight
+        // set before the task is counted.
         return next.apply(input)
-                .concatWith(
-                        Mono.<AgentEvent>fromRunnable(() -> maybeRunMaintenance(rc))
-                                .subscribeOn(Schedulers.boundedElastic())
-                                .onErrorResume(
-                                        e -> {
-                                            log.warn(
-                                                    "Memory maintenance failed: {}",
-                                                    e.getMessage());
-                                            return Mono.empty();
-                                        }));
+                .doOnComplete(
+                        () -> {
+                            MemoryBackgroundTasks.begin();
+                            Mono.defer(() -> doMaintenance(rc))
+                                    .subscribeOn(Schedulers.boundedElastic())
+                                    .doFinally(signal -> MemoryBackgroundTasks.end())
+                                    .subscribe(
+                                            null,
+                                            e ->
+                                                    log.warn(
+                                                            "Memory maintenance failed: {}",
+                                                            e.getMessage()));
+                        });
+    }
+
+    /** 限流判断 + 触发维护。 */
+    private Mono<Void> doMaintenance(RuntimeContext rc) {
+        // 距上次维护不足 minGap 或 CAS 抢占失败（已有其他线程触发维护），本次跳过
+        if (!periodicGate.tryClaim(compositeTimerKey(rc), minGap)) {
+            // Throttled out; the in-flight slot acquired at dispatch is released when this
+            // Mono completes.
+            return Mono.empty();
+        }
+        return Mono.fromRunnable(() -> runMaintenance(rc));
     }
 
     /**
-     * 限流判断 + 触发维护。
-     *
-     * <p>先检查距上次维护是否已满 {@link #minGap} 间隔；若未满直接返回。
-     * 随后用 CAS（{@code compareAndSet}）抢占更新时间戳：并发场景下多个调用同时到达时，
-     * 只有 CAS 成功的那个会继续执行维护，其余直接跳过，避免重复维护造成的文件竞争。
+     * Builds a composite key from {@link IsolationScope} name and the per-call identity returned
+     * by {@link #timerKeyFor(RuntimeContext)}. The operation prefix keeps maintenance independent
+     * of flush when both use the same {@link PeriodicGate}. The scope prefix keeps different
+     * isolation dimensions from sharing a slot.
      */
-    private void maybeRunMaintenance(RuntimeContext rc) {
-        Instant now = Instant.now();
-        AtomicReference<Instant> ref = lastRunAtFor(rc);
-        Instant last = ref.get();
-        // 距上次维护不足 minGap，本次跳过
-        if (Duration.between(last, now).compareTo(minGap) < 0) {
-            return;
-        }
-        // CAS 抢占失败说明已有其他线程触发维护，直接跳过
-        if (!ref.compareAndSet(last, now)) {
-            return;
-        }
-        try {
-            runMaintenance(rc);
-        } catch (Exception e) {
-            log.warn("Memory maintenance failed: {}", e.getMessage());
-        }
+    private String compositeTimerKey(RuntimeContext rc) {
+        return "memory-maintenance:" + isolationScope.name() + ":" + timerKeyFor(rc);
     }
 
     /**
-     * 获取（不存在则初始化）当前隔离键对应的限流时间戳引用。
-     * 初始值为 {@link Instant#EPOCH}，保证首次调用必然触发维护。
-     */
-    private AtomicReference<Instant> lastRunAtFor(RuntimeContext rc) {
-        return lastRunAtByKey.computeIfAbsent(
-                timerKeyFor(rc), k -> new AtomicReference<>(Instant.EPOCH));
-    }
-
-    /**
-     * Derives the timer map key from the configured {@link IsolationScope} and the per-call
-     * {@link RuntimeContext}, mirroring the memory data namespace. See
-     * {@link MemoryFlushMiddleware#timerKeyFor(RuntimeContext)} for the same logic.
+     * Derives the per-call identity portion of the composite timer key from the configured
+     * {@link IsolationScope} and the {@link RuntimeContext}, mirroring the memory data
+     * namespace. See {@link MemoryFlushMiddleware#timerKeyFor(RuntimeContext)} for the
+     * identical logic.
      */
     /**
      * 根据配置的 {@link IsolationScope} 和每次调用的 {@link RuntimeContext} 派生限流键，
@@ -259,14 +270,9 @@ public class MemoryMaintenanceMiddleware implements HarnessRuntimeMiddleware {
      */
     String timerKeyFor(RuntimeContext rc) {
         return switch (isolationScope) {
-            case USER -> {
-                String uid = rc != null ? rc.getUserId() : null;
-                yield (uid != null && !uid.isBlank()) ? uid : "";
-            }
-            case SESSION -> {
-                String sid = rc != null ? rc.getSessionId() : null;
-                yield (sid != null && !sid.isBlank()) ? sid : "";
-            }
+            case USER -> MemoryFlushMiddleware.blankToEmpty(rc != null ? rc.getUserId() : null);
+            case SESSION ->
+                    MemoryFlushMiddleware.blankToEmpty(rc != null ? rc.getSessionId() : null);
             case AGENT, GLOBAL -> "";
         };
     }

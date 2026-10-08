@@ -26,7 +26,6 @@ import io.agentscope.core.model.ChatUsage;
 import io.agentscope.core.state.State;
 import io.agentscope.core.util.JsonUtils;
 import io.agentscope.core.util.TypeUtils;
-
 import java.beans.Transient;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -85,6 +84,21 @@ public class Msg implements State {
     public static final String METADATA_CONFIRM_RESULTS = "agentscope_confirm_results";
 
     /**
+     * Metadata key storing the {@code replyId} of the {@code RequireUserConfirmEvent} that paused
+     * this assistant turn. Used to correlate the later {@code UserConfirmResultEvent}.
+     */
+    public static final String METADATA_CONFIRM_REQUEST_REPLY_ID =
+            "agentscope_confirm_request_reply_id";
+
+    /**
+     * Metadata key storing the {@code replyId} of the {@code RequireExternalExecutionEvent} that
+     * paused this assistant turn. Used to correlate the later
+     * {@code ExternalExecutionResultEvent}.
+     */
+    public static final String METADATA_EXTERNAL_EXECUTION_REQUEST_REPLY_ID =
+            "agentscope_external_execution_request_reply_id";
+
+    /**
      * Metadata key (boolean) marking a message as <em>synthetic</em>: framework-injected rather
      * than authored by the user, the model, or a tool. Synthetic messages (e.g. the per-turn todo
      * reminder produced by {@code TaskReminderMiddleware}) are appended transiently to the
@@ -104,38 +118,38 @@ public class Msg implements State {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.systemDefault());
 
     /*
-     {
-        "id": "message_id",
-          "name": "message_name",
-          "role": "user",
-          "content": [
-          {
-                "type": "text",
-                "text": "Hello, world!"
-            },
-            {
-              "type": "thinking",
-               ""
-               },
-               {
-    "type": "tool_use",
-    "id": "call_123",
-    "name": "get_weather",
-    "input": {
-        "city": "Beijing",
-        "unit": "celsius"
-    }
-},
+         {
+            "id": "message_id",
+              "name": "message_name",
+              "role": "user",
+              "content": [
+              {
+                    "type": "text",
+                    "text": "Hello, world!"
+                },
+                {
+                  "type": "thinking",
+                   ""
+                   },
+                   {
+        "type": "tool_use",
+        "id": "call_123",
+        "name": "get_weather",
+        "input": {
+            "city": "Beijing",
+            "unit": "celsius"
+        }
+    },
 
-          ],
-          "metadata": {
-             "key": "value",
-              ..........
-          },
-          "timestamp": "2023-07-05 12:34:56.789"
-     }
-     // 测试过程中一定要输出消息体json
-     */
+              ],
+              "metadata": {
+                 "key": "value",
+                  ..........
+              },
+              "timestamp": "2023-07-05 12:34:56.789"
+         }
+         // 测试过程中一定要输出消息体json
+         */
     // Message ID
     private final String id;
 
@@ -557,8 +571,7 @@ public class Msg implements State {
         }
         try {
             return JsonUtils.getJsonCodec()
-                    .convertValue(result, new TypeReference<Map<String, Object>>() {
-                    });
+                    .convertValue(result, new TypeReference<Map<String, Object>>() {});
         } catch (Exception e) {
             throw new IllegalArgumentException("Failed to convert structured output to Map.", e);
         }
@@ -596,6 +609,10 @@ public class Msg implements State {
      * if (usage != null) {
      *     System.out.println("Input tokens: " + usage.getInputTokens());
      *     System.out.println("Output tokens: " + usage.getOutputTokens());
+     *     System.out.println("Cached tokens: " + usage.getCachedTokens());
+     *     System.out.println("Cache creation tokens: " + usage.getCacheCreationTokens());
+     *     System.out.println("Reasoning tokens: " + usage.getReasoningTokens());
+     *     System.out.println("Tool-use prompt tokens: " + usage.getToolUsePromptTokens());
      *     System.out.println("Total tokens: " + usage.getTotalTokens());
      *     System.out.println("Time: " + usage.getTime() + "s");
      * }
@@ -623,6 +640,10 @@ public class Msg implements State {
                     ChatUsage.builder()
                             .inputTokens(toInt(map.get("inputTokens")))
                             .outputTokens(toInt(map.get("outputTokens")))
+                            .cachedTokens(toInt(map.get("cachedTokens")))
+                            .cacheCreationTokens(toInt(map.get("cacheCreationTokens")))
+                            .reasoningTokens(toInt(map.get("reasoningTokens")))
+                            .toolUsePromptTokens(toInt(map.get("toolUsePromptTokens")))
                             .time(toDouble(map.get("time")))
                             .build();
             metadata.put(MessageMetadataKeys.CHAT_USAGE, chatUsage);
@@ -656,6 +677,7 @@ public class Msg implements State {
      *   <li>{@link GenerateReason#ACTING_STOP_REQUESTED} - HITL stop in acting phase</li>
      *   <li>{@link GenerateReason#INTERRUPTED} - Agent was interrupted</li>
      *   <li>{@link GenerateReason#MAX_ITERATIONS} - Maximum iterations reached</li>
+     *   <li>{@link GenerateReason#TOOL_RETURN_DIRECT} - Tool result returned directly to the caller</li>
      * </ul>
      *
      * @return The generate reason, defaults to {@link GenerateReason#MODEL_STOP} if not set
@@ -715,6 +737,23 @@ public class Msg implements State {
                 this.role,
                 newContent,
                 this.metadata,
+                this.timestamp,
+                this.usage);
+    }
+
+    /**
+     * Returns a copy of this message with the given metadata.
+     *
+     * @param newMetadata the replacement metadata
+     * @return a new Msg with identical content but replaced metadata
+     */
+    public Msg withMetadata(Map<String, Object> newMetadata) {
+        return new Msg(
+                this.id,
+                this.name,
+                this.role,
+                this.content,
+                newMetadata,
                 this.timestamp,
                 this.usage);
     }
@@ -851,15 +890,6 @@ public class Msg implements State {
         }
 
         /**
-         * Sets the generate reason for this message.
-         *
-         * <p>The generate reason indicates why this message was generated by the agent,
-         * helping users understand the execution context and required follow-up actions.
-         *
-         * @param reason The generate reason
-         * @return This builder for chaining
-         */
-        /**
          * Sets the token usage information for this message.
          *
          * @param usage The ChatUsage containing token counts
@@ -870,6 +900,15 @@ public class Msg implements State {
             return this;
         }
 
+        /**
+         * Sets the generate reason for this message.
+         *
+         * <p>The generate reason indicates why this message was generated by the agent,
+         * helping users understand the execution context and required follow-up actions.
+         *
+         * @param reason The generate reason
+         * @return This builder for chaining
+         */
         public Builder generateReason(GenerateReason reason) {
             if (reason != null) {
                 if (this.metadata == null || this.metadata.isEmpty()) {

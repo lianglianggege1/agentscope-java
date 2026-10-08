@@ -21,18 +21,19 @@ import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.middleware.AgentInput;
 import io.agentscope.harness.agent.skill.curator.SkillCurator;
 import java.time.Instant;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
 /**
- * Schedules {@link SkillCurator} runs after the main {@code call()} completes. Behaves like
- * {@code MemoryMaintenanceMiddleware}: gates on idle-time + interval, runs on a single-thread
- * daemon executor so the agent loop is never blocked.
+ * Schedules {@link SkillCurator} runs after the main {@code call()} completes. Gates on the
+ * curator's interval + {@code PeriodicGate}, and runs on a single-thread daemon executor so the
+ * agent loop is never blocked.
  */
 /**
  * 在主 {@code call()} 完成后调度 {@link SkillCurator}（技能策展器）运行。
@@ -48,9 +49,6 @@ public class SkillCuratorMiddleware implements HarnessRuntimeMiddleware {
 
     /** 单线程守护调度执行器，后台运行策展任务，不阻塞智能体主循环。 */
     private final ScheduledExecutorService executor;
-
-    /** 记录最近一次调用结束的时间点，供空闲时长判断使用。 */
-    private final AtomicReference<Instant> lastCallEnded = new AtomicReference<>();
 
     /** 关闭标记，置位后不再接受新的后台策展任务。 */
     private volatile boolean shutdown = false;
@@ -69,6 +67,12 @@ public class SkillCuratorMiddleware implements HarnessRuntimeMiddleware {
                         });
     }
 
+    /** Narrow declaration: subclasses overriding more hooks must extend this set. */
+    @Override
+    public Set<ExtensionPoint> activePoints() {
+        return EnumSet.of(ExtensionPoint.ON_AGENT);
+    }
+
     /**
      * 中间件钩子：在智能体事件流完成时（doOnComplete）记录调用结束时间，
      * 并尝试触发一次策展运行。
@@ -79,18 +83,12 @@ public class SkillCuratorMiddleware implements HarnessRuntimeMiddleware {
             RuntimeContext ctx,
             AgentInput input,
             Function<AgentInput, Flux<AgentEvent>> next) {
-        return next.apply(input)
-                .doOnComplete(
-                        () -> {
-                            lastCallEnded.set(Instant.now());
-                            maybeRunCurator();
-                        });
+        return next.apply(input).doOnComplete(this::maybeRunCurator);
     }
 
     /**
-     * Called from the {@code onAgent} doOnComplete: if the gate accepts, dispatch a curator run
-     * to the daemon executor. {@code minIdleHours} == 0 makes this run effectively eagerly,
-     * matching plan-text default.
+     * Called from the {@code onAgent} doOnComplete: if the curator gate accepts, dispatch a run
+     * to the daemon executor.
      */
     /**
      * 由 {@code onAgent} 的 doOnComplete 调用：若触发门槛通过，则把一次策展运行

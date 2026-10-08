@@ -34,11 +34,13 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.harness.agent.filesystem.AbstractFilesystem;
 import io.agentscope.harness.agent.filesystem.OverlayFilesystem;
+import io.agentscope.harness.agent.filesystem.RoutedSandboxFilesystem;
 import io.agentscope.harness.agent.filesystem.model.FileInfo;
 import io.agentscope.harness.agent.filesystem.model.GlobResult;
 import io.agentscope.harness.agent.filesystem.model.ReadResult;
 import io.agentscope.harness.agent.filesystem.model.WriteResult;
 import io.agentscope.harness.agent.filesystem.remote.store.NamespaceFactory;
+import io.agentscope.harness.agent.filesystem.sandbox.SandboxBackedFilesystem;
 import io.agentscope.harness.agent.subagent.task.TaskRecord;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -137,8 +139,10 @@ public class WorkspaceManager implements AutoCloseable {
      * Keyed by workspace-relative path (e.g. {@code agents/X/tasks/Y.json},
      * {@code agents/X/sessions/sessions.json}, {@code memory/YYYY-MM-DD.md}).
      *
-     * <p>This is an in-process lock only. For cross-process (multi-node) deployments the Remote
-     * backend must additionally use server-side CAS / optimistic locking.
+     * <p>This is an in-process lock only. Workspace file RMW paths here are last-writer-wins
+     * across replicas — {@code WorkspaceManager} does not perform server-side CAS. True
+     * optimistic concurrency lives on {@code BaseStore#putIfVersion} and
+     * {@code AgentStateStore#saveIfVersion}, not on these path locks.
      */
     /**
      * 基于工作区相对路径的细粒度锁，用于避免并发读改写竞争问题。
@@ -406,16 +410,15 @@ public class WorkspaceManager implements AutoCloseable {
      * All writes go through the {@link AbstractFilesystem}.
      *
      * <p>A per-path {@link ReentrantLock} serialises concurrent callers so that the
-     * read→merge→write cycle is atomic within this process. For cross-process / multi-node
-     * deployments the {@link AbstractFilesystem} backend must additionally provide server-side
-     * concurrency control.
+     * read→merge→write cycle is atomic within this process. Across replicas the append is
+     * last-writer-wins; this method does not perform CAS.
      */
     public void appendUtf8WorkspaceRelative(
             RuntimeContext rc, String relativePath, String content) {
         if (relativePath == null || content == null) {
             return;
         }
-        String normalized = normalizeRelativePath(relativePath);
+        String normalized = requireSafeRelativePath(relativePath);
         if (normalized.isEmpty()) {
             return;
         }
@@ -485,6 +488,24 @@ public class WorkspaceManager implements AutoCloseable {
     }
 
     // ==================== Task record methods ====================
+
+    /**
+     * {@code true} when the filesystem layer serving task-record paths is the per-call sandbox
+     * proxy. Task records are cross-call orchestration metadata: the heartbeat and orphan
+     * sweeper of {@code WorkspaceTaskRepository} maintain them from scheduler threads that run
+     * outside any agent call, where {@code SandboxBackedFilesystem} holds no live sandbox and
+     * every operation throws. In that case task-record IO is routed to the host workspace
+     * directly — the same location used when no filesystem layer is configured — so task
+     * liveness bookkeeping keeps working between calls. Explicit prefix routes (e.g. a
+     * persistent store mounted for {@code agents/}) are respected and still take over.
+     */
+    private boolean taskRecordsRouteToLiveSandbox(String relPath) {
+        AbstractFilesystem fs = this.filesystem;
+        if (fs instanceof RoutedSandboxFilesystem routed) {
+            fs = routed.backendFor(relPath);
+        }
+        return fs instanceof SandboxBackedFilesystem;
+    }
 
     /**
      * Upserts a {@link TaskRecord} in {@code agents/<agentId>/tasks/<sessionId>.json}.
@@ -608,7 +629,7 @@ public class WorkspaceManager implements AutoCloseable {
         // workspace-relative path → Optional<Instant> last-modified (empty = mtime unknown)
         Map<String, Optional<Instant>> relPaths = new LinkedHashMap<>();
 
-        if (filesystem != null) {
+        if (filesystem != null && !taskRecordsRouteToLiveSandbox(tasksRelDir)) {
             GlobResult glob = filesystem.glob(rc, "*.json", tasksRelDir);
             if (glob.isSuccess() && glob.matches() != null) {
                 for (FileInfo fi : glob.matches()) {
@@ -670,59 +691,13 @@ public class WorkspaceManager implements AutoCloseable {
         }
     }
 
-    /**
-     * Reads the timestamp written by the most recent successful orphan-sweep for this agent, or
-     * {@link Optional#empty()} if no sweep has been recorded yet.
-     *
-     * <p>Stored in {@code agents/<agentId>/tasks/_sweep.marker} as a plain ISO-8601 string. Any
-     * node can write to this path, so it naturally propagates through the shared filesystem layer.
-     */
-    /**
-     * 读取当前智能体最近一次成功执行孤立任务清理操作的时间戳；若无清理记录，则返回 {@link Optional#empty()}。
-     *
-     * <p>该时间戳以标准ISO-8601字符串格式存储于路径 {@code agents/<agentId>/tasks/_sweep.marker}。
-     * 任意节点均可写入该文件，标记信息可依托共享文件系统层自动同步至各节点。
-     */
-    public Optional<Instant> readSweepMarker(RuntimeContext rc, String agentId) {
-        if (agentId == null || agentId.isBlank()) {
-            return Optional.empty();
-        }
-        String rel = sweepMarkerPath(agentId);
-        String content = readWritableWorkspaceRelativeUtf8(rc, rel);
-        return Optional.ofNullable(parseInstantQuiet(content == null ? null : content.strip()));
-    }
-
-    /**
-     * Records the current timestamp as the completion time of the most recent orphan-sweep for
-     * this agent. Subsequent nodes that read this marker within the sweep interval will skip their
-     * own sweep, reducing redundant workspace I/O in multi-node deployments.
-     */
-    /**
-     * 将当前时间戳记录为当前智能体最近一次孤立任务清理操作的完成时间。
-     * 其他节点若在清理周期内读取到该标记，会跳过自身的清理流程，减少多节点部署场景下重复的工作区IO操作。
-     */
-    public void writeSweepMarker(RuntimeContext rc, String agentId) {
-        if (agentId == null || agentId.isBlank()) {
-            return;
-        }
-        String rel = sweepMarkerPath(agentId);
-        try {
-            writeUtf8WorkspaceRelative(rc, rel, Instant.now().toString());
-        } catch (Exception e) {
-            log.warn("Failed to write sweep marker for agent {}: {}", agentId, e.getMessage());
-        }
-    }
-
-    private String sweepMarkerPath(String agentId) {
-        return AGENTS_DIR + "/" + agentId + "/" + TASKS_DIR + "/_sweep.marker";
-    }
-
     private String taskRecordPath(String agentId, String sessionId) {
         return AGENTS_DIR + "/" + agentId + "/" + TASKS_DIR + "/" + sessionId + ".json";
     }
 
     /**
-     * Acquires the per-file lock before delegating to {@link #readTaskMap(String)}, so that reads
+     * Acquires the per-file lock before delegating to {@link #readTaskMap(RuntimeContext, String)},
+     * so that reads
      * are mutually exclusive with the read-modify-write cycle in {@link #writeTaskRecord}. This
      * prevents a concurrent writer's non-atomic file update (truncate → write) from being observed
      * as a partial JSON read.
@@ -751,7 +726,12 @@ public class WorkspaceManager implements AutoCloseable {
     }
 
     private Map<String, TaskRecord> readTaskMap(RuntimeContext rc, String rel) throws IOException {
-        String json = readWritableWorkspaceRelativeUtf8(rc, rel);
+        String json =
+                taskRecordsRouteToLiveSandbox(rel)
+                        // Same normalization/validation as the non-routed branch, so a poisoned
+                        // sessionId cannot read outside the workspace via the host-disk path.
+                        ? readFileQuietly(workspace.resolve(requireSafeRelativePath(rel)))
+                        : readWritableWorkspaceRelativeUtf8(rc, rel);
         if (json == null || json.isBlank()) {
             return new LinkedHashMap<>();
         }
@@ -763,6 +743,10 @@ public class WorkspaceManager implements AutoCloseable {
         try {
             String serialized =
                     TASK_RECORD_JSON.writerWithDefaultPrettyPrinter().writeValueAsString(map);
+            if (taskRecordsRouteToLiveSandbox(rel)) {
+                writeLocalFile(rel, serialized);
+                return;
+            }
             writeUtf8WorkspaceRelative(rc, rel, serialized);
         } catch (IOException e) {
             log.warn("Failed to write task record store {}: {}", rel, e.getMessage());
@@ -795,7 +779,7 @@ public class WorkspaceManager implements AutoCloseable {
     }
 
     private String readWritableWorkspaceRelativeUtf8(RuntimeContext rc, String relativePath) {
-        String normalized = normalizeRelativePath(relativePath);
+        String normalized = requireSafeRelativePath(relativePath);
         if (normalized.isEmpty()) {
             return "";
         }
@@ -808,7 +792,7 @@ public class WorkspaceManager implements AutoCloseable {
         if (relativePath == null || content == null) {
             return;
         }
-        String normalized = normalizeRelativePath(relativePath);
+        String normalized = requireSafeRelativePath(relativePath);
         if (normalized.isEmpty()) {
             return;
         }
@@ -875,7 +859,7 @@ public class WorkspaceManager implements AutoCloseable {
         if (relativePath == null || content == null) {
             return;
         }
-        String normalized = normalizeRelativePath(relativePath);
+        String normalized = requireSafeRelativePath(relativePath);
         if (normalized.isEmpty()) {
             return;
         }
@@ -906,8 +890,8 @@ public class WorkspaceManager implements AutoCloseable {
         if (fromRelative == null || toRelative == null || filesystem == null) {
             return false;
         }
-        String src = normalizeRelativePath(fromRelative);
-        String dst = normalizeRelativePath(toRelative);
+        String src = requireSafeRelativePath(fromRelative);
+        String dst = requireSafeRelativePath(toRelative);
         if (src.isEmpty() || dst.isEmpty()) {
             return false;
         }
@@ -1044,6 +1028,14 @@ public class WorkspaceManager implements AutoCloseable {
             s = s.substring(1);
         }
         return s;
+    }
+
+    private static String requireSafeRelativePath(String relativePath) {
+        String normalized = normalizeRelativePath(relativePath);
+        if (!normalized.isEmpty()) {
+            AbstractFilesystem.validatePath(normalized);
+        }
+        return normalized;
     }
 
     /**

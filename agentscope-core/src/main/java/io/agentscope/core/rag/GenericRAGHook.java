@@ -19,6 +19,7 @@ import io.agentscope.core.hook.Hook;
 import io.agentscope.core.hook.HookEvent;
 import io.agentscope.core.hook.PreCallEvent;
 import io.agentscope.core.hook.PreReasoningEvent;
+import io.agentscope.core.message.ContentBlock;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.TextBlock;
@@ -207,50 +208,29 @@ public class GenericRAGHook implements Hook {
         return "";
     }
 
-    /**
-     * Creates enhanced message list with knowledge context injected.
-     * 创建带有知识上下文注入的增强消息列表。
-     *
-     * <p>The knowledge is injected as a system message at the beginning of the message list.
-     * 知识作为系统消息注入到消息列表的开头。
-     *
-     * @param retrievedDocs the retrieved documents
-     * @return the enhanced message list with knowledge context
-     */
+    /** Creates a user message that preserves retrieved text and multimodal content. */
     private Msg createEnhancedMessages(List<Document> retrievedDocs) {
-        String knowledgeContent = buildKnowledgeContent(retrievedDocs);
-
-        return Msg.builder()
-                .name("user")
-                .role(MsgRole.USER)
-                .content(TextBlock.builder().text(knowledgeContent).build())
-                .build();
-    }
-
-    /**
-     * Builds knowledge content string from retrieved documents.
-     * 构建从检索的文档中生成的知识内容字符串。
-     *
-     * <p>Formats documents with scores and content for inclusion in the prompt.
-     * 格式化文档以供提示包含
-     *
-     * @param documents the retrieved documents
-     * @return the formatted knowledge content string
-     */
-    private String buildKnowledgeContent(List<Document> documents) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(
-                "<retrieved_knowledge>Use the following content from the knowledge base(s) if it is"
-                        + " helpful:\n\n");
-        for (Document doc : documents) {
-            sb.append("- Score: ")
-                    .append(String.format("%.3f", doc.getScore() != null ? doc.getScore() : 0.0))
-                    .append(", ");
-            sb.append("Content: ").append(doc.getMetadata().getContentText()).append("\n");
+        List<ContentBlock> content = new ArrayList<>();
+        content.add(
+                TextBlock.builder()
+                        .text(
+                                "<retrieved_knowledge>Use the following content from the knowledge"
+                                        + " base(s) if it is helpful:\n\n")
+                        .build());
+        for (Document doc : retrievedDocs) {
+            content.add(
+                    TextBlock.builder()
+                            .text(
+                                    "- Score: "
+                                            + String.format(
+                                                    "%.3f",
+                                                    doc.getScore() != null ? doc.getScore() : 0.0)
+                                            + ", Content: ")
+                            .build());
+            content.add(doc.getMetadata().getContent());
         }
-        sb.append("</retrieved_knowledge>");
-
-        return sb.toString();
+        content.add(TextBlock.builder().text("\n</retrieved_knowledge>").build());
+        return Msg.builder().name("user").role(MsgRole.USER).content(content).build();
     }
 
     /**

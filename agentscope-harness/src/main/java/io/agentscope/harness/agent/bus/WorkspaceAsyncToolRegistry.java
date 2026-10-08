@@ -52,11 +52,13 @@ import reactor.core.publisher.Mono;
 public class WorkspaceAsyncToolRegistry implements AsyncToolRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceAsyncToolRegistry.class);
+
     /** 文件系统操作使用的空 RuntimeContext（注册器操作不依赖调用上下文）。 */
     private static final RuntimeContext RC = RuntimeContext.empty();
 
     /** 底层文件系统抽象（本地/远端/沙箱均可）。 */
     private final AbstractFilesystem fs;
+
     /** 注册表根目录（末尾斜杠已在构造时去除）。 */
     private final String registryRoot;
 

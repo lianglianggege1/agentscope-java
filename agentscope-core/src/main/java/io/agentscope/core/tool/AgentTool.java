@@ -103,6 +103,35 @@ public interface AgentTool {
     }
 
     /**
+     * Returns whether this tool performs only read operations and never mutates state.
+     *
+     * <p>Read-only tools are automatically permitted in restricted execution modes such as
+     * Plan Mode, where write operations require explicit approval.
+     *
+     * @return {@code true} if the tool is read-only; {@code false} by default
+     */
+    default boolean isReadOnly() {
+        return false;
+    }
+
+    /**
+     * Whether this tool's result should be returned directly to the caller,
+     * skipping the next reasoning iteration. Defaults to {@code false}.
+     *
+     * <p>The flag applies wherever the tool's successful result is produced: framework-executed
+     * tools and results supplied by the caller when resuming after {@code TOOL_SUSPENDED}
+     * (e.g. {@code externalTool = true} tools). A batch resolved across multiple resumes, or
+     * mixing externally supplied and framework-executed results, is always fed back to the
+     * model.
+     *
+     * <p>Since the successful result becomes the turn's final answer, ensure it always
+     * produces presentable content blocks — never an empty output list.
+     */
+    default boolean isReturnDirect() {
+        return false;
+    }
+
+    /**
      * Execute the tool with the given parameters (asynchronous).
      * 执行工具（异步）。
      *
